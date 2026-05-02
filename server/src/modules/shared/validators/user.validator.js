@@ -1,4 +1,7 @@
 import zod from 'zod'
+import { BUSINESS_CATEGORIES } from '../constants/businessCategories.js'
+
+const businessCategoryEnum = zod.enum(BUSINESS_CATEGORIES)
 
 export const registerSchema = zod.object({
     body: zod.object({
@@ -12,7 +15,7 @@ export const registerSchema = zod.object({
         businessDescription: zod.string().optional(),
         businessAddress: zod.string().optional(),
         businessContact: zod.string().optional(),
-        businessCategory: zod.string().optional(),
+        businessCategory: businessCategoryEnum.optional(),
     }).refine((data) => data.password === data.confirmPassword, {
         message: 'Passwords do not match',
         path: ['confirmPassword']

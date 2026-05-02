@@ -31,8 +31,8 @@ const Login = () => {
   const onSubmit = async (data) => {
     try {
       const response = await login(data)
-      console.log(response.data.properties)
-      const destin_url = roleBasedRoute(response.data?.properties?.role)
+      const role = response.data?.properties?.user?.role
+      const destin_url = roleBasedRoute(role)
       navigate(`/${destin_url}`)
       showSuccessToast('Welcome back! You are now signed in.')
     } catch (error) {

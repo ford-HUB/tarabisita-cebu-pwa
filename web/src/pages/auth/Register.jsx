@@ -6,6 +6,7 @@ import { registerSchema } from '../../shared/validators/auth.validator'
 import { useAuthStore } from '../../stores/auth/auth.store'
 import { showErrorToast, showSuccessToast } from '../../shared/ui/toast.util'
 import { useNavigate } from 'react-router-dom'
+import { BUSINESS_CATEGORIES } from '../../shared/constants/businessCategories.constants'
 
 const Register = () => {
   const navigate = useNavigate()
@@ -323,13 +324,18 @@ const Register = () => {
                   >
                     Business Category
                   </label>
-                  <input
+                  <select
                     className={inputClassName}
                     id="businessCategory"
-                    placeholder="Restaurant, Tours, Hotel..."
-                    type="text"
                     {...register('businessCategory')}
-                  />
+                  >
+                    <option value="">Select a category</option>
+                    {BUSINESS_CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
                   {errors.businessCategory && (
                     <p className={errorTextClassName}>{errors.businessCategory.message}</p>
                   )}

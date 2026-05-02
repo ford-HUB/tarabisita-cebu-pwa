@@ -24,6 +24,8 @@ const writeVerificationExpiryCache = (cache) => {
 export const useAuthStore = create((set) => ({
   user: null,
   isAuthenticated: false,
+  isCheckingAuth: false,
+  hasCheckedAuth: false,
 
   register: async (data) => {
     try {
@@ -39,7 +41,22 @@ export const useAuthStore = create((set) => ({
   login: async (data) => {
     try {
       const response = await loginUser(data)
-      set({ user: response.data, isAuthenticated: true })
+      const loginUserPayload = response.data?.properties?.user || null
+      set({
+        user: loginUserPayload,
+        isAuthenticated: true,
+        hasCheckedAuth: true
+      })
+
+      try {
+        const checkUserResponse = await checkUser()
+        if (checkUserResponse?.data?.user) {
+          set({ user: checkUserResponse.data.user, isAuthenticated: true, hasCheckedAuth: true })
+        }
+      } catch (checkUserError) {
+        console.error('Failed to hydrate user profile after login', checkUserError)
+      }
+
       return response
     } catch (error) {
       console.error(error)
@@ -50,7 +67,7 @@ export const useAuthStore = create((set) => ({
   logout: async () => {
     try {
         await logoutUser()
-        set({ user: null, isAuthenticated: false })
+        set({ user: null, isAuthenticated: false, hasCheckedAuth: true })
     } catch (error) {
         console.error(error)
         throw error
@@ -119,11 +136,23 @@ export const useAuthStore = create((set) => ({
 
   checkUser: async () => {
     try {
+        set({ isCheckingAuth: true })
         const response = await checkUser()
-        set({ user: response.data.user, isAuthenticated: true })
+        set({
+          user: response.data.user,
+          isAuthenticated: true,
+          isCheckingAuth: false,
+          hasCheckedAuth: true
+        })
+        return response
     } catch (error) {
-        console.error(error)
-        throw error
+        set({
+          user: null,
+          isAuthenticated: false,
+          isCheckingAuth: false,
+          hasCheckedAuth: true
+        })
+        return null
     }
   },
 
@@ -155,4 +184,10 @@ export const useAuthStore = create((set) => ({
     delete currentCache[sessionToken]
     writeVerificationExpiryCache(currentCache)
   },
+
+  setUser: (nextUser) => {
+    set((state) => ({
+      user: { ...(state.user || {}), ...nextUser }
+    }))
+  }
 }))

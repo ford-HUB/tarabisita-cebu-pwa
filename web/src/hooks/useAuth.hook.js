@@ -3,17 +3,22 @@ import { useAuthStore } from "../stores/auth/auth.store";
 
 export const useAuth = () => {
     const checkUser = useAuthStore((state) => state.checkUser)
+    const setUser = useAuthStore((state) => state.setUser)
     const user = useAuthStore((state) => state.user)
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+    const isCheckingAuth = useAuthStore((state) => state.isCheckingAuth)
+    const hasCheckedAuth = useAuthStore((state) => state.hasCheckedAuth)
 
     useEffect(() => {
-        if (!user && !isAuthenticated) {
+        if (!hasCheckedAuth && !isCheckingAuth) {
             checkUser()
         }
-    }, [user, isAuthenticated])
+    }, [hasCheckedAuth, isCheckingAuth])
 
     return {
         user,
-        isAuthenticated
+        isAuthenticated,
+        isAuthLoading: !hasCheckedAuth || isCheckingAuth,
+        setUser
     }
 }

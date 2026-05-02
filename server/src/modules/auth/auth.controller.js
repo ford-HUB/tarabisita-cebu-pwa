@@ -1,15 +1,58 @@
 import mongoose from 'mongoose'
 import bcrypt from 'bcrypt'
-import User from "../user/User.model.js";
+import User from "./User.model.js";
 import Role from "./Role.model.js";
 import { generateAccessToken } from "../shared/utils/generateJwt.js";
 import { generateToken, generateResetToken, generateSessionToken } from "../shared/utils/generateToken.js";
 import { templateReader } from '../shared/utils/templateReaderExtractor.js';
 import { sendMailer } from './auth.service.js';
 import VerificationCode from './VerificationCode.model.js';
-import ResetPassword from './ResetPassword.model.js';
+import ResetPasswordModel from './ResetPassword.model.js';
 import Business from '../business/Business.model.js';
 import Category from '../business/Category.model.js';
+import ActivityLog from '../ActivityLog.model.js';
+import { BUSINESS_CATEGORY_LABELS } from '../shared/constants/businessCategories.js';
+
+// Backward-compatible alias for any lingering ResetPassword references.
+const ResetPassword = ResetPasswordModel
+
+const extractRequestMeta = (req) => {
+    const forwardedFor = req.headers['x-forwarded-for']
+    const ipAddress = Array.isArray(forwardedFor)
+        ? forwardedFor[0]
+        : String(forwardedFor || req.ip || '').split(',')[0].trim()
+    const userAgent = String(req.headers['user-agent'] || '')
+    const device = /mobile|android|iphone|ipad/i.test(userAgent) ? 'MOBILE' : 'WEB_DESKTOP'
+    return { ipAddress, userAgent, device }
+}
+
+const createBusinessAuthActivityLog = async ({ req, user, action, status = 'SUCCESS', description, failureReason = '' }) => {
+    if (!user || user?.roleId?.name !== 'BUSINESS') return
+
+    const business = await Business.findOne({ userId: user._id }).select('_id')
+    if (!business) return
+
+    const { ipAddress, userAgent, device } = extractRequestMeta(req)
+
+    await ActivityLog.create({
+        actorUserId: user._id,
+        actorRole: 'BUSINESS',
+        scopeType: 'BUSINESS',
+        scopeId: business._id,
+        action,
+        category: 'ACCOUNT_SECURITY',
+        severity: status === 'FAILED' ? 'HIGH' : 'MEDIUM',
+        status,
+        description,
+        details: {
+            authAction: action
+        },
+        ipAddress,
+        userAgent,
+        device,
+        failureReason
+    })
+}
 
 export const register = async (req, res) => {
     const session = await mongoose.startSession()
@@ -31,12 +74,19 @@ export const register = async (req, res) => {
         ], { session })
 
         if (accountType === 'BUSINESS') {
-            let foundCategory = await Category.findOne({ name: businessCategory })
+            const normalizedCategory = String(businessCategory || '').trim().toUpperCase()
+            const categoryLabel = BUSINESS_CATEGORY_LABELS[normalizedCategory] || normalizedCategory
+            let foundCategory = await Category.findOne({
+                $or: [{ name: normalizedCategory }, { name: categoryLabel }]
+            }).session(session)
             if (!foundCategory) {
-                const newCategory = await Category.create([
-                    { name: businessCategory, description: `${businessCategory} category` }
+                const createdCategory = await Category.create([
+                    {
+                        name: normalizedCategory,
+                        description: `${categoryLabel} category`
+                    }
                 ], { session })
-                foundCategory = newCategory[0]
+                foundCategory = createdCategory[0]
             }
 
             await Business.create([
@@ -68,13 +118,47 @@ export const login = async (req, res) => {
         const isPasswordValid = await bcrypt.compare(password, user.password)
 
         if (!isPasswordValid) {
+            await createBusinessAuthActivityLog({
+                req,
+                user,
+                action: 'LOGIN_FAILED',
+                status: 'FAILED',
+                description: 'Business login failed due to invalid password.',
+                failureReason: 'INVALID_PASSWORD'
+            })
             return res.status(401).json({ message: "Invalid password" })
         }
 
+        if (user.whitelisted === false) {
+            await createBusinessAuthActivityLog({
+                req,
+                user,
+                action: 'LOGIN_FAILED',
+                status: 'FAILED',
+                description: 'Login blocked: account is not whitelisted.',
+                failureReason: 'NOT_WHITELISTED'
+            })
+            return res.status(403).json({
+                message: 'This account cannot sign in. Contact support if you believe this is a mistake.'
+            })
+        }
+
         generateAccessToken(user, res)
+        await createBusinessAuthActivityLog({
+            req,
+            user,
+            action: 'LOGIN_SUCCESS',
+            status: 'SUCCESS',
+            description: 'Business account login successful.'
+        })
         return res.status(200).json({
             properties: {
-                role: user.roleId.name
+                user: {
+                    name: user.name,
+                    email: user.email,
+                    role: user.roleId.name,
+                    avatar: user.avatar || null
+                }
             }, message: "User logged in successfully"
         })
     } catch (error) {
@@ -84,6 +168,13 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
     try {
+        await createBusinessAuthActivityLog({
+            req,
+            user: req.user,
+            action: 'LOGOUT_SUCCESS',
+            status: 'SUCCESS',
+            description: 'Business account logout successful.'
+        })
         res.clearCookie('accessToken')
         res.clearCookie('refreshToken')
         return res.status(200).json({ message: "User logged out successfully" })
@@ -198,7 +289,7 @@ export const sendRequestedResetPassword = async (req, res) => {
 
         const genCode = await generateResetToken()
 
-        const resetPassword = await ResetPassword.create([
+        const resetPassword = await ResetPasswordModel.create([
             { userId: user._id, token: genCode, expiresAt: Date.now() + 10 * 60 * 1000 }
         ])
 
@@ -217,7 +308,7 @@ export const sendRequestedResetPassword = async (req, res) => {
 export const resetPassword = async (req, res) => {
     try {
         const { token, password } = req.validatedData.body
-        const resetPassword = await ResetPassword.findOne({ token })
+        const resetPassword = await ResetPasswordModel.findOne({ token })
         if (!resetPassword) {
             return res.status(404).json({ message: "Reset password not found" })
         }
@@ -231,7 +322,7 @@ export const resetPassword = async (req, res) => {
             { new: true }
         )
 
-        await ResetPassword.findOneAndUpdate(
+        await ResetPasswordModel.findOneAndUpdate(
             { token: token },
             { $set: { used: true } },
             { new: true }
@@ -262,12 +353,32 @@ export const checkUser = async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "User not found" })
         }
+        let businessVerificationStatus = null
+        let businessLogo = null
+        let businessCategory = null
+        let businessCategoryLabel = null
+
+        if (user.roleId.name === 'BUSINESS') {
+            const business = await Business.findOne({ userId: user._id })
+                .populate('category', 'name')
+                .select('verificationStatus logo category')
+            businessVerificationStatus = business?.verificationStatus || null
+            businessLogo = business?.logo || null
+            businessCategory = business?.category?.name || null
+            businessCategoryLabel = businessCategory ? (BUSINESS_CATEGORY_LABELS[businessCategory] || businessCategory) : null
+        }
+
         return res.status(200).json({
             user: {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
-                role: user.roleId.name
+                role: user.roleId.name,
+                avatar: user.avatar || null,
+                businessVerificationStatus,
+                businessLogo,
+                businessCategory,
+                businessCategoryLabel
             }
         })
     } catch (error) {

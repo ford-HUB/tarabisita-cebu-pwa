@@ -18,6 +18,10 @@ export const AuthRoutes = [
         element: <Login />,
       },
       {
+        path: 'admin/login',
+        element: <Login />,
+      },
+      {
         path: 'register',
         element: <Register />,
       },

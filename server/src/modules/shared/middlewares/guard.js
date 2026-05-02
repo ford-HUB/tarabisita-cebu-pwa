@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import User from '../../user/User.model.js'
+import User from '../../auth/User.model.js'
 
 export const guard = ([...roles]) => {
     return async (req, res, next) => {
@@ -20,7 +20,6 @@ export const guard = ([...roles]) => {
             }
 
             req.user = user
-            console.log("middleware catch: " + user)
             next()
         } catch (error) {
             res.status(500).json({ message: error.message })

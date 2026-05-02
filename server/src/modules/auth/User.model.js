@@ -14,6 +14,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    avatar: {
+        type: String,
+        required: false
+    },
 
     createdAt: {
         type: Date,
@@ -30,6 +34,12 @@ const userSchema = new mongoose.Schema({
         ref: 'Role',
         required: true
     },
+
+    /** When false, login is blocked (platform suspension / denylist). */
+    whitelisted: {
+        type: Boolean,
+        default: true
+    }
 })
 
 const User = mongoose.model('User', userSchema)

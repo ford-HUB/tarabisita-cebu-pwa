@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { BUSINESS_CATEGORIES } from '../constants/businessCategories.constants'
+
+const businessCategoryValues = BUSINESS_CATEGORIES.map((item) => item.value)
 
 const baseSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -10,7 +13,7 @@ const baseSchema = z.object({
   businessDescription: z.string().optional(),
   businessAddress: z.string().optional(),
   businessContact: z.string().optional(),
-  businessCategory: z.string().optional(),
+  businessCategory: z.enum(businessCategoryValues).optional(),
 })
 
 export const loginSchema = z.object({
