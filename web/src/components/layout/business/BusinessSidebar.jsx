@@ -7,7 +7,8 @@ const BusinessSidebar = ({
   expandedMenus,
   onToggleMenu,
   sidebarLinks,
-  isRestricted
+  isRestricted,
+  profileHref
 }) => {
   return (
     <aside
@@ -48,12 +49,19 @@ const BusinessSidebar = ({
                 <>
                   {(() => {
                     const isProfileMenu =
-                      typeof menu.path === 'string' && menu.path.startsWith('/business/dashboard/profile')
+                      typeof menu.path === 'string' &&
+                      typeof profileHref === 'string' &&
+                      menu.path === profileHref
                     const isLocked = isRestricted && !isProfileMenu
+                    const showLockIcon = isRestricted
+                    const lockTitle = isProfileMenu
+                      ? 'Complete business verification to unlock the rest of the dashboard'
+                      : 'Complete business verification to unlock this section'
                     return menu.path ? (
                       <NavLink
                         to={isLocked ? '#' : menu.path}
                         end={typeof menu.path === 'string' && menu.path.startsWith('/business/dashboard')}
+                        title={showLockIcon ? lockTitle : undefined}
                         onClick={(event) => {
                           if (isLocked) event.preventDefault()
                         }}
@@ -61,21 +69,35 @@ const BusinessSidebar = ({
                           `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
                             isLocked
                               ? 'cursor-not-allowed bg-[#fbf7f2] text-[#b2a79a]'
-                              : isActive
-                                ? 'bg-[#f2e8da] text-[#9b5a2c]'
-                                : 'text-[#2f2f2f] hover:bg-[#f7f3ed]'
+                              : isProfileMenu && isRestricted
+                                ? isActive
+                                  ? 'bg-[#f2e8da] text-[#9b5a2c]'
+                                  : 'border border-dashed border-[#d4c4b2] bg-[#fffaf5] text-[#6d5d4d] hover:bg-[#f7f3ed]'
+                                : isActive
+                                  ? 'bg-[#f2e8da] text-[#9b5a2c]'
+                                  : 'text-[#2f2f2f] hover:bg-[#f7f3ed]'
                           }`
                         }
                       >
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg">
+                        <span className="relative flex h-8 w-8 items-center justify-center rounded-lg">
                           <menu.icon size={18} />
+                          {isSidebarCollapsed && showLockIcon ? (
+                            <FiLock
+                              size={10}
+                              className="absolute -bottom-0.5 -right-0.5 rounded bg-white p-0.5 text-[#9b5a2c] shadow-sm"
+                              aria-hidden
+                            />
+                          ) : null}
                         </span>
                         {!isSidebarCollapsed && <span className="flex-1 text-left">{menu.label}</span>}
-                        {!isSidebarCollapsed && isLocked && <FiLock size={14} className="text-[#b2a79a]" />}
+                        {!isSidebarCollapsed && showLockIcon ? (
+                          <FiLock size={14} className="shrink-0 text-[#9b5a2c]" aria-hidden />
+                        ) : null}
                       </NavLink>
                     ) : (
                       <button
                         type="button"
+                        title={showLockIcon ? lockTitle : undefined}
                         onClick={() => !isLocked && menu.children && onToggleMenu(menu.label)}
                         className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
                           isLocked
@@ -83,14 +105,21 @@ const BusinessSidebar = ({
                             : 'text-[#2f2f2f] hover:bg-[#f7f3ed]'
                         }`}
                       >
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg">
+                        <span className="relative flex h-8 w-8 items-center justify-center rounded-lg">
                           <menu.icon size={18} />
+                          {isSidebarCollapsed && showLockIcon ? (
+                            <FiLock
+                              size={10}
+                              className="absolute -bottom-0.5 -right-0.5 rounded bg-white p-0.5 text-[#9b5a2c] shadow-sm"
+                              aria-hidden
+                            />
+                          ) : null}
                         </span>
                         {!isSidebarCollapsed && (
                           <>
                             <span className="flex-1 text-left">{menu.label}</span>
                             {isLocked ? (
-                              <FiLock size={14} className="text-[#b2a79a]" />
+                              <FiLock size={14} className="shrink-0 text-[#9b5a2c]" aria-hidden />
                             ) : (
                               menu.children && (
                                 <span>

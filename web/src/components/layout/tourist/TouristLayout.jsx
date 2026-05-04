@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useAuth } from '../../../hooks/useAuth.hook'
-import { useAuthStore } from '../../../stores/auth/auth.store'
+import { useTouristCartItemPersistence } from '../../../hooks/useTouristCartItemPersistence.hook'
+import { useAuthStore } from '../../../store/auth/auth.store'
 import TouristTopbar from './TouristTopbar'
-import { getAvatarFallback } from './touristLayout.constants'
+import { getAvatarFallback, touristShellContentClass } from './touristLayout.constants'
 
 const TouristLayout = () => {
   const { user } = useAuth()
+  useTouristCartItemPersistence()
   const logout = useAuthStore((state) => state.logout)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
 
@@ -18,15 +20,16 @@ const TouristLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f5f0] text-[#1f1f1f]">
+    <div className="flex min-h-screen min-h-dvh flex-col bg-[#f8f5f0] text-[#1f1f1f]">
       <TouristTopbar
         isProfileOpen={isProfileOpen}
         onToggleProfile={() => setIsProfileOpen((value) => !value)}
+        onCloseProfile={() => setIsProfileOpen(false)}
         avatarFallback={avatarFallback}
         onLogout={handleLogout}
       />
 
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 md:px-8">
+      <main className={`${touristShellContentClass} flex-1 py-5 md:py-6 lg:py-8`}>
         <Outlet />
       </main>
     </div>

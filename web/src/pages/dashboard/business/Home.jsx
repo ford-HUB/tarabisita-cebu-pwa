@@ -165,7 +165,7 @@ const Home = () => {
             <div className="mb-5 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold text-[#1f1f1f]">Monthly Sales</h2>
-                <p className="text-sm text-[#7a7169]">Restaurant product sales this year</p>
+                <p className="text-sm text-[#7a7169]">Menu and product sales this year</p>
               </div>
             </div>
             <div className="h-60">

@@ -38,7 +38,15 @@ const Menu = () => {
     handleRestoreMenuItem,
     openEditModal,
     closeEditModal,
-    handleEditMenuItem
+    handleEditMenuItem,
+    menuCategoryPresets,
+    pickMenuCategoryPreset,
+    handleCategoryFieldKeyDown,
+    isSaveMenuCategoryPresetOpen,
+    pendingMenuCategoryPreset,
+    confirmSaveMenuCategoryPreset,
+    dismissSaveMenuCategoryPreset,
+    deleteMenuCategoryPreset
   } = useBusinessItemList(user)
 
   return (
@@ -61,6 +69,14 @@ const Menu = () => {
           handleImageSelection={handleImageSelection}
           handleRemoveImage={handleRemoveImage}
           handleAddMenuItem={handleAddMenuItem}
+          menuCategoryPresets={menuCategoryPresets}
+          pickMenuCategoryPreset={pickMenuCategoryPreset}
+          handleCategoryFieldKeyDown={handleCategoryFieldKeyDown}
+          isSaveMenuCategoryPresetOpen={isSaveMenuCategoryPresetOpen}
+          pendingMenuCategoryPreset={pendingMenuCategoryPreset}
+          confirmSaveMenuCategoryPreset={confirmSaveMenuCategoryPreset}
+          dismissSaveMenuCategoryPreset={dismissSaveMenuCategoryPreset}
+          deleteMenuCategoryPreset={deleteMenuCategoryPreset}
         />
       )}
 

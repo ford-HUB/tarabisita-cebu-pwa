@@ -1,54 +1,50 @@
-import { motion } from 'motion/react'
+import { orderHasCustomerNotes } from './orderBoardCustomerNotes.utils'
 
 const CollapsedOrderList = ({
   columnTitle,
-  columnKey,
   orders,
-  loopOrders,
-  isHovered,
-  setHoveredColumnKey,
-  autoRollSecondsPerItem,
   onOpenDetails,
+  isRestaurantAccount = false,
+  onOpenCustomerNotes,
   onAdvanceStatus,
   onOpenCancelModal
 }) => {
   return (
     <div
-      onMouseEnter={() => setHoveredColumnKey(columnKey)}
-      onMouseLeave={() => setHoveredColumnKey((current) => (current === columnKey ? null : current))}
-      className="max-h-[332px] overflow-y-auto pr-1 [scrollbar-width:thin] [touch-action:pan-y]"
-      aria-label={`${columnTitle} rolling orders`}
+      className="min-h-0 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] [touch-action:pan-y]"
+      aria-label={`${columnTitle} orders`}
     >
-      <motion.div
-        initial={false}
-        animate={orders.length > 1 && !isHovered ? { y: ['0%', '-66.6667%'] } : undefined}
-        transition={
-          orders.length > 1
-            ? {
-                duration: Math.max(20, orders.length * autoRollSecondsPerItem),
-                ease: 'linear',
-                repeat: Number.POSITIVE_INFINITY
-              }
-            : undefined
-        }
-      >
-        {loopOrders.map((order, index) => (
-          <article key={`${order.id}-${index}`} className="mb-2 rounded-lg border border-[#ecdfd1] bg-white p-3">
+      {orders.length === 0 ? (
+        <p className="flex flex-1 items-center justify-center py-10 text-center text-sm text-[#8f8377]">No orders yet</p>
+      ) : null}
+      {orders.map((order) => (
+        <article key={order.id} className="mb-2 rounded-lg border border-[#ecdfd1] bg-white p-3">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold tracking-wide text-[#7d5b3b]">{order.id}</p>
+              <p className="text-xs font-semibold tracking-wide text-[#7d5b3b]">{order.orderCode || order.id}</p>
               <p className="text-xs text-[#8a7f74]">{order.time}</p>
             </div>
             <div className="mt-2 flex items-center gap-2">
               <img src={order.productImage} alt={order.productName} className="h-10 w-10 rounded-md object-cover" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-[#2f2f2f]">{order.productName}</p>
-                <button
-                  type="button"
-                  onClick={() => onOpenDetails(order)}
-                  className="text-[11px] text-[#9b5a2c] hover:underline"
-                >
-                  View details
-                </button>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => onOpenDetails(order)}
+                    className="text-[11px] text-[#9b5a2c] hover:underline"
+                  >
+                    View details
+                  </button>
+                  {isRestaurantAccount && orderHasCustomerNotes(order) ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenCustomerNotes?.(order)}
+                      className="text-[11px] font-semibold text-[#7d5b3b] hover:underline"
+                    >
+                      Customer notes
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
             <p className="mt-1 text-sm font-semibold text-[#2f2f2f]">{order.customer}</p>
@@ -99,9 +95,8 @@ const CollapsedOrderList = ({
                 Completed
               </span>
             )}
-          </article>
-        ))}
-      </motion.div>
+        </article>
+      ))}
     </div>
   )
 }

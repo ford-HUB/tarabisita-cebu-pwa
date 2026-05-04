@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { FiPaperclip, FiSend, FiX } from 'react-icons/fi'
 import { toast } from 'sonner'
-import { sendAdminUserWarningEmail } from '../../../../services/auth/auth.service'
+import { useAdminManageUsersStore } from '../../../../store/admin/manageUsers.store'
 import ManageUsersAvatar from './ManageUsersAvatar'
 
 const defaultSubject = 'Regarding your TaraBisita account'
@@ -46,7 +46,7 @@ const ManageUsersComposeEmailModal = ({ user, onClose }) => {
       fd.append('subject', subject.trim() || defaultSubject)
       fd.append('message', trimmed)
       files.forEach((f) => fd.append('files', f))
-      await sendAdminUserWarningEmail(user.id, fd)
+      await useAdminManageUsersStore.getState().sendUserWarningEmail(user.id, fd)
       toast.success('Email sent.')
       onClose()
     } catch (err) {

@@ -35,3 +35,5 @@ Thumbs.db
 
 # local pnpm lock temporary files
 **/.pnpm-debug.log
+
+.cursor/*

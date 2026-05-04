@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { forgotPasswordSchema } from '../../shared/validators/auth.validator'
-import { mailChecker } from '../../services/auth/auth.service'
+import { useAuthStore } from '../../store/auth/auth.store'
 
 const RequestForgotPassword = ({ isOpen, onClose, onSubmit }) => {
   const {
@@ -63,7 +63,7 @@ const RequestForgotPassword = ({ isOpen, onClose, onSubmit }) => {
       setEmailCheck({ status: 'checking', message: 'Checking email...' })
 
       try {
-        const response = await mailChecker({ email })
+        const response = await useAuthStore.getState().mailChecker({ email })
         if (latestRequestIdRef.current !== requestId) return
 
         setEmailCheck({

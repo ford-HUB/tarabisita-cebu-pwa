@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
 import {
   subscriptionEffectiveStatusLabels,
@@ -9,17 +10,14 @@ import {
   BILLING_PAYMENT_TOAST_DURATION_SECONDS,
   billingPaymentReturnToastConfig
 } from '../shared/constants/billing.constants'
-import {
-  createBusinessBillingCheckout,
-  getMyBusinessBillingLedger,
-  updateMyBusinessProfile
-} from '../services/business/business.service'
-import {
-  buildUpdateProfilePayloadFromBillingForm,
-  formatBillingDateTime,
-  formatBillingPeso
-} from '../shared/utils/billingDisplay.utils'
+import { formatBillingDateTime, formatBillingPeso } from '../shared/utils/billingDisplay.utils'
 import { useBusinessBillingProfile } from './useBusinessBillingProfile.hook'
+import { useBillingStore } from '../store/billing/billing.store'
+import {
+  assignPaymongoCheckout,
+  isLikelySocialInAppBrowser,
+  isTrustedPaymongoCheckoutUrl
+} from '../shared/utils/paymongoCheckoutRedirect.utils'
 
 /**
  * Billing page controller: profile rows, checkout, billing-address save, plan modals, payment return UX.
@@ -30,9 +28,15 @@ export const useBusinessBilling = () => {
   const [processingPlanId, setProcessingPlanId] = useState(null)
   const [isAvailablePlansModalOpen, setIsAvailablePlansModalOpen] = useState(false)
   const [isCompareFeaturesModalOpen, setIsCompareFeaturesModalOpen] = useState(false)
-  const [ledgerPayments, setLedgerPayments] = useState([])
-  const [ledgerSubscriptions, setLedgerSubscriptions] = useState([])
-  const [isLedgerLoading, setIsLedgerLoading] = useState(true)
+  const [paymongoInAppCheckoutUrl, setPaymongoInAppCheckoutUrl] = useState(null)
+
+  const { ledgerPayments, ledgerSubscriptions, isLedgerLoading } = useBillingStore(
+    useShallow((s) => ({
+      ledgerPayments: s.ledgerPayments,
+      ledgerSubscriptions: s.ledgerSubscriptions,
+      isLedgerLoading: s.isLedgerLoading
+    }))
+  )
 
   const {
     profileData,
@@ -43,23 +47,14 @@ export const useBusinessBilling = () => {
   } = useBusinessBillingProfile()
 
   const loadLedger = useCallback(async () => {
-    try {
-      setIsLedgerLoading(true)
-      const res = await getMyBusinessBillingLedger()
-      const data = res?.data?.data
-      setLedgerPayments(Array.isArray(data?.payments) ? data.payments : [])
-      setLedgerSubscriptions(Array.isArray(data?.subscriptions) ? data.subscriptions : [])
-    } catch {
-      setLedgerPayments([])
-      setLedgerSubscriptions([])
-    } finally {
-      setIsLedgerLoading(false)
-    }
+    await useBillingStore.getState().loadLedger()
   }, [])
 
   useEffect(() => {
-    void loadLedger()
-  }, [loadLedger])
+    const store = useBillingStore.getState()
+    void store.loadBillingAccountProfile()
+    void store.loadLedger()
+  }, [])
 
   const planSubscriptionSummary = useMemo(() => {
     if (!profileData) {
@@ -84,6 +79,10 @@ export const useBusinessBilling = () => {
   }, [profileData])
 
   const hasActivePlan = planSubscriptionSummary?.effectiveStatus === 'ACTIVE'
+
+  const isPlanSelectionLocked = Boolean(
+    profileData?.subscription?.planChangeLocked ?? hasActivePlan
+  )
 
   const showPastOrFailedPlan =
     Boolean(planSubscriptionSummary) &&
@@ -156,38 +155,59 @@ export const useBusinessBilling = () => {
     setSearchParams(nextParams, { replace: true })
   }, [searchParams, setSearchParams, refetchProfile, loadLedger])
 
+  const closePaymongoInAppCheckoutModal = useCallback(() => {
+    setPaymongoInAppCheckoutUrl(null)
+  }, [])
+
+  const continuePaymongoInAppCheckout = useCallback(() => {
+    if (!paymongoInAppCheckoutUrl) {
+      return
+    }
+    try {
+      assignPaymongoCheckout(paymongoInAppCheckoutUrl)
+    } catch {
+      toast.error('That payment link is not valid. Please try choosing a plan again.')
+      setPaymongoInAppCheckoutUrl(null)
+    }
+  }, [paymongoInAppCheckoutUrl])
+
   const handleChoosePlan = useCallback(async (plan) => {
+    if (isPlanSelectionLocked) {
+      toast.error(
+        'Your current prepaid plan is still active. You can choose a new billing cycle after the current period ends.'
+      )
+      return
+    }
     try {
       setProcessingPlanId(plan.id)
-      const response = await createBusinessBillingCheckout({
+      const checkoutUrl = await useBillingStore.getState().createBillingCheckout({
         months: plan.months,
         returnBaseUrl: window.location.origin
       })
-      const checkoutUrl = response?.data?.data?.checkoutUrl
-
-      if (!checkoutUrl) {
-        throw new Error('Checkout URL is missing.')
+      if (!isTrustedPaymongoCheckoutUrl(checkoutUrl)) {
+        toast.error('Invalid payment session link. Please try again or contact support.')
+        setProcessingPlanId(null)
+        return
       }
-
-      window.location.assign(checkoutUrl)
+      if (isLikelySocialInAppBrowser()) {
+        setPaymongoInAppCheckoutUrl(checkoutUrl)
+        setProcessingPlanId(null)
+        return
+      }
+      assignPaymongoCheckout(checkoutUrl)
     } catch (error) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to start PayMongo checkout.')
       setProcessingPlanId(null)
     }
-  }, [])
+  }, [isPlanSelectionLocked])
 
-  const handleBillingAddressSave = useCallback(
-    async (trimmed) => {
-      const payload = buildUpdateProfilePayloadFromBillingForm(profileData, trimmed)
-      await updateMyBusinessProfile(payload)
-      await refetchProfile()
-      await loadLedger()
-    },
-    [profileData, refetchProfile, loadLedger]
-  )
+  const handleBillingAddressSave = useCallback(async (trimmed) => {
+    await useBillingStore.getState().saveBillingAddressFromForm(trimmed)
+  }, [])
 
   return {
     hasActivePlan,
+    isPlanSelectionLocked,
     planSubscriptionSummary,
     showPastOrFailedPlan,
     billingAccountSummary,
@@ -205,6 +225,10 @@ export const useBusinessBilling = () => {
     handleOpenAvailablePlansModal: () => setIsAvailablePlansModalOpen(true),
     handleCloseAvailablePlansModal: () => setIsAvailablePlansModalOpen(false),
     handleOpenCompareFeaturesModal: () => setIsCompareFeaturesModalOpen(true),
-    handleCloseCompareFeaturesModal: () => setIsCompareFeaturesModalOpen(false)
+    handleCloseCompareFeaturesModal: () => setIsCompareFeaturesModalOpen(false),
+    isPaymongoMobileCheckoutModalOpen: Boolean(paymongoInAppCheckoutUrl),
+    paymongoMobileCheckoutUrl: paymongoInAppCheckoutUrl || '',
+    closePaymongoMobileCheckoutModal: closePaymongoInAppCheckoutModal,
+    continuePaymongoMobileCheckout: continuePaymongoInAppCheckout
   }
 }

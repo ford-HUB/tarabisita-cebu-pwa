@@ -1,0 +1,157 @@
+import Business from '../models/business.model.js'
+import {
+    incrementPublicBusinessProfileViewCount,
+    listPublicMenuItemsFromBusinessDoc,
+    listPublicMenuFeedItems,
+    createTouristCustomerOrder,
+    createTouristMenuOrderPaymongoCheckout
+} from './public-catalog.service.js'
+import { sanitizeBusinessPayload } from '../../../shared/utils/business-controller.helpers.js'
+
+export const getPublicMenuFeed = async (req, res) => {
+    try {
+        const menuCategory =
+            req.query.menuCategory != null && String(req.query.menuCategory).trim() !== ''
+                ? String(req.query.menuCategory).trim()
+                : 'ALL'
+        const data = await listPublicMenuFeedItems({ menuCategory })
+        return res.status(200).json({ data })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const postTouristCustomerOrderCheckout = async (req, res) => {
+    try {
+        const { businessId } = req.params
+        const { returnBaseUrl, ...body } = req.validatedData.body
+        const data = await createTouristMenuOrderPaymongoCheckout({
+            userId: req.user._id,
+            businessId,
+            ...body,
+            returnBaseUrl
+        })
+        return res.status(200).json({
+            message: 'PayMongo checkout created. Complete payment to place your order.',
+            data
+        })
+    } catch (error) {
+        const msg = error?.message || ''
+        if (msg === 'BUSINESS_NOT_FOUND' || msg === 'MENU_CATALOG_NOT_SUPPORTED') {
+            return res.status(404).json({ message: 'Business not found or not available for menu orders.' })
+        }
+        if (msg.startsWith('MENU_ITEM_NOT_FOUND') || msg.startsWith('MENU_ITEM_UNAVAILABLE')) {
+            return res
+                .status(400)
+                .json({ message: 'One or more menu items are no longer available. Refresh and try again.' })
+        }
+        if (msg === 'INVALID_PRICE' || msg === 'INVALID_ORDER_AMOUNT') {
+            return res.status(400).json({ message: 'Could not validate menu prices or order total.' })
+        }
+        if (msg === 'PAYMONGO_SECRET_KEY_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'PayMongo secret key is not configured' })
+        }
+        if (msg === 'PAYMONGO_CHECKOUT_URL_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'PayMongo checkout URL is not configured' })
+        }
+        if (msg === 'CHECKOUT_RETURN_BASE_URL_INVALID') {
+            return res.status(400).json({
+                message:
+                    'Invalid return base URL. Send returnBaseUrl (e.g. https://your-site.com) or set CLIENT_URL / PAYMONGO_RETURN_BASE_URL.'
+            })
+        }
+        if (msg === 'CHECKOUT_RETURN_URLS_INVALID') {
+            return res.status(400).json({ message: 'Could not build success or cancel return URLs.' })
+        }
+        if (msg === 'PAYMENT_METHOD_NOT_ENABLED_FOR_CHECKOUT') {
+            return res.status(400).json({
+                message:
+                    'This payment method is disabled in server settings. Choose another option or ask the site admin to update PAYMONGO_PAYMENT_METHOD_TYPES.'
+            })
+        }
+        return res.status(500).json({ message: error.message || 'Could not start checkout.' })
+    }
+}
+
+export const postTouristCustomerOrder = async (req, res) => {
+    try {
+        const { businessId } = req.params
+        const data = await createTouristCustomerOrder({
+            businessId,
+            placedByUserId: req.user._id,
+            ...req.body
+        })
+        return res.status(201).json({ data })
+    } catch (error) {
+        const msg = error?.message || ''
+        if (msg === 'BUSINESS_NOT_FOUND' || msg === 'MENU_CATALOG_NOT_SUPPORTED') {
+            return res.status(404).json({ message: 'Business not found or not available for menu orders.' })
+        }
+        if (msg.startsWith('MENU_ITEM_NOT_FOUND') || msg.startsWith('MENU_ITEM_UNAVAILABLE')) {
+            return res
+                .status(400)
+                .json({ message: 'One or more menu items are no longer available. Refresh and try again.' })
+        }
+        if (msg === 'INVALID_PRICE') {
+            return res.status(400).json({ message: 'Could not validate menu prices.' })
+        }
+        return res.status(500).json({ message: error.message || 'Could not place order.' })
+    }
+}
+
+export const getPublicBusinesses = async (_req, res) => {
+    try {
+        const businesses = await Business.find({ verificationStatus: 'VERIFIED' })
+            .populate('category')
+            .sort({ publicProfileViewCount: -1, createdAt: -1 })
+
+        return res.status(200).json({
+            data: businesses.map(sanitizeBusinessPayload)
+        })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const recordPublicBusinessView = async (req, res) => {
+    try {
+        const { businessId } = req.params
+        const business = await incrementPublicBusinessProfileViewCount(businessId)
+
+        if (!business) {
+            return res.status(404).json({ message: 'Business not found' })
+        }
+
+        return res.status(200).json({
+            data: { publicProfileViewCount: business.publicProfileViewCount ?? 0 }
+        })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const getBusinessById = async (req, res) => {
+    try {
+        const { businessId } = req.params
+        const business = await Business.findById(businessId).populate('category')
+
+        if (!business) {
+            return res.status(404).json({ message: 'Business not found' })
+        }
+
+        if (business.verificationStatus !== 'VERIFIED') {
+            return res.status(403).json({ message: 'Business is not yet publicly available' })
+        }
+
+        const menuItems = listPublicMenuItemsFromBusinessDoc(business)
+
+        return res.status(200).json({
+            data: {
+                ...sanitizeBusinessPayload(business),
+                menuItems
+            }
+        })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}

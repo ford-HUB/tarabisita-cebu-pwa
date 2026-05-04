@@ -21,7 +21,7 @@ const ResolvedOrdersSection = ({ orders }) => {
                 key={`resolved-${order.id}`}
                 className="grid grid-cols-[1fr_1.6fr_1.2fr_0.9fr_0.9fr] items-center gap-2 px-3 py-2 text-xs md:text-sm"
               >
-                <p className="font-semibold text-[#7d5b3b]">{order.id}</p>
+                <p className="font-semibold text-[#7d5b3b]">{order.orderCode || order.id}</p>
                 <div className="flex min-w-0 items-center gap-2">
                   <img src={order.productImage} alt={order.productName} className="h-8 w-8 rounded-md object-cover" />
                   <p className="truncate font-medium text-[#2f2f2f]">{order.productName}</p>

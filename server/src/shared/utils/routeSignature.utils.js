@@ -20,7 +20,7 @@ export const encryptRouteWithPass = (routeValue, passphrase) => {
 }
 
 const BUSINESS_BILLING_ROUTE = 'business/dashboard/billing'
-
+const TOURIST_CHECKOUT_ROUTE = 'tourist/explore/checkout'
 
 export const buildSignedBusinessBillingReturnUrl = (clientBaseUrl, { payment, planId }) => {
     const base = String(clientBaseUrl || '').trim().replace(/\/+$/, '')
@@ -33,6 +33,22 @@ export const buildSignedBusinessBillingReturnUrl = (clientBaseUrl, { payment, pl
     url.searchParams.set('payment', payment)
     if (planId) {
         url.searchParams.set('plan', String(planId))
+    }
+    return url.toString()
+}
+
+/** PayMongo return URL for tourist menu prepayment (must match SPA path + rk signing). */
+export const buildSignedTouristCheckoutReturnUrl = (clientBaseUrl, { payment, pendingCheckoutId }) => {
+    const base = String(clientBaseUrl || '').trim().replace(/\/+$/, '')
+    if (!base || !/^https?:\/\//i.test(base)) {
+        return ''
+    }
+    const rk = encryptRouteWithPass(TOURIST_CHECKOUT_ROUTE, getRouteSigningPassphrase())
+    const url = new URL(`/${TOURIST_CHECKOUT_ROUTE}`, `${base}/`)
+    url.searchParams.set('rk', rk)
+    url.searchParams.set('payment', payment)
+    if (pendingCheckoutId) {
+        url.searchParams.set('pending', String(pendingCheckoutId))
     }
     return url.toString()
 }

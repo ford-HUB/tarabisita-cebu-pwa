@@ -1,4 +1,6 @@
-import { FiImage, FiX } from 'react-icons/fi'
+import { useRef, useState } from 'react'
+import { FiImage, FiTrash2, FiX } from 'react-icons/fi'
+import SaveMenuCategoryPresetModal from '../modals/SaveMenuCategoryPresetModal'
 
 const ItemListFormSection = ({
   form,
@@ -7,8 +9,44 @@ const ItemListFormSection = ({
   setField,
   handleImageSelection,
   handleRemoveImage,
-  handleAddMenuItem
+  handleAddMenuItem,
+  menuCategoryPresets = [],
+  pickMenuCategoryPreset,
+  handleCategoryFieldKeyDown,
+  isSaveMenuCategoryPresetOpen,
+  pendingMenuCategoryPreset,
+  confirmSaveMenuCategoryPreset,
+  dismissSaveMenuCategoryPreset,
+  deleteMenuCategoryPreset
 }) => {
+  const [isCategoryPresetPickerOpen, setIsCategoryPresetPickerOpen] = useState(false)
+  const categoryBlurTimeout = useRef(null)
+
+  const clearCategoryBlurTimeout = () => {
+    if (categoryBlurTimeout.current) {
+      window.clearTimeout(categoryBlurTimeout.current)
+      categoryBlurTimeout.current = null
+    }
+  }
+
+  const openCategoryPresetPicker = () => {
+    clearCategoryBlurTimeout()
+    setIsCategoryPresetPickerOpen(true)
+  }
+
+  const scheduleCloseCategoryPresetPicker = () => {
+    clearCategoryBlurTimeout()
+    categoryBlurTimeout.current = window.setTimeout(() => {
+      setIsCategoryPresetPickerOpen(false)
+      categoryBlurTimeout.current = null
+    }, 150)
+  }
+
+  const handlePickPreset = (label) => {
+    pickMenuCategoryPreset(label)
+    setIsCategoryPresetPickerOpen(false)
+  }
+
   return (
     <section className="rounded-2xl border border-[#ece3d9] bg-[#fffcf8] p-5">
       <div className="rounded-xl border border-[#ecdccd] bg-white p-4">
@@ -50,13 +88,57 @@ const ItemListFormSection = ({
 
           <label className="space-y-1">
             <span className="text-xs font-medium text-[#5f5f5f]">Category</span>
-            <input
-              type="text"
-              value={form.category}
-              onChange={(event) => setField('category', event.target.value)}
-              placeholder="Main Course, Dessert, Drinks"
-              className="w-full rounded-lg border border-[#e4dbd0] px-3 py-2 text-sm outline-none transition focus:border-[#ff7a1a]"
-            />
+            <div className="relative">
+              {menuCategoryPresets.length > 0 && isCategoryPresetPickerOpen && (
+                <div
+                  className="absolute bottom-full left-0 right-0 z-20 mb-1 overflow-hidden rounded-lg border border-[#e4dbd0] bg-white py-1 shadow-md"
+                  role="listbox"
+                  aria-label="Saved categories"
+                >
+                  {menuCategoryPresets.map((preset) => (
+                    <div
+                      key={preset}
+                      role="option"
+                      className="flex items-stretch border-b border-[#f3ebe3] last:border-b-0"
+                    >
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 px-3 py-2 text-left text-sm text-[#3f3a35] transition hover:bg-[#fff5ec]"
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          handlePickPreset(preset)
+                        }}
+                      >
+                        {preset}
+                      </button>
+                      <button
+                        type="button"
+                        className="shrink-0 px-2.5 text-[#a8988a] transition hover:bg-[#fff0e8] hover:text-[#c45c3c]"
+                        aria-label={`Remove saved category ${preset}`}
+                        onMouseDown={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          deleteMenuCategoryPreset(preset)
+                        }}
+                      >
+                        <FiTrash2 size={15} aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <input
+                type="text"
+                value={form.category}
+                onChange={(event) => setField('category', event.target.value)}
+                onKeyDown={handleCategoryFieldKeyDown}
+                onFocus={openCategoryPresetPicker}
+                onBlur={scheduleCloseCategoryPresetPicker}
+                placeholder="Main Course, Dessert, Drinks"
+                className="w-full rounded-lg border border-[#e4dbd0] px-3 py-2 text-sm outline-none transition focus:border-[#ff7a1a]"
+                autoComplete="off"
+              />
+            </div>
           </label>
 
           <label className="space-y-1">
@@ -172,6 +254,13 @@ const ItemListFormSection = ({
           </button>
         </div>
       </div>
+
+      <SaveMenuCategoryPresetModal
+        isOpen={isSaveMenuCategoryPresetOpen}
+        categoryLabel={pendingMenuCategoryPreset}
+        onClose={dismissSaveMenuCategoryPreset}
+        onConfirm={confirmSaveMenuCategoryPreset}
+      />
     </section>
   )
 }

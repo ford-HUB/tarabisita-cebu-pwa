@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../../../hooks/useAuth.hook'
-import { useAuthStore } from '../../../stores/auth/auth.store'
+import { useAuthStore } from '../../../store/auth/auth.store'
 import { roleBasedRoute } from '../../../shared/utils/direct.utils'
 import AdminSidebar from './AdminSidebar'
 import AdminTopbar from './AdminTopbar'

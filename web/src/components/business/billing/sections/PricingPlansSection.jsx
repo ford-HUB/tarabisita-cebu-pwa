@@ -1,6 +1,12 @@
 import { pricingOptions as defaultPricingOptions } from '../constants/billing.constants'
 
-const PricingPlansSection = ({ pricingOptions = defaultPricingOptions, onChoosePlan, processingPlanId = null }) => {
+const PricingPlansSection = ({
+  pricingOptions = defaultPricingOptions,
+  onChoosePlan,
+  processingPlanId = null,
+  isPlanSelectionLocked = false,
+  planSelectionLockExpiresAtLabel = ''
+}) => {
   return (
     <article className="rounded-2xl border border-[#e7dfd5] bg-white p-5 shadow-sm">
       <header className="mb-4">
@@ -8,6 +14,15 @@ const PricingPlansSection = ({ pricingOptions = defaultPricingOptions, onChooseP
         <p className="text-sm text-[#6d645d]">
           Select a billing cycle that matches your goals. Longer plans give better monthly value.
         </p>
+        {isPlanSelectionLocked ? (
+          <div className="mt-3 rounded-xl border border-[#e9dece] bg-[#fffaeb] px-3 py-2.5 text-xs text-[#6d645d]">
+            <span className="font-semibold text-[#92400e]">Current plan still active.</span> You cannot start a new
+            prepaid checkout until your paid period ends
+            {planSelectionLockExpiresAtLabel && planSelectionLockExpiresAtLabel !== '—'
+              ? ` (${planSelectionLockExpiresAtLabel}).`
+              : '.'}
+          </div>
+        ) : null}
         <div className="mt-3 rounded-xl border border-[#efe7dc] bg-[#fcfaf7] px-3 py-2 text-xs text-[#6d645d]">
           Checkout payment methods include <span className="font-semibold text-[#2f2f2f]">Card</span>,{' '}
           <span className="font-semibold text-[#2f2f2f]">GCash</span>,{' '}
@@ -44,12 +59,17 @@ const PricingPlansSection = ({ pricingOptions = defaultPricingOptions, onChooseP
             <button
               type="button"
               onClick={() => onChoosePlan?.(plan)}
-              disabled={Boolean(processingPlanId)}
+              disabled={Boolean(processingPlanId) || isPlanSelectionLocked}
+              title={
+                isPlanSelectionLocked
+                  ? 'You can choose a new plan after your current prepaid period ends.'
+                  : undefined
+              }
               className={`mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-medium transition ${
                 plan.highlighted
                   ? 'bg-[#9b5a2c] text-white hover:bg-[#824b24]'
                   : 'border border-[#e1d4c5] text-[#5f5f5f] hover:bg-[#f7f3ed]'
-              } ${processingPlanId ? 'cursor-not-allowed opacity-70' : ''}`}
+              } ${processingPlanId || isPlanSelectionLocked ? 'cursor-not-allowed opacity-70' : ''}`}
             >
               {processingPlanId === plan.id ? 'Redirecting to PayMongo...' : 'Choose Plan'}
             </button>

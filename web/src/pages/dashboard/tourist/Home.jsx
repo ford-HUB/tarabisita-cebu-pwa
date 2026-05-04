@@ -1,111 +1,162 @@
-import { useMemo, useState } from 'react'
-import { useAuth } from '../../../hooks/useAuth.hook'
-
-const categories = [
-  {
-    title: 'Most Visited',
-    items: [
-      { name: 'Cebu Lechon Hub', type: 'Food', summary: 'Known for crispy skin and group meals.' },
-      { name: 'Mountain View Deck', type: 'Scenic', summary: 'A highland stop with wide city views.' },
-      { name: 'Heritage Food Walk', type: 'Tour', summary: 'Local guided street-food experience.' },
-      { name: 'Sunset Pier Dining', type: 'Dining', summary: 'Seafood dining with sunset ambiance.' }
-    ]
-  },
-  {
-    title: 'Restaurants',
-    items: [
-      { name: 'Casa Kare-Kare', type: 'Filipino', summary: 'Classic comfort dishes in a modern interior.' },
-      { name: 'Sutukil Spot', type: 'Seafood', summary: 'Choose fresh catch and pick your cooking style.' },
-      { name: 'Tapsilog District', type: 'Budget', summary: 'Affordable all-day breakfast selection.' },
-      { name: 'Cafe Coastal', type: 'Cafe', summary: 'Coffee and pastry lounge near the bay.' }
-    ]
-  },
-  {
-    title: 'Nature & Spots',
-    items: [
-      { name: 'Bamboo Falls Trail', type: 'Nature', summary: 'Short hike leading to a cool-water cascade.' },
-      { name: 'Cloudline Hills', type: 'Viewpoint', summary: 'Morning fog and mountain breeze destination.' },
-      { name: 'Lakeside Picnic Park', type: 'Family', summary: 'Open space ideal for picnics and relax time.' },
-      { name: 'Riverwalk Garden', type: 'Relax', summary: 'Quiet walkway with evening light shows.' }
-    ]
-  }
-]
+import { useState } from 'react'
+import { useTouristExplore } from '../../../hooks/useTouristExplore.hook'
+import { useTouristExploreMenuDeepLink } from '../../../hooks/useTouristExploreMenuDeepLink.hook'
+import TouristExploreHeroSection from '../../../components/tourist/explore/sections/TouristExploreHeroSection'
+import TouristExploreIntentsSection from '../../../components/tourist/explore/sections/TouristExploreIntentsSection'
+import TouristCategoryChipsSection from '../../../components/tourist/explore/sections/TouristCategoryChipsSection'
+import TouristBusinessCarouselSection from '../../../components/tourist/explore/sections/TouristBusinessCarouselSection'
+import TouristExploreLoadingSection from '../../../components/tourist/explore/sections/TouristExploreLoadingSection'
+import TouristBusinessDetailModal from '../../../components/tourist/explore/modals/TouristBusinessDetailModal'
+import TouristMenuItemDetailModal from '../../../components/tourist/explore/modals/TouristMenuItemDetailModal'
+import TouristExploreRightRailSection from '../../../components/tourist/explore/sections/TouristExploreRightRailSection'
+import TouristExploreFoodMenuSection from '../../../components/tourist/explore/sections/TouristExploreFoodMenuSection'
 
 const Home = () => {
-  const { user } = useAuth()
-  const [selectedItem, setSelectedItem] = useState(null)
+  const {
+    user,
+    heroSpotlightBusinesses,
+    exploreRows,
+    filterChips,
+    serviceIntents,
+    intentHighlightId,
+    showPartnerTypeChips,
+    categoryFilter,
+    setCategoryFilter,
+    foodMenuCategory,
+    setFoodMenuCategory,
+    menuFeedItems,
+    menuFeedCategories,
+    menuFeedLoading,
+    menuFeedError,
+    selectedBusiness,
+    openBusiness,
+    closeBusiness,
+    isLoading,
+    errorMessage,
+    filteredBusinesses,
+    businesses,
+    reload
+  } = useTouristExplore()
 
-  const featuredItems = useMemo(() => categories[0].items, [])
+  const userName = user?.name || 'Tourist'
+  const [isExploreRailCollapsed, setIsExploreRailCollapsed] = useState(false)
+  const [selectedMenuItem, setSelectedMenuItem] = useState(null)
+
+  useTouristExploreMenuDeepLink(setSelectedMenuItem)
+
+  if (isLoading && !businesses.length) {
+    return (
+      <div className="space-y-6 md:space-y-8">
+        <TouristExploreLoadingSection />
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-2xl border border-[#e7dfd5] bg-gradient-to-r from-[#9b5a2c] to-[#ff7a1a] p-6 text-white shadow-sm">
-        <p className="text-sm uppercase tracking-wider text-white/85">Explore Cebu</p>
-        <h1 className="mt-1 text-3xl font-semibold">Hello, {user?.name || 'Tourist'}!</h1>
-        <p className="mt-2 max-w-2xl text-sm text-white/90">
-          Discover local businesses, check details in quick modals, and find your next destination by category.
-        </p>
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-xl font-semibold text-[#1f1f1f]">Most Visited</h2>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {featuredItems.map((item) => (
-            <button
-              key={item.name}
-              type="button"
-              onClick={() => setSelectedItem(item)}
-              className="rounded-2xl border border-[#e7dfd5] bg-white p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <p className="text-xs font-medium uppercase tracking-wide text-[#9b5a2c]">{item.type}</p>
-              <p className="mt-2 text-lg font-semibold">{item.name}</p>
-              <p className="mt-1 text-sm text-[#5b5b5b]">{item.summary}</p>
-            </button>
-          ))}
+    <div className="space-y-6 md:space-y-8">
+      {errorMessage && !businesses.length ? (
+        <div className="rounded-2xl border border-[#fecdca] bg-[#fff4f2] p-6 text-sm text-[#7a271a]">
+          <p className="font-medium">We couldn&apos;t load listings.</p>
+          <p className="mt-1 text-[#b42318]">{errorMessage}</p>
+          <button
+            type="button"
+            onClick={() => reload()}
+            className="mt-4 rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb6c12]"
+          >
+            Try again
+          </button>
         </div>
-      </section>
+      ) : null}
 
-      {categories.map((category) => (
-        <section key={category.title}>
-          <h2 className="mb-3 text-xl font-semibold text-[#1f1f1f]">{category.title}</h2>
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            {category.items.map((item) => (
-              <button
-                key={`${category.title}-${item.name}`}
-                type="button"
-                onClick={() => setSelectedItem(item)}
-                className="min-w-60 rounded-2xl border border-[#e7dfd5] bg-white p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <p className="text-xs font-medium uppercase tracking-wide text-[#9b5a2c]">{item.type}</p>
-                <p className="mt-2 text-lg font-semibold">{item.name}</p>
-                <p className="mt-1 text-sm text-[#5b5b5b]">{item.summary}</p>
-              </button>
+      {!errorMessage || businesses.length ? (
+        <div
+          className={
+            isExploreRailCollapsed
+              ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_2.75rem] lg:items-start lg:gap-x-2 lg:gap-y-0'
+              : 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(15rem,26vw)] lg:items-start lg:gap-x-5 lg:gap-y-0 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,24vw)] xl:gap-x-8 2xl:gap-x-10'
+          }
+        >
+          <div className="min-w-0 space-y-6 md:space-y-8">
+            {heroSpotlightBusinesses.length ? (
+              <TouristExploreHeroSection
+                userName={userName}
+                businesses={heroSpotlightBusinesses}
+                onOpen={openBusiness}
+              />
+            ) : (
+              <section className="rounded-2xl border border-[#e7dfd5] bg-gradient-to-r from-[#9b5a2c] to-[#ff7a1a] p-6 text-white shadow-sm md:p-8">
+                <p className="text-sm uppercase tracking-wider text-white/85">Order &amp; book in Cebu</p>
+                <h1 className="mt-1 text-2xl font-semibold md:text-3xl">Hello, {userName}!</h1>
+                <p className="mt-2 max-w-none text-sm text-white/90 md:text-base">
+                  Soon you&apos;ll order meals, book stays, and arrange rentals with verified partners — all in one place.
+                </p>
+              </section>
+            )}
+
+            <div className="lg:hidden">
+              <TouristExploreIntentsSection
+                intents={serviceIntents}
+                highlightIntentId={intentHighlightId}
+                allPartnersActive={categoryFilter === 'ALL'}
+                onSelect={setCategoryFilter}
+              />
+            </div>
+
+            {showPartnerTypeChips ? (
+              <div className="space-y-2.5 lg:hidden">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a79a8b]">Partner type</p>
+                <TouristCategoryChipsSection chips={filterChips} activeId={categoryFilter} onSelect={setCategoryFilter} />
+              </div>
+            ) : null}
+
+            {!filteredBusinesses.length && businesses.length ? (
+              <p className="rounded-xl border border-[#e7dfd5] bg-white p-4 text-sm text-[#5b5b5b]">
+                No partners match this filter yet. Try another goal, pick a partner type, or view all partners.
+              </p>
+            ) : null}
+
+            {categoryFilter === 'INTENT_FOOD' ? (
+              <TouristExploreFoodMenuSection
+                foodMenuCategory={foodMenuCategory}
+                onFoodMenuCategoryChange={setFoodMenuCategory}
+                categories={menuFeedCategories}
+                items={menuFeedItems}
+                isLoading={menuFeedLoading}
+                errorMessage={menuFeedError}
+                onOpenMenuItem={setSelectedMenuItem}
+              />
+            ) : null}
+
+            {exploreRows.map((row) => (
+              <TouristBusinessCarouselSection key={row.id} title={row.title} items={row.items} onOpen={openBusiness} />
             ))}
           </div>
-        </section>
-      ))}
 
-      {selectedItem && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-xl font-semibold">{selectedItem.name}</h3>
-            <p className="mt-1 text-sm text-[#9b5a2c]">{selectedItem.type}</p>
-            <p className="mt-4 text-sm text-[#4f4f4f]">{selectedItem.summary}</p>
-            <p className="mt-4 text-sm text-[#4f4f4f]">
-              Reservation and map access depend on each business setup.
-            </p>
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedItem(null)}
-                className="rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#eb6c12]"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+          <aside className="mt-8 hidden w-full min-w-0 shrink-0 lg:mt-0 lg:block" aria-label="Filters and shortcuts">
+            <TouristExploreRightRailSection
+              intents={serviceIntents}
+              highlightIntentId={intentHighlightId}
+              allPartnersActive={categoryFilter === 'ALL'}
+              onSelectIntent={setCategoryFilter}
+              filterChips={filterChips}
+              categoryFilter={categoryFilter}
+              onSelectChip={setCategoryFilter}
+              showPartnerTypeChips={showPartnerTypeChips}
+              isCollapsed={isExploreRailCollapsed}
+              onToggleCollapsed={() => setIsExploreRailCollapsed((v) => !v)}
+              foodMenuCategory={foodMenuCategory}
+              onFoodMenuCategoryChange={setFoodMenuCategory}
+              foodMenuCategories={menuFeedCategories}
+              foodMenuCategoriesLoading={menuFeedLoading}
+            />
+          </aside>
         </div>
-      )}
+      ) : null}
+
+      {selectedMenuItem ? (
+        <TouristMenuItemDetailModal item={selectedMenuItem} onClose={() => setSelectedMenuItem(null)} />
+      ) : null}
+      {selectedBusiness ? <TouristBusinessDetailModal business={selectedBusiness} onClose={closeBusiness} /> : null}
     </div>
   )
 }

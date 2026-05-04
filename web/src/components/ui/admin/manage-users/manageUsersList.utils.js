@@ -1,4 +1,4 @@
-/** Normalize GET /auth/admin/users response into list + pagination state. */
+/** Normalize GET /admin/manage-users/users response into list + pagination state. */
 export const applyAdminUsersListResponse = (res, { setRows, setTotal, setTotalPages, setPage, currentPage }) => {
   const meta = res?.data
   const nextRows = meta?.data || []

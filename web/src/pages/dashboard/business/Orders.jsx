@@ -2,7 +2,7 @@ import OrderBoardSection from '../../../components/business/menu/sections/OrderB
 
 const Orders = () => {
   return (
-    <div className="space-y-6 rounded-2xl bg-white p-5 shadow-sm">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-sm">
       <OrderBoardSection />
     </div>
   )

@@ -94,33 +94,42 @@ const InterfaceHeaderSection = ({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="rounded-full px-3.5 py-2 text-xs font-medium text-white transition"
-              style={{ backgroundColor: themeColor }}
-            >
-              View as User
-            </button>
+            {!isEditingHeader && (
+              <button
+                type="button"
+                className="rounded-full px-3.5 py-2 text-xs font-medium text-white transition"
+                style={{ backgroundColor: themeColor }}
+              >
+                View as User
+              </button>
+            )}
             <label
-              className="inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition"
+              className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition ${
+                isEditingHeader ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+              }`}
               style={{
                 borderColor: `${themeColor}4d`,
                 backgroundColor: `${themeColor}14`,
                 color: '#7a4a22'
               }}
+              title={isEditingHeader ? undefined : 'Click Edit to enable theme color changes'}
             >
               <input
                 type="color"
                 value={themeColor}
                 onChange={(event) => setThemeColor(event.target.value)}
-                className="h-4 w-4 cursor-pointer rounded border-0 bg-transparent p-0"
+                disabled={!isEditingHeader}
+                className={`h-4 w-4 rounded border-0 bg-transparent p-0 disabled:cursor-not-allowed ${
+                  isEditingHeader ? 'cursor-pointer' : 'cursor-not-allowed'
+                }`}
               />
               Change Theme Color
             </label>
             <button
               type="button"
               onClick={handleSaveThemeColor}
-              disabled={isSavingThemeColor}
+              disabled={!isEditingHeader || isSavingThemeColor}
+              title={isEditingHeader ? undefined : 'Click Edit to enable saving theme color'}
               className="rounded-full border px-3.5 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
               style={{
                 borderColor: `${themeColor}52`,

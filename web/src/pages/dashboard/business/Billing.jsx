@@ -1,4 +1,5 @@
 import { BillingOverviewSection, PricingPlansSection } from '../../../components/business/billing/sections'
+import PaymongoMobileCheckoutModal from '../../../components/business/billing/modals/PaymongoMobileCheckoutModal'
 import { useBusinessBilling } from '../../../hooks/useBusinessBilling.hook'
 import { useSubscriptionCatalog } from '../../../hooks/useSubscriptionCatalog.hook'
 
@@ -7,6 +8,7 @@ const Billing = () => {
 
   const {
     hasActivePlan,
+    isPlanSelectionLocked,
     planSubscriptionSummary,
     showPastOrFailedPlan,
     billingAccountSummary,
@@ -24,7 +26,11 @@ const Billing = () => {
     handleOpenAvailablePlansModal,
     handleCloseAvailablePlansModal,
     handleOpenCompareFeaturesModal,
-    handleCloseCompareFeaturesModal
+    handleCloseCompareFeaturesModal,
+    isPaymongoMobileCheckoutModalOpen,
+    paymongoMobileCheckoutUrl,
+    closePaymongoMobileCheckoutModal,
+    continuePaymongoMobileCheckout
   } = useBusinessBilling()
 
   return (
@@ -44,6 +50,7 @@ const Billing = () => {
         featureComparisonRows={subscriptionCatalog.rows}
         pricingOptions={subscriptionCatalog.pricing}
         hasActivePlan={hasActivePlan}
+        isPlanSelectionLocked={isPlanSelectionLocked}
         planSubscriptionSummary={planSubscriptionSummary}
         showPastOrFailedPlan={showPastOrFailedPlan}
         billingAccountSummary={billingAccountSummary}
@@ -67,6 +74,15 @@ const Billing = () => {
         pricingOptions={subscriptionCatalog.pricing}
         onChoosePlan={handleChoosePlan}
         processingPlanId={processingPlanId}
+        isPlanSelectionLocked={isPlanSelectionLocked}
+        planSelectionLockExpiresAtLabel={planSubscriptionSummary?.expiresAtLabel}
+      />
+
+      <PaymongoMobileCheckoutModal
+        isOpen={isPaymongoMobileCheckoutModalOpen}
+        checkoutUrl={paymongoMobileCheckoutUrl}
+        onClose={closePaymongoMobileCheckoutModal}
+        onContinueToPaymongo={continuePaymongoMobileCheckout}
       />
     </section>
   )

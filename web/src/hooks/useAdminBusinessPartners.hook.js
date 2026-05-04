@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
-import { getAdminBusinessPartners } from '../services/business/business.service'
+import { useEffect, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { useAdminBusinessPartnersStore } from '../store/admin/businessPartners.store'
 
 const PLAN_FILTER = {
   ALL: 'ALL',
@@ -9,45 +9,19 @@ const PLAN_FILTER = {
   INACTIVE: 'INACTIVE'
 }
 
-const mapRow = (item) => ({
-  id: String(item?._id || ''),
-  name: item?.name || 'Unnamed business',
-  logo: item?.logo || '',
-  ownerName: item?.ownerName || '—',
-  ownerEmail: item?.ownerEmail || '—',
-  phone: item?.phone || '—',
-  category: item?.category || '—',
-  verificationStatus: item?.verificationStatus || '—',
-  firstPartneredAt: item?.firstPartneredAt || null,
-  planId: item?.subscription?.planId || null,
-  planMonths: item?.subscription?.months ?? null,
-  effectiveStatus: item?.subscription?.effectiveStatus || 'INACTIVE',
-  expiresAt: item?.subscription?.expiresAt || null
-})
-
 export const useAdminBusinessPartners = () => {
-  const [rows, setRows] = useState([])
-  const [search, setSearch] = useState('')
-  const [planFilter, setPlanFilter] = useState(PLAN_FILTER.ALL)
-  const [isLoading, setIsLoading] = useState(true)
-
-  const loadPartners = async () => {
-    try {
-      setIsLoading(true)
-      const response = await getAdminBusinessPartners()
-      const list = Array.isArray(response?.data?.data) ? response.data.data : []
-      setRows(list.map(mapRow))
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to load business partners.')
-      setRows([])
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { rows, search, planFilter, isLoading } = useAdminBusinessPartnersStore(
+    useShallow((s) => ({
+      rows: s.rows,
+      search: s.search,
+      planFilter: s.planFilter,
+      isLoading: s.isLoading
+    }))
+  )
 
   useEffect(() => {
     const requestId = requestAnimationFrame(() => {
-      void loadPartners()
+      void useAdminBusinessPartnersStore.getState().fetchPartners()
     })
     return () => cancelAnimationFrame(requestId)
   }, [])
@@ -68,6 +42,9 @@ export const useAdminBusinessPartners = () => {
     })
   }, [rows, search, planFilter])
 
+  const setSearch = (v) => useAdminBusinessPartnersStore.getState().setSearch(v)
+  const setPlanFilter = (v) => useAdminBusinessPartnersStore.getState().setPlanFilter(v)
+
   return {
     isLoading,
     search,
@@ -76,6 +53,6 @@ export const useAdminBusinessPartners = () => {
     setPlanFilter,
     planFilterOptions: PLAN_FILTER,
     filteredRows,
-    reload: loadPartners
+    reload: () => useAdminBusinessPartnersStore.getState().fetchPartners()
   }
 }

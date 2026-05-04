@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { resetPasswordSchema } from '../../shared/validators/auth.validator'
 import { showErrorToast, showSuccessToast } from '../../shared/ui/toast.util'
-import { useAuthStore } from '../../stores/auth/auth.store'
+import { useAuthStore } from '../../store/auth/auth.store'
 
 const ResetPassword = () => {
   const navigate = useNavigate()

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import VerificationCodeInput from '../../components/auth/VerificationCodeInput'
 import VerificationCountdown from '../../components/auth/VerificationCountdown'
-import { useAuthStore } from '../../stores/auth/auth.store'
+import { useAuthStore } from '../../store/auth/auth.store'
 import { showErrorToast, showSuccessToast } from '../../shared/ui/toast.util'
 import { verificationCodeSchema } from '../../shared/validators/auth.validator'
 

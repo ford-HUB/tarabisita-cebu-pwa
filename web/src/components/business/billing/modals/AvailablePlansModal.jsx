@@ -6,7 +6,9 @@ const AvailablePlansModal = ({
   onClose,
   onChoosePlan,
   processingPlanId = null,
-  pricingOptions = defaultPricingOptions
+  pricingOptions = defaultPricingOptions,
+  isPlanSelectionLocked = false,
+  planSelectionLockExpiresAtLabel = ''
 }) => {
   if (!isOpen) {
     return null
@@ -46,6 +48,15 @@ const AvailablePlansModal = ({
         </header>
 
         <div className="max-h-[calc(min(90vh,720px)-140px)] overflow-y-auto p-5">
+          {isPlanSelectionLocked ? (
+            <p className="mb-4 rounded-xl border border-[#e9dece] bg-[#fffaeb] px-3 py-2.5 text-xs text-[#6d645d]">
+              <span className="font-semibold text-[#92400e]">Plan selection is locked</span> until your current prepaid
+              period ends
+              {planSelectionLockExpiresAtLabel && planSelectionLockExpiresAtLabel !== '—'
+                ? ` (${planSelectionLockExpiresAtLabel}).`
+                : '.'}
+            </p>
+          ) : null}
           <ul className="space-y-4">
             {pricingOptions.map((plan) => (
               <li
@@ -84,12 +95,17 @@ const AvailablePlansModal = ({
                     onClick={() => {
                       onChoosePlan?.(plan)
                     }}
-                    disabled={Boolean(processingPlanId)}
+                    disabled={Boolean(processingPlanId) || isPlanSelectionLocked}
+                    title={
+                      isPlanSelectionLocked
+                        ? 'You can choose a new plan after your current prepaid period ends.'
+                        : undefined
+                    }
                     className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-medium transition sm:self-center ${
                       plan.highlighted
                         ? 'bg-[#9b5a2c] text-white hover:bg-[#824b24]'
                         : 'border border-[#e1d4c5] text-[#5f5f5f] hover:bg-[#f7f3ed]'
-                    } ${processingPlanId ? 'cursor-not-allowed opacity-70' : ''}`}
+                    } ${processingPlanId || isPlanSelectionLocked ? 'cursor-not-allowed opacity-70' : ''}`}
                   >
                     {processingPlanId === plan.id ? 'Redirecting…' : 'Select plan'}
                   </button>

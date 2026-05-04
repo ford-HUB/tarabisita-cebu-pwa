@@ -16,6 +16,7 @@ const statusBadgeClass = (effectiveStatus) => {
 
 const PlanDetailsSection = ({
   hasActivePlan,
+  isPlanSelectionLocked = false,
   planSubscriptionSummary = null,
   showPastOrFailedPlan = false,
   planBenefits = defaultPlanBenefits,
@@ -67,7 +68,7 @@ const PlanDetailsSection = ({
 
             <p className="rounded-xl border border-[#e9dece] bg-white px-3 py-2.5 text-xs text-[#6d645d]">
               Your prepaid window is counted from the exact time checkout completed, for the number of months in your
-              plan. After the period end, renew to keep premium access.
+              plan. After the period end, you can purchase a new billing cycle to keep premium access.
             </p>
           </div>
 
@@ -93,21 +94,42 @@ const PlanDetailsSection = ({
               ))}
             </ul>
 
-            <div className="flex flex-wrap items-center gap-2 pt-4">
-              <button
-                type="button"
-                onClick={() => onOpenAvailablePlans?.()}
-                className="rounded-xl bg-[#9b5a2c] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#824b24]"
-              >
-                View plans & renew
-              </button>
-              <button
-                type="button"
-                onClick={() => onOpenCompareFeatures?.()}
-                className="rounded-xl border border-[#e1d4c5] px-4 py-2.5 text-sm font-medium text-[#5f5f5f] transition hover:bg-[#f7f3ed]"
-              >
-                Compare features
-              </button>
+            <div className="flex flex-col gap-2 pt-4">
+              {isPlanSelectionLocked ? (
+                <p className="rounded-xl border border-[#efe7dc] bg-[#fcfaf7] px-3 py-2 text-xs text-[#6d645d]">
+                  Plan changes are disabled until your current prepaid period ends
+                  {planSubscriptionSummary?.expiresAtLabel && planSubscriptionSummary.expiresAtLabel !== '—'
+                    ? ` (${planSubscriptionSummary.expiresAtLabel}).`
+                    : '.'}{' '}
+                  You can choose a new billing cycle after that time.
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onOpenAvailablePlans?.()}
+                  disabled={isPlanSelectionLocked}
+                  title={
+                    isPlanSelectionLocked
+                      ? 'You can choose a new plan after your current period ends.'
+                      : undefined
+                  }
+                  className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                    isPlanSelectionLocked
+                      ? 'cursor-not-allowed bg-[#e7dfd5] text-[#8a8076]'
+                      : 'bg-[#9b5a2c] text-white hover:bg-[#824b24]'
+                  }`}
+                >
+                  View plans & renew
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onOpenCompareFeatures?.()}
+                  className="rounded-xl border border-[#e1d4c5] px-4 py-2.5 text-sm font-medium text-[#5f5f5f] transition hover:bg-[#f7f3ed]"
+                >
+                  Compare features
+                </button>
+              </div>
             </div>
           </div>
         </div>

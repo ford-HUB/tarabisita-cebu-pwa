@@ -13,6 +13,7 @@ const BillingOverviewSection = ({
   featureComparisonRows,
   pricingOptions,
   hasActivePlan,
+  isPlanSelectionLocked = false,
   planSubscriptionSummary = null,
   showPastOrFailedPlan = false,
   billingAccountSummary = null,
@@ -52,6 +53,7 @@ const BillingOverviewSection = ({
       <div className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
         <PlanDetailsSection
           hasActivePlan={hasActivePlan}
+          isPlanSelectionLocked={isPlanSelectionLocked}
           planSubscriptionSummary={planSubscriptionSummary}
           showPastOrFailedPlan={showPastOrFailedPlan}
           planBenefits={planBenefits}
@@ -78,6 +80,8 @@ const BillingOverviewSection = ({
         onChoosePlan={onChoosePlan}
         processingPlanId={processingPlanId}
         pricingOptions={pricingOptions}
+        isPlanSelectionLocked={isPlanSelectionLocked}
+        planSelectionLockExpiresAtLabel={planSubscriptionSummary?.expiresAtLabel}
       />
 
       <CompareFeaturesModal

@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
 import { adminTransactionsFilterSchema } from '../shared/validators/adminTransactions.validator'
-import { getAdminPlanSubscriptionTransactions } from '../services/business/business.service'
 import { buildPlanSubscriptionTransactionsCsv, sortTransactionRows } from '../components/ui/admin/transactions/transactions.utils'
 import { PAYMENT_STATUS_FILTER, PERIOD_OPTIONS } from '../components/ui/admin/transactions/transactions.constants'
+import { useAdminTransactionsStore } from '../store/admin/transactions.store'
 
 const defaultFilterValues = {
   search: '',
@@ -13,28 +14,17 @@ const defaultFilterValues = {
   paymentStatus: 'ALL'
 }
 
-const mapRow = (item) => ({
-  id: item?.id || '',
-  orderId: item?.orderId || '—',
-  businessName: item?.businessName || '—',
-  customerName: item?.customerName || '—',
-  email: item?.email || '—',
-  amount: item?.amount,
-  currency: item?.currency || 'PHP',
-  planId: item?.planId || '',
-  months: item?.months,
-  status: item?.status || 'PENDING',
-  paidAt: item?.paidAt,
-  createdAt: item?.createdAt,
-  subscriptionEndsAt: item?.subscriptionEndsAt
-})
-
 export const useAdminTransactions = () => {
-  const [rawRows, setRawRows] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [sortKey, setSortKey] = useState('createdAt')
-  const [sortDir, setSortDir] = useState('desc')
-  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const { rawRows, isLoading, sortKey, sortDir, selectedIds } = useAdminTransactionsStore(
+    useShallow((s) => ({
+      rawRows: s.rawRows,
+      isLoading: s.isLoading,
+      sortKey: s.sortKey,
+      sortDir: s.sortDir,
+      selectedIds: s.selectedIds
+    }))
+  )
+
   const {
     register,
     watch,
@@ -50,25 +40,11 @@ export const useAdminTransactions = () => {
   const search = watch('search')
 
   const load = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      const response = await getAdminPlanSubscriptionTransactions({
-        days: period,
-        status: paymentStatus
-      })
-      const records = response?.data?.data || []
-      setRawRows(records.map(mapRow))
-      setSelectedIds(new Set())
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to load transactions.')
-      setRawRows([])
-    } finally {
-      setIsLoading(false)
-    }
+    await useAdminTransactionsStore.getState().fetchTransactions({ period, paymentStatus })
   }, [period, paymentStatus])
 
   useEffect(() => {
-    load()
+    void load()
   }, [load])
 
   const filteredRows = useMemo(() => {
@@ -87,18 +63,11 @@ export const useAdminTransactions = () => {
   )
 
   const onSort = useCallback((key) => {
-    setSortKey((prev) => {
-      if (prev === key) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-        return prev
-      }
-      setSortDir('asc')
-      return key
-    })
+    useAdminTransactionsStore.getState().toggleSort(key)
   }, [])
 
   const toggleRow = useCallback((id) => {
-    setSelectedIds((prev) => {
+    useAdminTransactionsStore.getState().setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -110,7 +79,7 @@ export const useAdminTransactions = () => {
     sortedRows.length > 0 && sortedRows.every((row) => selectedIds.has(row.id))
 
   const toggleAllVisible = useCallback(() => {
-    setSelectedIds((prev) => {
+    useAdminTransactionsStore.getState().setSelectedIds((prev) => {
       if (sortedRows.length === 0) return new Set()
       const allSelected = sortedRows.every((row) => prev.has(row.id))
       if (allSelected) return new Set()

@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
-import {
-  getMyBusinessProfile,
-  updateMyBusinessProfile,
-  updateMyBusinessThemeColor,
-  uploadMyBusinessBannerImage,
-  uploadMyBusinessProfileImage
-} from '../services/business/business.service'
+import { useBusinessInterfaceStore } from '../store/business/businessInterface.store'
 
 const toDataUrl = (file) =>
   new Promise((resolve, reject) => {
@@ -26,10 +21,7 @@ const toDataUrl = (file) =>
 export const useBusinessInterface = ({ user, categoryLabel }) => {
   const emptyCards = Array.from({ length: 6 })
   const [themeColor, setThemeColor] = useState('#ff7a1a')
-  const [isSavingThemeColor, setIsSavingThemeColor] = useState(false)
   const [isEditingHeader, setIsEditingHeader] = useState(false)
-  const [isSavingHeader, setIsSavingHeader] = useState(false)
-  const [businessProfile, setBusinessProfile] = useState(null)
   const [businessNameInput, setBusinessNameInput] = useState('')
   const [businessDescriptionInput, setBusinessDescriptionInput] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
@@ -41,23 +33,26 @@ export const useBusinessInterface = ({ user, categoryLabel }) => {
   const [isEditingLayout, setIsEditingLayout] = useState(false)
   const [showCardDetails, setShowCardDetails] = useState(true)
 
-  useEffect(() => {
-    const loadBusinessInterfaceData = async () => {
-      try {
-        const response = await getMyBusinessProfile()
-        const profile = response?.data?.data
-        if (profile?.themeColor) setThemeColor(profile.themeColor)
-        setBusinessProfile(profile || null)
-        setBusinessNameInput(profile?.name || '')
-        setBusinessDescriptionInput(profile?.description || `${categoryLabel} profile and branding setup`)
-        setLogoUrl(profile?.logo || '')
-        setBannerUrl(profile?.banner || profile?.coverImage || '')
-      } catch (_error) {
-        // Silent fallback to defaults.
-      }
-    }
+  const { businessProfile, isSavingThemeColor, isSavingHeader } = useBusinessInterfaceStore(
+    useShallow((s) => ({
+      businessProfile: s.businessProfile,
+      isSavingThemeColor: s.isSavingThemeColor,
+      isSavingHeader: s.isSavingHeader
+    }))
+  )
 
-    loadBusinessInterfaceData()
+  useEffect(() => {
+    const run = async () => {
+      const { profile } = await useBusinessInterfaceStore.getState().loadInterfaceProfile()
+      if (profile?.themeColor) setThemeColor(profile.themeColor)
+      setBusinessNameInput(profile?.name || '')
+      setBusinessDescriptionInput(
+        profile?.description || `${categoryLabel} profile and branding setup`
+      )
+      setLogoUrl(profile?.logo || '')
+      setBannerUrl(profile?.banner || profile?.coverImage || '')
+    }
+    void run()
   }, [categoryLabel])
 
   const hasTextHeaderChanges =
@@ -68,15 +63,7 @@ export const useBusinessInterface = ({ user, categoryLabel }) => {
   const hasHeaderChanges = hasTextHeaderChanges || Boolean(logoFileData) || Boolean(bannerFileData)
 
   const handleSaveThemeColor = async () => {
-    try {
-      setIsSavingThemeColor(true)
-      await updateMyBusinessThemeColor(themeColor)
-      toast.success('Theme color saved successfully.')
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to save theme color.')
-    } finally {
-      setIsSavingThemeColor(false)
-    }
+    await useBusinessInterfaceStore.getState().saveThemeColor(themeColor)
   }
 
   const handleLogoChange = async (event) => {
@@ -109,7 +96,9 @@ export const useBusinessInterface = ({ user, categoryLabel }) => {
 
   const resetHeaderDraft = () => {
     setBusinessNameInput(businessProfile?.name || '')
-    setBusinessDescriptionInput(businessProfile?.description || `${categoryLabel} profile and branding setup`)
+    setBusinessDescriptionInput(
+      businessProfile?.description || `${categoryLabel} profile and branding setup`
+    )
     setLogoUrl(businessProfile?.logo || '')
     setLogoFileData('')
     setBannerUrl(businessProfile?.banner || businessProfile?.coverImage || '')
@@ -128,67 +117,25 @@ export const useBusinessInterface = ({ user, categoryLabel }) => {
       return
     }
 
-    if (!businessProfile) {
-      toast.error('Business profile is not ready yet.')
-      return
-    }
-    if (hasTextHeaderChanges && businessNameInput.trim().length < 2) {
-      toast.error('Business name must be at least 2 characters.')
-      return
-    }
-    if (hasTextHeaderChanges && businessDescriptionInput.trim().length < 10) {
-      toast.error('Description must be at least 10 characters.')
-      return
-    }
+    const result = await useBusinessInterfaceStore.getState().saveHeaderBundle({
+      hasTextHeaderChanges,
+      businessNameInput,
+      businessDescriptionInput,
+      logoFileData,
+      bannerFileData,
+      businessProfile,
+      user,
+      categoryLabel
+    })
 
-    try {
-      setIsSavingHeader(true)
-      let updatedProfile = businessProfile
-
-      if (hasTextHeaderChanges) {
-        const lat = Number(businessProfile?.businessLocation?.lat)
-        const lng = Number(businessProfile?.businessLocation?.lng)
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-          toast.error('Business location is missing. Please complete your profile first.')
-          return
-        }
-
-        const profileResponse = await updateMyBusinessProfile({
-          ownerName: businessProfile?.ownerName || user?.name || 'Business Owner',
-          businessName: businessNameInput.trim(),
-          address: businessProfile?.address || 'Business address',
-          phone: businessProfile?.contact_info?.phone || '0000000',
-          about: businessDescriptionInput.trim(),
-          website: businessProfile?.website || '',
-          lat,
-          lng
-        })
-        updatedProfile = profileResponse?.data?.data || updatedProfile
-      }
-
-      if (logoFileData) {
-        const logoResponse = await uploadMyBusinessProfileImage(logoFileData)
-        updatedProfile = logoResponse?.data?.data || updatedProfile
-      }
-
-      if (bannerFileData) {
-        const bannerResponse = await uploadMyBusinessBannerImage(bannerFileData)
-        updatedProfile = bannerResponse?.data?.data || updatedProfile
-      }
-
-      setBusinessProfile(updatedProfile || businessProfile)
-      setBusinessNameInput(updatedProfile?.name || businessNameInput)
-      setBusinessDescriptionInput(updatedProfile?.description || businessDescriptionInput)
-      setLogoUrl(updatedProfile?.logo || logoUrl)
-      setBannerUrl(updatedProfile?.banner || updatedProfile?.coverImage || bannerUrl)
+    if (result?.ok && result.profile) {
+      setBusinessNameInput(result.profile?.name || businessNameInput)
+      setBusinessDescriptionInput(result.profile?.description || businessDescriptionInput)
+      setLogoUrl(result.profile?.logo || logoUrl)
+      setBannerUrl(result.profile?.banner || result.profile?.coverImage || bannerUrl)
       setLogoFileData('')
       setBannerFileData('')
       setIsEditingHeader(false)
-      toast.success('Business header updated successfully.')
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to update business header.')
-    } finally {
-      setIsSavingHeader(false)
     }
   }
 

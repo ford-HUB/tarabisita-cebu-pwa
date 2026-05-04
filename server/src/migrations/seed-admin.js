@@ -3,8 +3,8 @@ import mongoose from 'mongoose'
 import bcrypt from 'bcrypt'
 
 import { dbConnection } from '../configs/db.config.js'
-import Role from '../modules/auth/Role.model.js'
-import User from '../modules/auth/User.model.js'
+import Role from '../modules/auth/models/role.model.js'
+import User from '../modules/auth/models/user.model.js'
 import { adminCredentials } from './seeders/admin-credentials.js'
 
 const seedAdmin = async () => {

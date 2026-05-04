@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-/** Mirrors server `subscriptionCatalogBodySchema` for admin catalog form (RHF + zodResolver). */
+/** Mirrors server `manageSubscriptionBodySchema` for admin catalog form (RHF + zodResolver). */
 const pricingItemSchema = z.object({
   id: z.string().min(1),
   months: z.coerce.number().int().positive(),

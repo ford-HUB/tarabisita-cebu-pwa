@@ -7,8 +7,12 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss()
-],
-server: {
+  ],
+  /** Avoid stale pre-bundle / "Outdated Optimize Dep" (504) after adding deps like socket.io-client */
+  optimizeDeps: {
+    include: ['socket.io-client']
+  },
+  server: {
     watch: {
       usePolling: true
     }

@@ -1,43 +1,51 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
-import { DEFAULT_LOCATION, DEFAULT_PROFILE } from '../shared/constants/profile.constants'
+import { DEFAULT_PROFILE } from '../shared/constants/profile.constants'
 import { businessProfileSchema } from '../shared/validators/profile.validator'
-import {
-  changeMyBusinessPassword,
-  getMyBusinessActivityLogs,
-  getMyBusinessProfile,
-  submitMyBusinessProof,
-  updateMyBusinessProfile,
-  uploadMyBusinessAvatarImage
-} from '../services/business/business.service'
+import { useBusinessProfileStore } from '../store/business/businessProfile.store'
 
 export const useBusinessProfile = ({ user, setUser }) => {
-  const [profileData, setProfileData] = useState(null)
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
-  const [isConfirmPasswordModalOpen, setIsConfirmPasswordModalOpen] = useState(false)
-  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
-  const [isChangingPassword, setIsChangingPassword] = useState(false)
-  const [isProofModalOpen, setIsProofModalOpen] = useState(false)
-  const [isSubmittingProof, setIsSubmittingProof] = useState(false)
-  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false)
-  const [isActivityPanelOpen, setIsActivityPanelOpen] = useState(false)
-  const [isLoadingActivityLogs, setIsLoadingActivityLogs] = useState(false)
-  const [activityLogs, setActivityLogs] = useState([])
-  const [initialProfileValues, setInitialProfileValues] = useState({
-    ownerName: DEFAULT_PROFILE.name,
-    businessName: DEFAULT_PROFILE.businessName,
-    address: DEFAULT_PROFILE.address,
-    phone: DEFAULT_PROFILE.phone,
-    about: DEFAULT_PROFILE.about,
-    website: '',
-    lat: Number(DEFAULT_LOCATION.lat),
-    lng: Number(DEFAULT_LOCATION.lng)
-  })
+  const {
+    profileData,
+    isLoadingProfile,
+    isEditing,
+    isSaving,
+    isUploadingPhoto,
+    isConfirmPasswordModalOpen,
+    isPasswordModalOpen,
+    isChangingPassword,
+    isProofModalOpen,
+    isSubmittingProof,
+    isSecurityModalOpen,
+    isActivityPanelOpen,
+    isLoadingActivityLogs,
+    activityLogs,
+    initialProfileValues,
+    location
+  } = useBusinessProfileStore(
+    useShallow((s) => ({
+      profileData: s.profileData,
+      isLoadingProfile: s.isLoadingProfile,
+      isEditing: s.isEditing,
+      isSaving: s.isSaving,
+      isUploadingPhoto: s.isUploadingPhoto,
+      isConfirmPasswordModalOpen: s.isConfirmPasswordModalOpen,
+      isPasswordModalOpen: s.isPasswordModalOpen,
+      isChangingPassword: s.isChangingPassword,
+      isProofModalOpen: s.isProofModalOpen,
+      isSubmittingProof: s.isSubmittingProof,
+      isSecurityModalOpen: s.isSecurityModalOpen,
+      isActivityPanelOpen: s.isActivityPanelOpen,
+      isLoadingActivityLogs: s.isLoadingActivityLogs,
+      activityLogs: s.activityLogs,
+      initialProfileValues: s.initialProfileValues,
+      location: s.location
+    }))
+  )
+
   const {
     register,
     handleSubmit,
@@ -57,52 +65,24 @@ export const useBusinessProfile = ({ user, setUser }) => {
     }
   })
   const form = watch()
-  const [location, setLocation] = useState(() => ({
-    lat: Number(DEFAULT_LOCATION.lat),
-    lng: Number(DEFAULT_LOCATION.lng)
-  }))
-
-  const hydrateForm = (data) => {
-    const nextValues = {
-      ownerName: data?.ownerName || user?.name || DEFAULT_PROFILE.name,
-      businessName: data?.name || DEFAULT_PROFILE.businessName,
-      address: data?.address || DEFAULT_PROFILE.address,
-      phone: data?.contact_info?.phone || DEFAULT_PROFILE.phone,
-      about: data?.description || DEFAULT_PROFILE.about,
-      website: data?.website || ''
-    }
-    reset(nextValues)
-
-    const nextLocation = {
-      lat: Number(data?.businessLocation?.lat ?? DEFAULT_LOCATION.lat),
-      lng: Number(data?.businessLocation?.lng ?? DEFAULT_LOCATION.lng)
-    }
-    setLocation(nextLocation)
-    setInitialProfileValues({
-      ...nextValues,
-      lat: nextLocation.lat,
-      lng: nextLocation.lng
-    })
-  }
-
-  const loadProfile = async () => {
-    try {
-      setIsLoadingProfile(true)
-      const response = await getMyBusinessProfile()
-      const data = response?.data?.data
-      setProfileData(data)
-      hydrateForm(data)
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to load business profile.')
-    } finally {
-      setIsLoadingProfile(false)
-    }
-  }
 
   useEffect(() => {
-    loadProfile()
+    const run = async () => {
+      const result = await useBusinessProfileStore.getState().loadProfile(user)
+      if (result?.ok && result.formValues) {
+        reset(result.formValues)
+      }
+    }
+    void run()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const status = profileData?.verificationStatus
+    if (typeof status !== 'string' || !setUser) return
+    if (user?.businessVerificationStatus === status) return
+    setUser({ businessVerificationStatus: status })
+  }, [profileData?.verificationStatus, setUser, user?.businessVerificationStatus])
 
   const profile = useMemo(
     () => ({
@@ -151,136 +131,101 @@ export const useBusinessProfile = ({ user, setUser }) => {
     }
 
     try {
-      setIsUploadingPhoto(true)
       const base64Image = await fileToDataUrl(file)
-      const response = await uploadMyBusinessAvatarImage(base64Image)
-      const updatedProfile = response?.data?.data
-      setProfileData(updatedProfile)
-      setUser({ avatar: updatedProfile?.avatar || '' })
-      toast.success('Profile image updated successfully.')
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to upload profile image.')
+      await useBusinessProfileStore.getState().uploadProfileAvatar({
+        base64Image,
+        mergeUser: setUser
+      })
     } finally {
-      setIsUploadingPhoto(false)
       event.target.value = ''
     }
   }
 
   const handleSaveProfile = handleSubmit(async (values) => {
-    try {
-      setIsSaving(true)
-      const response = await updateMyBusinessProfile({
-        ownerName: values.ownerName.trim(),
-        businessName: values.businessName.trim(),
-        address: values.address.trim(),
-        phone: values.phone.trim(),
-        about: values.about.trim(),
-        website: values.website?.trim() || '',
-        lat: Number(location.lat),
-        lng: Number(location.lng)
-      })
-      const updated = response?.data?.data
-      setProfileData(updated)
-      hydrateForm(updated)
-      setUser({ name: updated.ownerName })
-      setIsEditing(false)
-      toast.success('Business profile saved successfully.')
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to save business profile.')
-    } finally {
-      setIsSaving(false)
+    const result = await useBusinessProfileStore.getState().saveProfile({
+      values,
+      location: useBusinessProfileStore.getState().location,
+      user,
+      mergeUser: setUser
+    })
+    if (result?.ok && result.formValues) {
+      reset(result.formValues)
     }
   })
 
   const handleEditToggle = () => {
+    const store = useBusinessProfileStore.getState()
     if (isEditing) {
-      hydrateForm(profileData)
-      setIsEditing(false)
+      const r = store.reapplyBaselineFromStoredProfile(user)
+      if (r?.formValues) reset(r.formValues)
+      store.setIsEditing(false)
       return
     }
-    setIsEditing(true)
+    store.setIsEditing(true)
   }
 
-  const handleOpenChangePasswordFlow = () => setIsConfirmPasswordModalOpen(true)
+  const handleOpenChangePasswordFlow = () =>
+    useBusinessProfileStore.getState().setIsConfirmPasswordModalOpen(true)
+
   const handleProceedToChangePassword = () => {
-    setIsConfirmPasswordModalOpen(false)
-    setIsPasswordModalOpen(true)
-  }
-  const handleClosePasswordModals = () => {
-    setIsConfirmPasswordModalOpen(false)
-    setIsPasswordModalOpen(false)
-  }
-  const handleSubmitPasswordChange = async (passwordForm) => {
-    try {
-      setIsChangingPassword(true)
-      await changeMyBusinessPassword(passwordForm)
-      toast.success('Password changed successfully.')
-      handleClosePasswordModals()
-      return true
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to change password.')
-      return false
-    } finally {
-      setIsChangingPassword(false)
-    }
+    const store = useBusinessProfileStore.getState()
+    store.setIsConfirmPasswordModalOpen(false)
+    store.setIsPasswordModalOpen(true)
   }
 
-  const handleOpenProofModal = () => setIsProofModalOpen(true)
-  const handleCloseProofModal = () => setIsProofModalOpen(false)
+  const handleClosePasswordModals = () => {
+    const store = useBusinessProfileStore.getState()
+    store.setIsConfirmPasswordModalOpen(false)
+    store.setIsPasswordModalOpen(false)
+  }
+
+  const handleSubmitPasswordChange = async (passwordForm) => {
+    const result = await useBusinessProfileStore.getState().changePassword(passwordForm)
+    return Boolean(result?.ok)
+  }
+
+  const handleOpenProofModal = () => useBusinessProfileStore.getState().setIsProofModalOpen(true)
+
+  const handleCloseProofModal = () => useBusinessProfileStore.getState().setIsProofModalOpen(false)
+
   const handleSubmitBusinessProof = async ({ proofs, proofDocuments, notes }) => {
-    try {
-      if (!proofs.length && !proofDocuments.length) {
-        toast.error('Please provide at least one legal proof link or uploaded document.')
-        return false
-      }
-      setIsSubmittingProof(true)
-      const response = await submitMyBusinessProof({ proofs, proofDocuments, notes })
-      const updated = response?.data?.data
-      if (updated) setProfileData(updated)
-      toast.success('Business proof submitted successfully.')
-      return true
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to submit business proof.')
-      return false
-    } finally {
-      setIsSubmittingProof(false)
-    }
+    const result = await useBusinessProfileStore
+      .getState()
+      .submitBusinessProof({ proofs, proofDocuments, notes })
+    return Boolean(result?.ok)
   }
 
   const loadActivityLogs = async () => {
-    try {
-      setIsLoadingActivityLogs(true)
-      const response = await getMyBusinessActivityLogs({ limit: 30 })
-      setActivityLogs(response?.data?.data || [])
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to load activity logs.')
-    } finally {
-      setIsLoadingActivityLogs(false)
-    }
+    await useBusinessProfileStore.getState().loadActivityLogs()
   }
 
   const handleOpenSecurityModal = async () => {
-    setIsSecurityModalOpen(true)
+    useBusinessProfileStore.getState().setIsSecurityModalOpen(true)
     await loadActivityLogs()
   }
 
   const handleOpenSecurityActivityLogs = async () => {
-    setIsSecurityModalOpen(true)
-    setIsActivityPanelOpen(true)
+    const store = useBusinessProfileStore.getState()
+    store.setIsSecurityModalOpen(true)
+    store.setIsActivityPanelOpen(true)
     await loadActivityLogs()
   }
 
   const handleCloseSecurityModal = () => {
-    setIsSecurityModalOpen(false)
-    setIsActivityPanelOpen(false)
+    const store = useBusinessProfileStore.getState()
+    store.setIsSecurityModalOpen(false)
+    store.setIsActivityPanelOpen(false)
   }
 
   const handleToggleActivityPanel = async () => {
-    if (!isActivityPanelOpen && !activityLogs.length) {
+    const store = useBusinessProfileStore.getState()
+    if (!store.isActivityPanelOpen && !store.activityLogs.length) {
       await loadActivityLogs()
     }
-    setIsActivityPanelOpen((current) => !current)
+    store.setIsActivityPanelOpen(!store.isActivityPanelOpen)
   }
+
+  const setLocation = (next) => useBusinessProfileStore.getState().setLocation(next)
 
   return {
     form,

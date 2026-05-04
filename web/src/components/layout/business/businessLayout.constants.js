@@ -12,6 +12,26 @@ import {
 import { toEncryptedRoute } from '../../../shared/utils/direct.utils'
 import { getBusinessCategoryLabel } from '../../../shared/constants/businessCategories.constants'
 
+/** Customer order chats (query `c` = conversation id). */
+export const buildBusinessStoreMessagingThreadHref = (conversationId) => {
+  const route = toEncryptedRoute('business/dashboard/chat')
+  return `${route}&c=${encodeURIComponent(conversationId)}`
+}
+
+export const businessOrdersHref = `/${toEncryptedRoute('business/dashboard/orders')}`
+
+/** Deep link to Orders with optional `o` = customer order id (opens details when the board loads). */
+export const buildBusinessOrderDeepLinkHref = (orderId) => {
+  const route = toEncryptedRoute('business/dashboard/orders')
+  return `${route}&o=${encodeURIComponent(String(orderId))}`
+}
+
+export const businessChatHubHref = `/${toEncryptedRoute('business/dashboard/chat')}`
+
+export const businessNotificationsHref = `/${toEncryptedRoute('business/dashboard/notifications')}`
+
+export const businessDashboardHref = `/${toEncryptedRoute('business/dashboard')}`
+
 export const buildBusinessSidebarLinks = (businessCategory) => {
   const categoryLabel = getBusinessCategoryLabel(businessCategory)
   const baseBusinessPath = `/${toEncryptedRoute('business/dashboard')}`
@@ -19,8 +39,20 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
   const addItemLabel = normalizedCategory === 'RESTAURANT' ? 'Menus' : 'Products'
   const addItemPath = `/${toEncryptedRoute('business/dashboard/menu')}`
   const ordersPath = `/${toEncryptedRoute('business/dashboard/orders')}`
-  const listItem =
-    normalizedCategory === 'RESTAURANT' ? { label: 'Orders', path: ordersPath } : 'Product List'
+  const todaysRecordPath = `/${toEncryptedRoute('business/dashboard/todays-record')}`
+  const yourBusinessChildren =
+    normalizedCategory === 'RESTAURANT'
+      ? [
+          { label: 'Interface', path: `/${toEncryptedRoute('business/dashboard/interface')}` },
+          { label: addItemLabel, path: addItemPath },
+          { label: 'Orders', path: ordersPath },
+          { label: "Today's record", path: todaysRecordPath }
+        ]
+      : [
+          { label: 'Interface', path: `/${toEncryptedRoute('business/dashboard/interface')}` },
+          { label: addItemLabel, path: addItemPath },
+          'Product List'
+        ]
   const profilePath = `/${toEncryptedRoute('business/dashboard/profile')}`
 
   return [
@@ -30,11 +62,7 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
     {
       label: `Your ${categoryLabel}`,
       icon: FiBox,
-      children: [
-        { label: 'Interface', path: `/${toEncryptedRoute('business/dashboard/interface')}` },
-        { label: addItemLabel, path: addItemPath },
-        listItem
-      ]
+      children: yourBusinessChildren
     },
     ...(normalizedCategory === 'RESTAURANT'
       ? []

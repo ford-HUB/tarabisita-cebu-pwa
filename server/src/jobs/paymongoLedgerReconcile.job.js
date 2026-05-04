@@ -1,7 +1,7 @@
 import { Agenda } from 'agenda'
 import { MongoBackend } from '@agendajs/mongo-backend'
 import mongoose from 'mongoose'
-import { reconcilePaymongoWebhooksForBusinessLedger } from '../modules/business/business.service.js'
+import { reconcilePaymongoWebhooksForBusinessLedger } from '../modules/payments/payments.service.js'
 
 const JOB_NAME = 'paymongo-ledger-reconcile'
 

@@ -16,7 +16,7 @@ const BusinessLocationSection = ({
     <section className="rounded-2xl border border-[#e7dfd5] bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wide text-[#9b5a2c]">Restaurant Location</p>
+          <p className="text-xs uppercase tracking-wide text-[#9b5a2c]">Business location</p>
           <p className="mt-1 text-sm text-[#4f4f4f]">
             Default view shows a wider map. Edit Profile zooms in for precise marker updates.
           </p>

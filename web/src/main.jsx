@@ -10,7 +10,7 @@ const routes = createBrowserRouter(MainRoutes)
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <Toaster
-      position="top-right"
+      position="bottom-right"
       closeButton
       toastOptions={{
         className: 'border border-[#ecdcc9] bg-[#fffaf4] text-[#2f2a24] shadow-lg',

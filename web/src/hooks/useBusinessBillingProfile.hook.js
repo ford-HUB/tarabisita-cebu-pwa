@@ -1,31 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
-import { getMyBusinessProfile } from '../services/business/business.service'
+import { useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import {
   getBillingAccountDisplayRows,
   mapProfileToBillingAddressFormDefaults
 } from '../shared/utils/billingDisplay.utils'
+import { useBillingStore } from '../store/billing/billing.store'
 
+/** Reads billing account snapshot from store (loaded by `useBusinessBilling`). */
 export const useBusinessBillingProfile = () => {
-  const [profileData, setProfileData] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { profileData, isBillingProfileLoading } = useBillingStore(
+    useShallow((s) => ({
+      profileData: s.profileData,
+      isBillingProfileLoading: s.isBillingProfileLoading
+    }))
+  )
 
-  const loadProfile = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      const response = await getMyBusinessProfile()
-      setProfileData(response?.data?.data ?? null)
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to load business account for billing.')
-      setProfileData(null)
-    } finally {
-      setIsLoading(false)
-    }
+  const refetchProfile = useCallback(() => {
+    return useBillingStore.getState().loadBillingAccountProfile()
   }, [])
-
-  useEffect(() => {
-    loadProfile()
-  }, [loadProfile])
 
   const displayRows = useMemo(() => getBillingAccountDisplayRows(profileData), [profileData])
 
@@ -38,7 +30,7 @@ export const useBusinessBillingProfile = () => {
     profileData,
     displayRows,
     billingAddressFormDefaults,
-    isLoading,
-    refetchProfile: loadProfile
+    isLoading: isBillingProfileLoading,
+    refetchProfile
   }
 }

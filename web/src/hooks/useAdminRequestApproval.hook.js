@@ -1,52 +1,32 @@
-import { useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
-import { APPROVAL_STATUS } from '../components/ui/admin/request-approval'
-import {
-  getBusinessApprovalQueue,
-  updateBusinessApprovalStatus
-} from '../services/business/business.service'
-
-const mapRequest = (item) => ({
-  id: item?._id || '',
-  businessName: item?.name || 'Unnamed Business',
-  ownerName: item?.ownerName || '-',
-  ownerEmail: item?.ownerEmail || '-',
-  phone: item?.phone || '-',
-  category: item?.category || '-',
-  submittedAt: item?.createdAt,
-  status: item?.verificationStatus || APPROVAL_STATUS.PENDING,
-  address: item?.address || '-',
-  logo: item?.logo || '',
-  verificationProofs: item?.verificationProofs || [],
-  verificationNotes:
-    typeof item?.verificationNotes === 'string' ? item.verificationNotes.trim() : item?.verificationNotes || ''
-})
+import { useEffect, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { useAdminRequestApprovalStore } from '../store/admin/requestApproval.store'
 
 export const useAdminRequestApproval = () => {
-  const [requests, setRequests] = useState([])
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ALL')
-  const [selectedRequest, setSelectedRequest] = useState(null)
-  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
-  const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSubmittingAction, setIsSubmittingAction] = useState(false)
-
-  const loadQueue = async (status = statusFilter) => {
-    try {
-      setIsLoading(true)
-      const response = await getBusinessApprovalQueue(status)
-      const records = response?.data?.data || []
-      setRequests(records.map(mapRequest))
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to load approval requests.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const {
+    requests,
+    search,
+    statusFilter,
+    selectedRequest,
+    isApproveModalOpen,
+    isDeclineModalOpen,
+    isLoading,
+    isSubmittingAction
+  } = useAdminRequestApprovalStore(
+    useShallow((s) => ({
+      requests: s.requests,
+      search: s.search,
+      statusFilter: s.statusFilter,
+      selectedRequest: s.selectedRequest,
+      isApproveModalOpen: s.isApproveModalOpen,
+      isDeclineModalOpen: s.isDeclineModalOpen,
+      isLoading: s.isLoading,
+      isSubmittingAction: s.isSubmittingAction
+    }))
+  )
 
   useEffect(() => {
-    loadQueue(statusFilter)
+    void useAdminRequestApprovalStore.getState().fetchQueue(statusFilter)
   }, [statusFilter])
 
   const filteredRequests = useMemo(() => {
@@ -60,41 +40,21 @@ export const useAdminRequestApproval = () => {
   }, [requests, search])
 
   const openReviewModal = (request) => {
-    setSelectedRequest(request)
-    setIsApproveModalOpen(false)
-    setIsDeclineModalOpen(false)
+    const store = useAdminRequestApprovalStore.getState()
+    store.setSelectedRequest(request)
+    store.setIsApproveModalOpen(false)
+    store.setIsDeclineModalOpen(false)
   }
 
   const closeAllModals = () => {
-    setSelectedRequest(null)
-    setIsApproveModalOpen(false)
-    setIsDeclineModalOpen(false)
+    const store = useAdminRequestApprovalStore.getState()
+    store.setSelectedRequest(null)
+    store.setIsApproveModalOpen(false)
+    store.setIsDeclineModalOpen(false)
   }
 
   const submitAction = async (status, notes = '') => {
-    if (!selectedRequest?.id) return
-    const trimmedNotes = typeof notes === 'string' ? notes.trim() : ''
-    try {
-      setIsSubmittingAction(true)
-      const response = await updateBusinessApprovalStatus({
-        businessId: selectedRequest.id,
-        status,
-        notes: trimmedNotes
-      })
-      const updated = mapRequest(response?.data?.data || {})
-      setRequests((current) => current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
-      setSelectedRequest((current) => (current ? { ...current, ...updated } : current))
-      setIsApproveModalOpen(false)
-      setIsDeclineModalOpen(false)
-      if (status === APPROVAL_STATUS.VERIFIED) {
-        setSelectedRequest(null)
-      }
-      toast.success(`Request ${status === APPROVAL_STATUS.VERIFIED ? 'approved' : 'declined'} successfully.`)
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to update request.')
-    } finally {
-      setIsSubmittingAction(false)
-    }
+    await useAdminRequestApprovalStore.getState().submitApprovalDecision({ status, notes })
   }
 
   return {
@@ -106,10 +66,10 @@ export const useAdminRequestApproval = () => {
     isLoading,
     isSubmittingAction,
     filteredRequests,
-    setSearch,
-    setStatusFilter,
-    setIsApproveModalOpen,
-    setIsDeclineModalOpen,
+    setSearch: (v) => useAdminRequestApprovalStore.getState().setSearch(v),
+    setStatusFilter: (v) => useAdminRequestApprovalStore.getState().setStatusFilter(v),
+    setIsApproveModalOpen: (v) => useAdminRequestApprovalStore.getState().setIsApproveModalOpen(v),
+    setIsDeclineModalOpen: (v) => useAdminRequestApprovalStore.getState().setIsDeclineModalOpen(v),
     openReviewModal,
     closeAllModals,
     submitAction

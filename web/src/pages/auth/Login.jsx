@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { loginSchema } from '../../shared/validators/auth.validator'
 import RequestForgotPassword from '../../components/auth/RequestForgotPasswordModal'
-import { useAuthStore } from '../../stores/auth/auth.store'
+import { useAuthStore } from '../../store/auth/auth.store'
 import { showErrorToast, showSuccessToast } from '../../shared/ui/toast.util'
 import { roleBasedRoute } from '../../shared/utils/direct.utils'
 
