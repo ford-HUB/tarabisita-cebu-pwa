@@ -6,6 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --config nodemon.json src/server.js",
+    "build": "node src/server.js",
     "seed:admin": "node src/migrations/seed-admin.js",
     "seed:restaurant-menu": "node src/migrations/seed-restaurant-menu.js",
     "migrate:customer-orders-collection": "node src/migrations/rename-customer-orders-collection.js",
