@@ -19,7 +19,7 @@ app.use(cookieParser())
 app.use(morgan('dev'))
 
 app.use(cors({
-    origin: process.env.CLIENT_URL,
+    origin: process.env.NODE_ENV === 'production' ? process.env.CLIENT_PRODUCTION : process.env.CLIENT_LOCAL,
     credentials: true
 }))
 
