@@ -16,6 +16,14 @@ import { BUSINESS_CATEGORY_LABELS } from '../../../shared/constants/businessCate
 // Backward-compatible alias for any lingering ResetPassword references.
 const ResetPassword = ResetPasswordModel
 
+const isProduction = process.env.NODE_ENV === 'production'
+
+const clearCookieOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax'
+}
+
 const extractRequestMeta = (req) => {
     const forwardedFor = req.headers['x-forwarded-for']
     const ipAddress = Array.isArray(forwardedFor)
@@ -175,8 +183,8 @@ export const logout = async (req, res) => {
             status: 'SUCCESS',
             description: 'Business account logout successful.'
         })
-        res.clearCookie('accessToken')
-        res.clearCookie('refreshToken')
+        res.clearCookie('accessToken', clearCookieOptions)
+        res.clearCookie('refreshToken', clearCookieOptions)
         return res.status(200).json({ message: "User logged out successfully" })
     } catch (error) {
         res.status(500).json({ message: error.message })
