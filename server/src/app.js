@@ -18,8 +18,25 @@ app.use(cookieParser())
 
 app.use(morgan('dev'))
 
+const allowedOrigins = [
+    process.env.CLIENT_LOCAL,
+    process.env.CLIENT_PRODUCTION
+].filter(Boolean)
+
+const isAllowedVercelPreviewOrigin = (origin) => {
+    return /^https:\/\/tara-bisita-[a-z0-9-]+\.vercel\.app$/i.test(origin)
+}
+
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' ? process.env.CLIENT_PRODUCTION : process.env.CLIENT_LOCAL,
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true)
+
+        const isAllowedOrigin = allowedOrigins.includes(origin) || isAllowedVercelPreviewOrigin(origin)
+
+        if (isAllowedOrigin) return callback(null, true)
+
+        return callback(new Error('Not allowed by CORS'))
+    },
     credentials: true
 }))
 
