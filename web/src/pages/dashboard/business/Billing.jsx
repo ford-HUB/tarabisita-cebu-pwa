@@ -1,5 +1,5 @@
 import { BillingOverviewSection, PricingPlansSection } from '../../../components/business/billing/sections'
-import PaymongoMobileCheckoutModal from '../../../components/business/billing/modals/PaymongoMobileCheckoutModal'
+import XenditMobileCheckoutModal from '../../../components/business/billing/modals/XenditMobileCheckoutModal'
 import { useBusinessBilling } from '../../../hooks/useBusinessBilling.hook'
 import { useSubscriptionCatalog } from '../../../hooks/useSubscriptionCatalog.hook'
 
@@ -27,10 +27,10 @@ const Billing = () => {
     handleCloseAvailablePlansModal,
     handleOpenCompareFeaturesModal,
     handleCloseCompareFeaturesModal,
-    isPaymongoMobileCheckoutModalOpen,
-    paymongoMobileCheckoutUrl,
-    closePaymongoMobileCheckoutModal,
-    continuePaymongoMobileCheckout
+    isXenditMobileCheckoutModalOpen,
+    xenditMobileCheckoutUrl,
+    closeXenditMobileCheckoutModal,
+    continueXenditMobileCheckout
   } = useBusinessBilling()
 
   return (
@@ -78,11 +78,11 @@ const Billing = () => {
         planSelectionLockExpiresAtLabel={planSubscriptionSummary?.expiresAtLabel}
       />
 
-      <PaymongoMobileCheckoutModal
-        isOpen={isPaymongoMobileCheckoutModalOpen}
-        checkoutUrl={paymongoMobileCheckoutUrl}
-        onClose={closePaymongoMobileCheckoutModal}
-        onContinueToPaymongo={continuePaymongoMobileCheckout}
+      <XenditMobileCheckoutModal
+        isOpen={isXenditMobileCheckoutModalOpen}
+        checkoutUrl={xenditMobileCheckoutUrl}
+        onClose={closeXenditMobileCheckoutModal}
+        onContinueToXendit={continueXenditMobileCheckout}
       />
     </section>
   )

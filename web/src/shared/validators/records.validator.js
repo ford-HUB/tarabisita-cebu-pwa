@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const recordsFilterSchema = z
   .object({
     search: z.string().optional().default(''),
-    status: z.enum(['ALL', 'SUCCESS', 'CANCELLED']).default('ALL'),
+    status: z.enum(['ALL', 'SUCCESS', 'FAILED']).default('ALL'),
     startDate: z.string().optional().default(''),
     endDate: z.string().optional().default('')
   })

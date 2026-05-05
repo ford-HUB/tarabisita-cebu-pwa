@@ -283,6 +283,11 @@ const TouristOrdersListSection = ({ groups = [], orders = [], isLoading, errorMe
                       <span className="rounded-full bg-[#fff0e3] px-2.5 py-0.5 text-xs font-medium text-[#9b5a2c]">
                         {count} order{count === 1 ? '' : 's'}
                       </span>
+                      {group.dayLabel ? (
+                        <span className="rounded-full bg-[#f3efe9] px-2.5 py-0.5 text-xs font-medium text-[#6d645d]">
+                          {group.dayLabel}
+                        </span>
+                      ) : null}
                     </div>
                     {!isOpen && latest ? (
                       <p className="mt-2 text-sm text-[#5b5b5b]">
@@ -362,58 +367,6 @@ const TouristOrdersListSection = ({ groups = [], orders = [], isLoading, errorMe
                                 {order.detailPreview}
                               </pre>
                             ) : null}
-                            {order.lineItems?.length ? (
-                              <div className="mt-4 rounded-xl border border-[#efe6dc] bg-[#fffcf8] p-3 md:p-4">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a79a8b]">
-                                  Items in this order
-                                </p>
-                                <ul className="mt-2.5 space-y-2.5">
-                                  {order.lineItems.map((line) => {
-                                    const unitLabel = formatLineUnitPhp(line.unit)
-                                    return (
-                                      <li
-                                        key={`${order.id}-${line.menuItemId}`}
-                                        className="flex flex-col gap-2 rounded-lg border border-[#ece3d9] bg-white p-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
-                                      >
-                                        <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                                          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[#ece3d9] bg-[#faf8f5]">
-                                            {line.image ? (
-                                              <img src={line.image} alt="" className="h-full w-full object-cover" />
-                                            ) : (
-                                              <div className="flex h-full w-full items-center justify-center text-[#c4b5a8]">
-                                                <FiPackage className="h-5 w-5" aria-hidden />
-                                              </div>
-                                            )}
-                                          </div>
-                                          <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-medium text-[#1f1f1f]">{line.name || 'Item'}</p>
-                                            <p className="mt-0.5 text-xs text-[#6b655d]">
-                                              <span className="font-medium text-[#5b4f45]">{line.qty}×</span>
-                                              {unitLabel ? (
-                                                <span className="text-[#7a726a]"> · {unitLabel} each</span>
-                                              ) : null}
-                                            </p>
-                                            {line.lineNotes ? (
-                                              <p className="mt-1 text-xs italic text-[#8a7a6e]">
-                                                Note: {line.lineNotes}
-                                              </p>
-                                            ) : null}
-                                          </div>
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onClick={() => goReorderMenuItem(order, line)}
-                                          className="inline-flex shrink-0 items-center justify-center gap-1.5 self-stretch rounded-full border border-[#e7dfd5] bg-[#fffaf6] px-3 py-2 text-xs font-semibold text-[#9b5a2c] transition hover:border-[#ff7a1a] hover:text-[#ff7a1a] sm:self-center"
-                                        >
-                                          <FiRefreshCw className="h-3.5 w-3.5" aria-hidden />
-                                          Re-order
-                                        </button>
-                                      </li>
-                                    )
-                                  })}
-                                </ul>
-                              </div>
-                            ) : null}
                             {order.statusKey === 'CANCELED' && order.cancelReason ? (
                               <p className="mt-2 text-xs text-[#8a6a5a]">Reason: {order.cancelReason}</p>
                             ) : null}
@@ -427,15 +380,6 @@ const TouristOrdersListSection = ({ groups = [], orders = [], isLoading, errorMe
                                 <span className="font-medium text-[#1f1f1f]">{order.total}</span>
                               ) : null}
                               {order.time ? <span>{order.time}</span> : null}
-                              <button
-                                type="button"
-                                disabled={messagingOrderId === order.id}
-                                onClick={() => void goMessageStore(order)}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-[#e7dfd5] bg-[#fffaf6] px-3 py-1.5 text-xs font-medium text-[#9b5a2c] transition hover:border-[#d4c4b4] enabled:cursor-pointer disabled:opacity-60"
-                              >
-                                <FiMessageCircle className="h-3.5 w-3.5" aria-hidden />
-                                {messagingOrderId === order.id ? 'Opening…' : 'Message store'}
-                              </button>
                             </div>
                           </div>
                         </div>

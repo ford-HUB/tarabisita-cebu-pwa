@@ -3,6 +3,7 @@ import AuthLayout from "../../components/layout/auth/AuthLayout"
 import Register from "../../pages/auth/Register"
 import VerifyEmail from "../../pages/auth/VerifyEmail"
 import ResetPassword from "../../pages/auth/ResetPassword"
+import Landing from "../../pages/public/Landing"
 
 export const AuthRoutes = [
   {
@@ -11,6 +12,14 @@ export const AuthRoutes = [
     children: [
       {
         index: true,
+        element: <Landing />,
+      },
+      {
+        path: 'home',
+        element: <Landing />,
+      },
+      {
+        path: 'register',
         element: <Register />,
       },
       {
@@ -20,10 +29,6 @@ export const AuthRoutes = [
       {
         path: 'admin/login',
         element: <Login />,
-      },
-      {
-        path: 'register',
-        element: <Register />,
       },
       {
         path: 'verify-email',

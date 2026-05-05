@@ -44,7 +44,8 @@ export const buildMapboxStaticMapUrl = ({
   height = 220,
   zoom = 12,
   routeCoordinates = null,
-  userLocation = null
+  userLocation = null,
+  fitPadding = 48
 }) => {
   const token = import.meta.env.VITE_MAPBOX_APIKEY
   if (!token || !Number.isFinite(lng) || !Number.isFinite(lat)) return null
@@ -70,14 +71,14 @@ export const buildMapboxStaticMapUrl = ({
     const destPin = `pin-s+ff7a1a(${lng},${lat})`
     const userPin = `pin-s+2563eb(${userLocation.lng},${userLocation.lat})`
     const overlays = `${pathOverlay},${destPin},${userPin}`
-    return `${base}/${overlays}/auto/${size}?padding=48&${tokenQs}`
+    return `${base}/${overlays}/auto/${size}?padding=${Math.max(16, Math.round(fitPadding))}&${tokenQs}`
   }
 
   if (userOk) {
     const destPin = `pin-s+ff7a1a(${lng},${lat})`
     const userPin = `pin-s+2563eb(${userLocation.lng},${userLocation.lat})`
     const overlays = `${destPin},${userPin}`
-    return `${base}/${overlays}/auto/${size}?padding=48&${tokenQs}`
+    return `${base}/${overlays}/auto/${size}?padding=${Math.max(16, Math.round(fitPadding))}&${tokenQs}`
   }
 
   const pin = `pin-s+ff7a1a(${lng},${lat})`

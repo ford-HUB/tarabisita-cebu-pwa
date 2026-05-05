@@ -12,6 +12,11 @@ export const getAvatarFallback = (name) => {
 
 /** Signed paths for `ProtectedRoute` (requires `rk` query). */
 export const touristExploreHref = `/${toEncryptedRoute('tourist/explore')}`
+export const buildTouristExploreBusinessDetailHref = (businessId) => {
+  const id = String(businessId || '').trim()
+  if (!id) return touristExploreHref
+  return `/${toEncryptedRoute(`tourist/explore/business/${id}`)}`
+}
 
 /** Deep-link to Explore and open `TouristMenuItemDetailModal` when params are handled on Home. */
 export const buildTouristExploreReorderHref = (businessId, menuItemId) => {

@@ -1,6 +1,6 @@
 import { useTouristRestaurantCheckout } from '../../../hooks/useTouristRestaurantCheckout.hook.js'
 import { touristCartHref } from '../../../components/layout/tourist/touristLayout.constants.js'
-import PaymongoMobileCheckoutModal from '../../../components/business/billing/modals/PaymongoMobileCheckoutModal.jsx'
+import XenditMobileCheckoutModal from '../../../components/business/billing/modals/XenditMobileCheckoutModal.jsx'
 import TouristCheckoutBillingSummarySection from '../../../components/tourist/checkout/sections/TouristCheckoutBillingSummarySection.jsx'
 import TouristCheckoutCustomerSection from '../../../components/tourist/checkout/sections/TouristCheckoutCustomerSection.jsx'
 import TouristCheckoutOrderReviewSection from '../../../components/tourist/checkout/sections/TouristCheckoutOrderReviewSection.jsx'
@@ -22,10 +22,10 @@ const RestaurantCheckout = () => {
     goExplore,
     goCart,
     setItemNotes,
-    isPaymongoMobileCheckoutModalOpen,
-    paymongoMobileCheckoutUrl,
-    closePaymongoMobileCheckoutModal,
-    continuePaymongoMobileCheckout
+    isXenditMobileCheckoutModalOpen,
+    xenditMobileCheckoutUrl,
+    closeXenditMobileCheckoutModal,
+    continueXenditMobileCheckout
   } = useTouristRestaurantCheckout()
 
   const {
@@ -126,11 +126,11 @@ const RestaurantCheckout = () => {
         Totals use current catalog prices on our server. Online prepayment is one restaurant at a time.
       </p>
 
-      <PaymongoMobileCheckoutModal
-        isOpen={isPaymongoMobileCheckoutModalOpen}
-        checkoutUrl={paymongoMobileCheckoutUrl}
-        onClose={closePaymongoMobileCheckoutModal}
-        onContinueToPaymongo={continuePaymongoMobileCheckout}
+      <XenditMobileCheckoutModal
+        isOpen={isXenditMobileCheckoutModalOpen}
+        checkoutUrl={xenditMobileCheckoutUrl}
+        onClose={closeXenditMobileCheckoutModal}
+        onContinueToXendit={continueXenditMobileCheckout}
       />
     </div>
   )

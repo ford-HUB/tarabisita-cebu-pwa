@@ -11,8 +11,6 @@ const BusinessProofModal = ({ isOpen, isSubmittingProof, onClose, onSubmitProof 
   const [proofForm, setProofForm] = useState(createInitialProofForm)
   const [proofFiles, setProofFiles] = useState(createInitialProofFiles)
 
-  if (!isOpen) return null
-
   const proofLinksCount = useMemo(
     () =>
       Object.entries(proofForm)
@@ -73,6 +71,8 @@ const BusinessProofModal = ({ isOpen, isSubmittingProof, onClose, onSubmitProof 
       handleClose()
     }
   }
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

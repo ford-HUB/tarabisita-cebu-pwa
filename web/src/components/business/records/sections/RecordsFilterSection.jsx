@@ -28,7 +28,7 @@ const RecordsFilterSection = ({ form }) => {
         >
           <option value="ALL">All Status</option>
           <option value="SUCCESS">Success</option>
-          <option value="CANCELLED">Cancelled</option>
+          <option value="FAILED">Failed</option>
         </select>
 
         <input

@@ -3,6 +3,7 @@ import { FiEye, FiEyeOff } from 'react-icons/fi'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'motion/react'
 import { loginSchema } from '../../shared/validators/auth.validator'
 import RequestForgotPassword from '../../components/auth/RequestForgotPasswordModal'
 import { useAuthStore } from '../../store/auth/auth.store'
@@ -52,7 +53,10 @@ const Login = () => {
 
   return (
     <main className="grid min-h-[calc(100svh-60px)] grid-cols-1 lg:grid-cols-2">
-      <section
+      <motion.section
+        initial={{ opacity: 0, x: -30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
         className="relative hidden overflow-hidden lg:block"
         style={{
           backgroundImage:
@@ -73,9 +77,14 @@ const Login = () => {
             lifetime.
           </p>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="flex items-center justify-center px-6 py-10 lg:px-12">
+      <motion.section
+        initial={{ opacity: 0, x: 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
+        className="flex items-center justify-center px-6 py-10 lg:px-12"
+      >
         <div className="w-full max-w-[460px]">
           <p className="mb-5 text-2xl text-[#c66b2b]">✶ <span>T a r a - B i s i t a C e b u</span></p>
           <h2 className="mb-2 text-5xl leading-tight font-semibold text-[#1c1a18]">
@@ -149,7 +158,7 @@ const Login = () => {
             </button>
           </p>
         </div>
-      </section>
+      </motion.section>
       <RequestForgotPassword
         isOpen={isForgotPasswordOpen}
         onClose={() => setIsForgotPasswordOpen(false)}

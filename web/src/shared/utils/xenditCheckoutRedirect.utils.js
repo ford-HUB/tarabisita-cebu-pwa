@@ -1,33 +1,24 @@
-/**
- * PayMongo hosted checkout (GCash, PayMaya, etc.). The wallet app is opened from
- * PayMongo’s page (e.g. “Open in GCash” → gcash://). Mobile Safari/Chrome handle that;
- * in-app browsers often block custom URL schemes — use {@link isLikelySocialInAppBrowser}.
- */
-
 const SOCIAL_IN_APP_UA =
   /FBAN|FBAV|FB_IAB|Instagram|Line\/|MicroMessenger|Snapchat|Twitter|LinkedInApp|Pinterest/i
 
-/**
- * @param {string} raw
- * @returns {boolean}
- */
-export const isTrustedPaymongoCheckoutUrl = (raw) => {
+export const isTrustedXenditCheckoutUrl = (raw) => {
   try {
     const u = new URL(String(raw || '').trim())
     if (u.protocol !== 'https:') {
       return false
     }
     const host = u.hostname.toLowerCase()
-    return host === 'checkout.paymongo.com' || host.endsWith('.paymongo.com')
+    return (
+      host === 'checkout.xendit.co' ||
+      host.endsWith('.xendit.co') ||
+      host === 'invoice.xendit.co' ||
+      host.endsWith('.xendit.net')
+    )
   } catch {
     return false
   }
 }
 
-/**
- * Facebook / Instagram / Line / WeChat in-app browsers often block gcash:// from PayMongo’s UI.
- * @returns {boolean}
- */
 export const isLikelySocialInAppBrowser = () => {
   if (typeof navigator === 'undefined' || !navigator.userAgent) {
     return false
@@ -35,10 +26,6 @@ export const isLikelySocialInAppBrowser = () => {
   return SOCIAL_IN_APP_UA.test(navigator.userAgent)
 }
 
-/**
- * @param {string} text
- * @returns {Promise<boolean>}
- */
 export const copyTextToClipboard = async (text) => {
   const value = String(text || '')
   if (!value) {
@@ -50,7 +37,6 @@ export const copyTextToClipboard = async (text) => {
       return true
     }
   } catch {
-    /* fall through */
   }
   try {
     const ta = document.createElement('textarea')
@@ -68,14 +54,10 @@ export const copyTextToClipboard = async (text) => {
   }
 }
 
-/**
- * Top-level navigation to PayMongo checkout (required so wallet deep links work).
- * @param {string} checkoutUrl
- */
-export const assignPaymongoCheckout = (checkoutUrl) => {
+export const assignXenditCheckout = (checkoutUrl) => {
   const trimmed = String(checkoutUrl || '').trim()
-  if (!isTrustedPaymongoCheckoutUrl(trimmed)) {
-    throw new Error('Invalid PayMongo checkout link.')
+  if (!isTrustedXenditCheckoutUrl(trimmed)) {
+    throw new Error('Invalid checkout link.')
   }
   window.location.assign(trimmed)
 }

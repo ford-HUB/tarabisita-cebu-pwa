@@ -3,7 +3,6 @@ import { toast } from 'sonner'
 import {
   getMyBusinessProfile,
   updateMyBusinessProfile,
-  updateMyBusinessThemeColor,
   uploadMyBusinessBannerImage,
   uploadMyBusinessProfileImage
 } from '../../services/business/business.service'
@@ -11,12 +10,10 @@ import {
 export const useBusinessInterfaceStore = create((set) => ({
   businessProfile: null,
   isLoadingProfile: true,
-  isSavingThemeColor: false,
   isSavingHeader: false,
 
   setBusinessProfile: (businessProfile) => set({ businessProfile }),
   setIsLoadingProfile: (isLoadingProfile) => set({ isLoadingProfile }),
-  setIsSavingThemeColor: (isSavingThemeColor) => set({ isSavingThemeColor }),
   setIsSavingHeader: (isSavingHeader) => set({ isSavingHeader }),
 
   loadInterfaceProfile: async () => {
@@ -29,20 +26,6 @@ export const useBusinessInterfaceStore = create((set) => ({
     } catch {
       set({ businessProfile: null, isLoadingProfile: false })
       return { ok: false, profile: null }
-    }
-  },
-
-  saveThemeColor: async (themeColor) => {
-    set({ isSavingThemeColor: true })
-    try {
-      await updateMyBusinessThemeColor(themeColor)
-      toast.success('Theme color saved successfully.')
-      return { ok: true }
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Failed to save theme color.')
-      return { ok: false }
-    } finally {
-      set({ isSavingThemeColor: false })
     }
   },
 

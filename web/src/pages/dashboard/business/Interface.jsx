@@ -9,9 +9,6 @@ const Interface = () => {
   const businessLabel = `Your ${categoryLabel}`
   const {
     emptyCards,
-    themeColor,
-    setThemeColor,
-    isSavingThemeColor,
     isEditingHeader,
     isSavingHeader,
     businessProfile,
@@ -22,36 +19,24 @@ const Interface = () => {
     logoUrl,
     bannerUrl,
     bannerFileData,
-    savedCardLayout,
-    cardLayoutDraft,
-    setCardLayoutDraft,
-    isEditingLayout,
     showCardDetails,
     setShowCardDetails,
     hasHeaderChanges,
-    hasPendingLayoutChange,
     cardListClassName,
-    handleSaveThemeColor,
     handleLogoChange,
     handleBannerChange,
     handleHeaderAction,
     getCardClassName,
-    handleStartLayoutEdit,
-    handleSaveLayout,
-    handleCancelLayoutEdit
+    menuItems,
+    isLoadingMenuItems,
+    menuCategories
   } = useBusinessInterface({ user, categoryLabel })
 
   return (
-    <div
-      className="space-y-6 rounded-2xl p-4 md:p-5"
-      style={{
-        backgroundColor: `${themeColor}14`
-      }}
-    >
+    <div className="space-y-6 rounded-2xl bg-[#f6f2ed] p-4 md:p-5">
       <InterfaceHeaderSection
         businessLabel={businessLabel}
         categoryLabel={categoryLabel}
-        themeColor={themeColor}
         bannerUrl={bannerUrl}
         isEditingHeader={isEditingHeader}
         bannerFileData={bannerFileData}
@@ -63,30 +48,21 @@ const Interface = () => {
         setBusinessNameInput={setBusinessNameInput}
         businessDescriptionInput={businessDescriptionInput}
         setBusinessDescriptionInput={setBusinessDescriptionInput}
-        handleSaveThemeColor={handleSaveThemeColor}
-        isSavingThemeColor={isSavingThemeColor}
-        setThemeColor={setThemeColor}
         handleHeaderAction={handleHeaderAction}
         hasHeaderChanges={hasHeaderChanges}
         isSavingHeader={isSavingHeader}
       />
 
       <InterfaceMenuSection
-        themeColor={themeColor}
         categoryLabel={categoryLabel}
-        isEditingLayout={isEditingLayout}
-        hasPendingLayoutChange={hasPendingLayoutChange}
-        handleStartLayoutEdit={handleStartLayoutEdit}
-        handleSaveLayout={handleSaveLayout}
-        handleCancelLayoutEdit={handleCancelLayoutEdit}
-        savedCardLayout={savedCardLayout}
-        cardLayoutDraft={cardLayoutDraft}
-        setCardLayoutDraft={setCardLayoutDraft}
         showCardDetails={showCardDetails}
         setShowCardDetails={setShowCardDetails}
         cardListClassName={cardListClassName}
         emptyCards={emptyCards}
         getCardClassName={getCardClassName}
+        menuItems={menuItems}
+        isLoadingMenuItems={isLoadingMenuItems}
+        menuCategories={menuCategories}
       />
     </div>
   )

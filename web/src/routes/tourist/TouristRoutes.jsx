@@ -7,6 +7,7 @@ import Orders from '../../pages/dashboard/tourist/Orders'
 import StoreMessages from '../../pages/dashboard/tourist/StoreMessages'
 import RestaurantCart from '../../pages/dashboard/tourist/RestaurantCart'
 import RestaurantCheckout from '../../pages/dashboard/tourist/RestaurantCheckout'
+import BusinessDetail from '../../pages/dashboard/tourist/BusinessDetail'
 import { ProtectedRoute } from '../ProtectedRoute'
 
 export const TouristRoutes = [
@@ -33,6 +34,10 @@ export const TouristRoutes = [
       {
         path: 'explore',
         element: <Home />
+      },
+      {
+        path: 'explore/business/:businessId',
+        element: <BusinessDetail />
       },
       {
         path: 'orders',

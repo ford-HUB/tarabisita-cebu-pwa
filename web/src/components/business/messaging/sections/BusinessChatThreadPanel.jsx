@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { FiMoreVertical, FiSend } from 'react-icons/fi'
 import { formatChatTime } from '../utils/formatChatTime.js'
 import OrderSnippetAboveMessage from './OrderSnippetAboveMessage.jsx'
+import DeleteConversationConfirmModal from '../modals/DeleteConversationConfirmModal.jsx'
 
 /**
  * @param {{
@@ -13,6 +14,7 @@ import OrderSnippetAboveMessage from './OrderSnippetAboveMessage.jsx'
  *   messages: { id: string, body: string, senderRole: string, senderUserId: string, createdAt?: string }[],
  *   currentUserId: string | null,
  *   onSend: (text: string) => void,
+ *   onDeleteConversation?: () => void | Promise<void>,
  *   isConnected: boolean,
  *   isLoading: boolean,
  *   errorMessage: string | null
@@ -23,11 +25,15 @@ const BusinessChatThreadPanel = ({
   messages,
   currentUserId,
   onSend,
+  onDeleteConversation,
   isConnected,
   isLoading,
   errorMessage
 }) => {
   const [draft, setDraft] = useState('')
+  const [showMenu, setShowMenu] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const submit = useCallback(() => {
     const t = draft.trim()
@@ -58,7 +64,8 @@ const BusinessChatThreadPanel = ({
   }
 
   return (
-    <article className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-2xl border border-[#e7dfd5] bg-white shadow-sm lg:min-h-[70dvh]">
+    <>
+      <article className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-2xl border border-[#e7dfd5] bg-white shadow-sm lg:min-h-[70dvh]">
       <header className="flex shrink-0 items-center justify-between border-b border-[#f0e8de] px-4 py-3 md:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative isolate h-11 w-11 shrink-0">
@@ -83,10 +90,30 @@ const BusinessChatThreadPanel = ({
             <p className="text-xs text-[#12b76a]">{isConnected ? 'Live' : 'Connecting…'}</p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button type="button" className="rounded-lg p-2 text-[#6d645d] transition hover:bg-[#f7f3ed]" aria-label="More">
+        <div className="relative flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            className="rounded-lg p-2 text-[#6d645d] transition hover:bg-[#f7f3ed]"
+            aria-label="More"
+            onClick={() => setShowMenu((v) => !v)}
+          >
             <FiMoreVertical size={18} />
           </button>
+          {showMenu ? (
+            <div className="absolute right-0 top-full z-20 mt-1.5 min-w-48 overflow-hidden rounded-xl border border-[#eadfce] bg-white py-1.5 shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!onDeleteConversation) return
+                  setShowMenu(false)
+                  setIsDeleteModalOpen(true)
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-[#b42318] transition hover:bg-[#fff4f2]"
+              >
+                Delete conversation
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -172,7 +199,25 @@ const BusinessChatThreadPanel = ({
           </button>
         </div>
       </footer>
-    </article>
+      </article>
+      <DeleteConversationConfirmModal
+        isOpen={isDeleteModalOpen}
+        isDeleting={isDeleting}
+        onCancel={() => {
+          if (isDeleting) return
+          setIsDeleteModalOpen(false)
+        }}
+        onConfirm={async () => {
+          if (!onDeleteConversation || isDeleting) return
+          setIsDeleting(true)
+          const deleted = await onDeleteConversation()
+          setIsDeleting(false)
+          if (deleted) {
+            setIsDeleteModalOpen(false)
+          }
+        }}
+      />
+    </>
   )
 }
 

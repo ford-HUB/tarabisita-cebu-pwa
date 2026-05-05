@@ -1,17 +1,21 @@
 import { useEffect, useMemo } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { FiMessageSquare } from 'react-icons/fi'
 import { useAuth } from '../../../hooks/useAuth.hook'
 import { useBusinessStoreMessaging } from '../../../hooks/useBusinessStoreMessaging.hook'
 import BusinessChatSidebar from '../../../components/business/messaging/sections/BusinessChatSidebar'
 import BusinessChatThreadPanel from '../../../components/business/messaging/sections/BusinessChatThreadPanel'
-import { businessDashboardHref } from '../../../components/layout/business/businessLayout.constants'
+import {
+  businessChatHubHref,
+  businessDashboardHref
+} from '../../../components/layout/business/businessLayout.constants'
 
 const Chat = () => {
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const c = searchParams.get('c')
   const { user } = useAuth()
-  const { hub, room, sendMessage } = useBusinessStoreMessaging({ conversationId: c })
+  const { hub, room, sendMessage, deleteConversation } = useBusinessStoreMessaging({ conversationId: c })
 
   const currentUserId = useMemo(
     () => (user?._id != null ? String(user._id) : user?.id != null ? String(user.id) : null),
@@ -67,6 +71,11 @@ const Chat = () => {
               messages={room.messages}
               currentUserId={currentUserId}
               onSend={sendMessage}
+              onDeleteConversation={async () => {
+                const deleted = await deleteConversation(c)
+                if (deleted) navigate(businessChatHubHref)
+                return deleted
+              }}
               isConnected={room.socketConnected}
               isLoading={room.loading}
               errorMessage={room.error}

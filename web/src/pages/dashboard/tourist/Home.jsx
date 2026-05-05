@@ -1,12 +1,14 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTouristExplore } from '../../../hooks/useTouristExplore.hook'
 import { useTouristExploreMenuDeepLink } from '../../../hooks/useTouristExploreMenuDeepLink.hook'
+import { buildTouristExploreBusinessDetailHref } from '../../../components/layout/tourist/touristLayout.constants.js'
+import { recordPublicBusinessView } from '../../../services/tourist/touristExplore.service.js'
 import TouristExploreHeroSection from '../../../components/tourist/explore/sections/TouristExploreHeroSection'
 import TouristExploreIntentsSection from '../../../components/tourist/explore/sections/TouristExploreIntentsSection'
 import TouristCategoryChipsSection from '../../../components/tourist/explore/sections/TouristCategoryChipsSection'
 import TouristBusinessCarouselSection from '../../../components/tourist/explore/sections/TouristBusinessCarouselSection'
 import TouristExploreLoadingSection from '../../../components/tourist/explore/sections/TouristExploreLoadingSection'
-import TouristBusinessDetailModal from '../../../components/tourist/explore/modals/TouristBusinessDetailModal'
 import TouristMenuItemDetailModal from '../../../components/tourist/explore/modals/TouristMenuItemDetailModal'
 import TouristExploreRightRailSection from '../../../components/tourist/explore/sections/TouristExploreRightRailSection'
 import TouristExploreFoodMenuSection from '../../../components/tourist/explore/sections/TouristExploreFoodMenuSection'
@@ -28,21 +30,26 @@ const Home = () => {
     menuFeedCategories,
     menuFeedLoading,
     menuFeedError,
-    selectedBusiness,
-    openBusiness,
-    closeBusiness,
     isLoading,
     errorMessage,
     filteredBusinesses,
     businesses,
     reload
   } = useTouristExplore()
+  const navigate = useNavigate()
 
   const userName = user?.name || 'Tourist'
   const [isExploreRailCollapsed, setIsExploreRailCollapsed] = useState(false)
   const [selectedMenuItem, setSelectedMenuItem] = useState(null)
 
   useTouristExploreMenuDeepLink(setSelectedMenuItem)
+
+  const openBusinessPage = (business) => {
+    const id = String(business?._id || '').trim()
+    if (!id) return
+    void recordPublicBusinessView(id).catch(() => {})
+    navigate(buildTouristExploreBusinessDetailHref(id))
+  }
 
   if (isLoading && !businesses.length) {
     return (
@@ -81,7 +88,7 @@ const Home = () => {
               <TouristExploreHeroSection
                 userName={userName}
                 businesses={heroSpotlightBusinesses}
-                onOpen={openBusiness}
+                onOpen={openBusinessPage}
               />
             ) : (
               <section className="rounded-2xl border border-[#e7dfd5] bg-gradient-to-r from-[#9b5a2c] to-[#ff7a1a] p-6 text-white shadow-sm md:p-8">
@@ -128,7 +135,7 @@ const Home = () => {
             ) : null}
 
             {exploreRows.map((row) => (
-              <TouristBusinessCarouselSection key={row.id} title={row.title} items={row.items} onOpen={openBusiness} />
+              <TouristBusinessCarouselSection key={row.id} title={row.title} items={row.items} onOpen={openBusinessPage} />
             ))}
           </div>
 
@@ -156,7 +163,6 @@ const Home = () => {
       {selectedMenuItem ? (
         <TouristMenuItemDetailModal item={selectedMenuItem} onClose={() => setSelectedMenuItem(null)} />
       ) : null}
-      {selectedBusiness ? <TouristBusinessDetailModal business={selectedBusiness} onClose={closeBusiness} /> : null}
     </div>
   )
 }
