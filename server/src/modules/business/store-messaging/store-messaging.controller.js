@@ -1,4 +1,5 @@
 import {
+    deleteBusinessConversation,
     getBusinessStoreMessagingNotificationSummary,
     listBusinessConversations,
     markAllBusinessStoreMessagingNotificationsRead,
@@ -54,6 +55,17 @@ export const getBusinessStoreMessagingThreadHandler = async (req, res) => {
     try {
         const { conversationId } = req.validatedData.query
         const data = await resolveBusinessMessagingThread(req.user._id, conversationId)
+        return noStoreJson(res, { data })
+    } catch (error) {
+        const mapped = mapErr(error)
+        return res.status(mapped.status).json({ message: mapped.message })
+    }
+}
+
+export const deleteBusinessStoreMessagingConversationHandler = async (req, res) => {
+    try {
+        const { conversationId } = req.validatedData.query
+        const data = await deleteBusinessConversation(req.user._id, conversationId)
         return noStoreJson(res, { data })
     } catch (error) {
         const mapped = mapErr(error)

@@ -2,6 +2,7 @@ import express from 'express'
 import { guard } from '../../../shared/middlewares/guard.js'
 import { validateRequest } from '../../../shared/middlewares/validateRequest.js'
 import {
+    deleteBusinessStoreMessagingConversationHandler,
     getBusinessStoreMessagingConversationsHandler,
     getBusinessStoreMessagingNotificationsHandler,
     getBusinessStoreMessagingThreadHandler,
@@ -34,6 +35,13 @@ businessStoreMessagingRoutes.get(
     guard(['BUSINESS']),
     validateRequest(businessStoreMessagingThreadQuerySchema),
     getBusinessStoreMessagingThreadHandler
+)
+
+businessStoreMessagingRoutes.delete(
+    '/me/store-messaging/conversations',
+    guard(['BUSINESS']),
+    validateRequest(businessStoreMessagingThreadQuerySchema),
+    deleteBusinessStoreMessagingConversationHandler
 )
 
 export default businessStoreMessagingRoutes

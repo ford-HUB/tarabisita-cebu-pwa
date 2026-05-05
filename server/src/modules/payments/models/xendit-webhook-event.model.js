@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 
-const paymongoWebhookEventSchema = new mongoose.Schema({
+const xenditWebhookEventSchema = new mongoose.Schema({
     dedupeKey: {
         type: String,
         required: true,
@@ -51,6 +51,6 @@ const paymongoWebhookEventSchema = new mongoose.Schema({
     }
 })
 
-const PaymongoWebhookEvent = mongoose.model('PaymongoWebhookEvent', paymongoWebhookEventSchema)
+const XenditWebhookEvent = mongoose.model('XenditWebhookEvent', xenditWebhookEventSchema)
 
-export default PaymongoWebhookEvent
+export default XenditWebhookEvent

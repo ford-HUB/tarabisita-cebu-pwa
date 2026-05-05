@@ -116,10 +116,6 @@ const businessSchema = new mongoose.Schema({
         type: Object,
         required: false
     },
-    themeColor: {
-        type: String,
-        default: '#ff7a1a'
-    },
     /** When the business last cleared the dashboard notification inbox (new orders since then count as unread). */
     ordersNotificationReadAt: {
         type: Date,

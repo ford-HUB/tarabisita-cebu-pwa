@@ -1,6 +1,6 @@
 export {
     createTouristCustomerOrder,
-    createTouristMenuOrderPaymongoCheckout,
+    createTouristMenuOrderXenditCheckout,
     incrementPublicBusinessProfileViewCount,
     listPublicMenuItemsFromBusinessDoc,
     listPublicMenuFeedItems

@@ -47,7 +47,7 @@ const paymentSchema = new mongoose.Schema(
             default: '',
             index: true
         },
-        paymongoPaymentId: {
+        xenditPaymentId: {
             type: String,
             default: ''
         },

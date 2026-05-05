@@ -4,7 +4,6 @@ import {
     getBusinessProfileByUserId,
     submitBusinessProofByUserId,
     updateBusinessProfileByUserId,
-    updateBusinessThemeColorByUserId,
     uploadBusinessAccountAvatarByUserId,
     uploadBusinessBannerImageByUserId,
     uploadBusinessProfileImageByUserId
@@ -114,30 +113,6 @@ export const uploadMyBusinessBannerImage = async (req, res) => {
 
         return res.status(200).json({
             message: 'Banner image uploaded successfully',
-            data: updatedProfile
-        })
-    } catch (error) {
-        if (error.message === 'BUSINESS_NOT_FOUND') {
-            return res.status(404).json({ message: 'Business profile not found' })
-        }
-        return res.status(500).json({ message: error.message })
-    }
-}
-
-export const updateMyBusinessThemeColor = async (req, res) => {
-    try {
-        const { themeColor } = req.validatedData.body
-        const updatedProfile = await updateBusinessThemeColorByUserId(req.user._id, themeColor)
-        await appendActivityLog(req, {
-            action: 'THEME_COLOR_UPDATED',
-            category: 'ACCOUNT_SETTINGS',
-            severity: 'LOW',
-            description: 'Business theme color preference was updated.',
-            details: { themeColor }
-        })
-
-        return res.status(200).json({
-            message: 'Business theme color updated successfully',
             data: updatedProfile
         })
     } catch (error) {

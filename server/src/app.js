@@ -32,7 +32,7 @@ app.get('/api/v1', (_req, res) => {
         ok: true,
         version: 'v1',
         mounts: ['/auth', '/business', '/tourist', '/admin'],
-        note: 'PayMongo webhook routes are served from src/modules/payments but mounted at /api/v1/business/webhooks/*'
+        note: 'Payments webhook routes are served from src/modules/payments and include /api/v1/business/webhooks/xendit'
     })
 })
 

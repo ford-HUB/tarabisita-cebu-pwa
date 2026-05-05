@@ -30,7 +30,7 @@ const businessSubscriptionSchema = new mongoose.Schema(
             ref: 'Payment',
             default: null
         },
-        /** PayMongo checkout session id `cs_*` (set when checkout is created). */
+        /** Xendit checkout session/invoice id (set when checkout is created). */
         checkoutSessionId: {
             type: String,
             default: '',
@@ -58,7 +58,7 @@ const businessSubscriptionSchema = new mongoose.Schema(
         endDay: { type: Number },
         endHour: { type: Number },
         endMinute: { type: Number },
-        paymongoCheckoutId: { type: String, default: '' },
+        xenditCheckoutId: { type: String, default: '' },
         requestReferenceNumber: { type: String, default: '' }
     },
     { timestamps: true }
