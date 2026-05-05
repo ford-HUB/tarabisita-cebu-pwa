@@ -4,7 +4,7 @@ import {
     listPublicMenuItemsFromBusinessDoc,
     listPublicMenuFeedItems,
     createTouristCustomerOrder,
-    createTouristMenuOrderPaymongoCheckout
+    createTouristMenuOrderXenditCheckout
 } from './public-catalog.service.js'
 import { sanitizeBusinessPayload } from '../../../shared/utils/business-controller.helpers.js'
 
@@ -25,14 +25,14 @@ export const postTouristCustomerOrderCheckout = async (req, res) => {
     try {
         const { businessId } = req.params
         const { returnBaseUrl, ...body } = req.validatedData.body
-        const data = await createTouristMenuOrderPaymongoCheckout({
+        const data = await createTouristMenuOrderXenditCheckout({
             userId: req.user._id,
             businessId,
             ...body,
             returnBaseUrl
         })
         return res.status(200).json({
-            message: 'PayMongo checkout created. Complete payment to place your order.',
+            message: 'Xendit checkout created. Complete payment to place your order.',
             data
         })
     } catch (error) {
@@ -48,16 +48,19 @@ export const postTouristCustomerOrderCheckout = async (req, res) => {
         if (msg === 'INVALID_PRICE' || msg === 'INVALID_ORDER_AMOUNT') {
             return res.status(400).json({ message: 'Could not validate menu prices or order total.' })
         }
-        if (msg === 'PAYMONGO_SECRET_KEY_NOT_CONFIGURED') {
-            return res.status(500).json({ message: 'PayMongo secret key is not configured' })
+        if (msg === 'XENDIT_SECRET_KEY_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'Xendit secret key is not configured' })
         }
-        if (msg === 'PAYMONGO_CHECKOUT_URL_NOT_CONFIGURED') {
-            return res.status(500).json({ message: 'PayMongo checkout URL is not configured' })
+        if (msg === 'XENDIT_SECRET_KEY_INVALID') {
+            return res.status(500).json({ message: 'Xendit secret key must start with xnd_' })
+        }
+        if (msg === 'XENDIT_INVOICE_URL_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'Xendit invoice URL is not configured' })
         }
         if (msg === 'CHECKOUT_RETURN_BASE_URL_INVALID') {
             return res.status(400).json({
                 message:
-                    'Invalid return base URL. Send returnBaseUrl (e.g. https://your-site.com) or set CLIENT_URL / PAYMONGO_RETURN_BASE_URL.'
+                    'Invalid return base URL. Send returnBaseUrl (e.g. https://your-site.com) or set CLIENT_URL / XENDIT_RETURN_BASE_URL.'
             })
         }
         if (msg === 'CHECKOUT_RETURN_URLS_INVALID') {
@@ -66,7 +69,7 @@ export const postTouristCustomerOrderCheckout = async (req, res) => {
         if (msg === 'PAYMENT_METHOD_NOT_ENABLED_FOR_CHECKOUT') {
             return res.status(400).json({
                 message:
-                    'This payment method is disabled in server settings. Choose another option or ask the site admin to update PAYMONGO_PAYMENT_METHOD_TYPES.'
+                    'This payment method is disabled in server settings. Choose another option or ask the site admin to update XENDIT_PAYMENT_METHODS.'
             })
         }
         return res.status(500).json({ message: error.message || 'Could not start checkout.' })

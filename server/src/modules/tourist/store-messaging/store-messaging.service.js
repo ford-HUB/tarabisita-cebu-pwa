@@ -299,6 +299,30 @@ export const resolveBusinessMessagingThread = async (businessUserId, conversatio
     }
 }
 
+export const deleteBusinessConversation = async (businessUserId, conversationId) => {
+    if (!mongoose.Types.ObjectId.isValid(String(conversationId || ''))) {
+        throw new Error('INVALID_CONVERSATION_ID')
+    }
+    const biz = await Business.findOne({ userId: businessUserId }).lean()
+    if (!biz) {
+        throw new Error('BUSINESS_NOT_FOUND')
+    }
+    const conv = await StoreConversation.findOne({
+        _id: conversationId,
+        businessId: biz._id
+    }).lean()
+    if (!conv) {
+        throw new Error('CONVERSATION_NOT_FOUND')
+    }
+
+    await Promise.all([
+        StoreMessage.deleteMany({ conversationId: conv._id }),
+        StoreConversation.deleteOne({ _id: conv._id })
+    ])
+
+    return { deleted: true, conversationId: String(conv._id) }
+}
+
 const unreadTouristMessagesLookup = () => ({
     from: 'storemessages',
     let: { convId: '$_id', readAt: '$businessLastReadAt' },

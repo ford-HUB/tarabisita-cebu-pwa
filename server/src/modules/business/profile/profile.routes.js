@@ -7,7 +7,6 @@ import {
     uploadMyBusinessProfileImage,
     uploadMyBusinessAccountAvatar,
     uploadMyBusinessBannerImage,
-    updateMyBusinessThemeColor,
     changeMyBusinessPassword,
     submitBusinessProof,
     getMyBusinessActivityLogs
@@ -15,7 +14,6 @@ import {
 import {
     submitBusinessProofSchema,
     updateBusinessProfileSchema,
-    updateBusinessThemeColorSchema,
     uploadBusinessProfileImageSchema,
     uploadBusinessAvatarImageSchema,
     uploadBusinessBannerImageSchema,
@@ -27,7 +25,6 @@ const profileRoutes = express.Router()
 profileRoutes.get('/me', guard(['BUSINESS']), getMyBusinessProfile)
 profileRoutes.get('/me/activity-logs', guard(['BUSINESS']), getMyBusinessActivityLogs)
 profileRoutes.put('/me', guard(['BUSINESS']), validateRequest(updateBusinessProfileSchema), updateMyBusinessProfile)
-profileRoutes.patch('/me/theme-color', guard(['BUSINESS']), validateRequest(updateBusinessThemeColorSchema), updateMyBusinessThemeColor)
 profileRoutes.post('/me/profile-image', guard(['BUSINESS']), validateRequest(uploadBusinessProfileImageSchema), uploadMyBusinessProfileImage)
 profileRoutes.post('/me/avatar', guard(['BUSINESS']), validateRequest(uploadBusinessAvatarImageSchema), uploadMyBusinessAccountAvatar)
 profileRoutes.post('/me/banner-image', guard(['BUSINESS']), validateRequest(uploadBusinessBannerImageSchema), uploadMyBusinessBannerImage)

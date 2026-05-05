@@ -2,7 +2,7 @@ import zod from 'zod'
 
 const billingTypeEnum = zod.enum(['PAY_AT_PICKUP', 'PREPAID_ONLINE', 'GCASH', 'MAYA', 'GRAB_PAY', 'BANK_TRANSFER', 'CARD'])
 
-const touristPaymongoCheckoutBillingEnum = zod.enum(['GCASH', 'MAYA', 'CARD', 'GRAB_PAY'])
+const touristCheckoutBillingEnum = zod.enum(['GCASH', 'MAYA', 'CARD', 'GRAB_PAY'])
 
 export const createTouristCustomerOrderSchema = zod.object({
     params: zod.object({
@@ -36,7 +36,7 @@ export const createTouristCustomerOrderCheckoutSchema = zod.object({
     body: zod.object({
         customerName: zod.string().trim().min(2).max(120),
         customerPhone: zod.string().trim().max(40).optional().default(''),
-        billingType: touristPaymongoCheckoutBillingEnum.default('GCASH'),
+        billingType: touristCheckoutBillingEnum.default('GCASH'),
         notes: zod.string().trim().max(2000).optional().default(''),
         lines: zod
             .array(

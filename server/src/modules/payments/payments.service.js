@@ -5,7 +5,7 @@ import Payment, { PAYMENT_TYPES } from '../business/billing/models/payment.model
 import BusinessSubscription from '../business/billing/models/business-subscription.model.js'
 import User from '../auth/models/user.model.js'
 import ActivityLog from '../auth/models/activity-log.model.js'
-import PaymongoWebhookEvent from './models/paymongo-webhook-event.model.js'
+import XenditWebhookEvent from './models/xendit-webhook-event.model.js'
 import cloudinary from '../../configs/cloudinary.js'
 import bcrypt from 'bcrypt'
 import { sendMailer } from '../auth/auth.service.js'
@@ -31,7 +31,6 @@ const extractPublicBusiness = (business) => ({
     coverImage: business.coverImage,
     banner: business.banner || business.coverImage,
     socialMedia: business.socialMedia,
-    themeColor: business.themeColor || '#ff7a1a',
     category: business.category,
     verificationStatus: business.verificationStatus
 })
@@ -89,8 +88,8 @@ const buildPaymentReferenceNumber = ({ businessId, planId }) => {
     return candidate.slice(0, 36)
 }
 
-const getPaymongoCheckoutBaseUrl = () =>
-    readFirstEnv(['PAYMONGO_CHECKOUT_URL']) || 'https://api.paymongo.com/v1/checkout_sessions'
+const getXenditInvoiceBaseUrl = () =>
+    readFirstEnv(['XENDIT_INVOICE_URL'])
 
 const readFirstEnv = (keys = []) =>
     keys.map((key) => process.env[key]).find((value) => typeof value === 'string' && value.trim())?.trim() || ''
@@ -100,11 +99,24 @@ const normalizeSecretKey = (value) =>
         .replace(/^\uFEFF/, '')
         .trim()
 
-const getPaymongoSecretKey = () =>
-    normalizeSecretKey(readFirstEnv(['PAYMONGO_SECRET_KEY', 'PAYMONGO_SK']))
+const getXenditSecretKey = () =>
+    normalizeSecretKey(readFirstEnv(['XENDIT_APIKEY']))
 
-const getPaymongoApiBaseUrl = () =>
-    readFirstEnv(['PAYMONGO_API_BASE_URL']) || 'https://api.paymongo.com/v1'
+const getXenditApiBaseUrl = () =>
+    readFirstEnv(['XENDIT_API_BASE_URL'])
+
+const normalizeXenditInvoiceMethod = (value = '') => {
+    const normalized = String(value || '').trim().toUpperCase().replace(/[\s-]+/g, '_')
+    if (!normalized) return ''
+    if (normalized === 'MAYA' || normalized === 'PAYMAYA') return 'PAYMAYA'
+    if (normalized === 'GCASH') return 'GCASH'
+    if (normalized === 'CARD' || normalized === 'CARDS') return 'CREDIT_CARD'
+    if (normalized === 'GRAB_PAY' || normalized === 'GRABPAY') return 'GRABPAY'
+    if (normalized === 'BANK_TRANSFER') return 'BANK_TRANSFER'
+    return normalized
+}
+
+const buildXenditBasicAuthHeader = (secretKey) => `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`
 
 const normalizePublicBaseUrl = (value = '') => {
     const trimmed = String(value || '').trim().replace(/\/+$/, '')
@@ -203,7 +215,7 @@ const serializeLedgerPayment = (p) => ({
     planId: p.planId,
     months: p.months,
     checkoutSessionId: p.checkoutSessionId,
-    paymongoPaymentId: p.paymongoPaymentId,
+    xenditPaymentId: p.xenditPaymentId,
     requestReferenceNumber: p.requestReferenceNumber,
     subscriptionRecordId: p.subscriptionRecordId ? String(p.subscriptionRecordId) : null,
     paidAt: p.paidAt,
@@ -237,14 +249,14 @@ const serializeLedgerSubscription = (s) => ({
             minute: s.endMinute
         }
     },
-    paymongoCheckoutId: s.paymongoCheckoutId,
+    xenditCheckoutId: s.xenditCheckoutId,
     requestReferenceNumber: s.requestReferenceNumber,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt
 })
 
-/** Pre-fills PayMongo hosted checkout (esp. card billing) from business profile + owner. */
-const buildPaymongoBillingPayload = (user, business) => {
+/** Pre-fills Xendit hosted checkout (esp. card billing) from business profile + owner. */
+const buildCheckoutBillingPayload = (user, business) => {
     const name = String(user?.name || '').trim()
     const email = String(user?.email || '').trim()
     const phone = String(business?.contact_info?.phone || '').trim()
@@ -291,21 +303,21 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
         throw new Error('INVALID_BILLING_MONTHS')
     }
 
-    const paymongoSecretKey = getPaymongoSecretKey()
-    if (!paymongoSecretKey) {
-        throw new Error('PAYMONGO_SECRET_KEY_NOT_CONFIGURED')
+    const xenditSecretKey = getXenditSecretKey()
+    if (!xenditSecretKey) {
+        throw new Error('XENDIT_SECRET_KEY_NOT_CONFIGURED')
     }
-    if (!paymongoSecretKey.startsWith('sk_')) {
-        throw new Error('PAYMONGO_SECRET_KEY_INVALID')
+    if (!xenditSecretKey.startsWith('xnd_')) {
+        throw new Error('XENDIT_SECRET_KEY_INVALID')
     }
 
-    const checkoutEndpoint = getPaymongoCheckoutBaseUrl()
+    const checkoutEndpoint = getXenditInvoiceBaseUrl()
     if (!checkoutEndpoint) {
-        throw new Error('PAYMONGO_CHECKOUT_URL_NOT_CONFIGURED')
+        throw new Error('XENDIT_INVOICE_URL_NOT_CONFIGURED')
     }
 
     const clientBaseUrl = normalizePublicBaseUrl(
-        returnBaseUrl || readFirstEnv(['PAYMONGO_RETURN_BASE_URL', 'CLIENT_URL'])
+        returnBaseUrl || readFirstEnv(['CLIENT_URL'])
     )
     if (!clientBaseUrl) {
         throw new Error('CHECKOUT_RETURN_BASE_URL_INVALID')
@@ -326,48 +338,40 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
         throw new Error('CHECKOUT_RETURN_URLS_INVALID')
     }
 
-    const amountInCentavos = Math.round(Number(selectedPlan.amount) * 100)
-    const enabledPaymentMethods = readFirstEnv(['PAYMONGO_PAYMENT_METHOD_TYPES'])
+    const amountInPeso = Math.round(Number(selectedPlan.amount) * 100) / 100
+    const enabledPaymentMethods = readFirstEnv(['XENDIT_PAYMENT_METHODS'])
         .split(',')
-        .map((value) => value.trim().toLowerCase())
+        .map((value) => normalizeXenditInvoiceMethod(value))
         .filter(Boolean)
 
-    const paymentMethodTypes = enabledPaymentMethods.length
+    const paymentMethods = enabledPaymentMethods.length
         ? enabledPaymentMethods
-        : ['card', 'gcash', 'paymaya', 'grab_pay']
+        : ['GCASH', 'PAYMAYA', 'CREDIT_CARD', 'GRABPAY']
 
-    const billing = buildPaymongoBillingPayload(user, business)
+    const billing = buildCheckoutBillingPayload(user, business)
 
     const payload = {
-        data: {
-            attributes: {
-                reference_number: referenceNumber,
-                send_email_receipt: true,
-                show_description: true,
-                show_line_items: true,
-                description: `${months}-month business billing subscription`,
-                line_items: [
-                    {
-                        currency: 'PHP',
-                        amount: amountInCentavos,
-                        name: selectedPlan.title,
-                        quantity: 1,
-                        description: `${months}-month billing access`
-                    }
-                ],
-                payment_method_types: paymentMethodTypes,
-                success_url: successUrl,
-                cancel_url: cancelUrl,
-                metadata: {
-                    businessId: String(business._id),
-                    planId: String(selectedPlan.id),
-                    months: String(months),
-                    amount: String(selectedPlan.amount),
-                    requestReferenceNumber: String(referenceNumber),
-                    ownerEmail: String(user?.email || '')
-                },
-                ...(billing ? { billing } : {})
-            }
+        external_id: referenceNumber,
+        amount: amountInPeso,
+        currency: 'PHP',
+        description: `${months}-month business billing subscription`,
+        success_redirect_url: successUrl,
+        failure_redirect_url: cancelUrl,
+        customer: billing
+            ? {
+                  given_names: String(billing.name || '').slice(0, 60),
+                  email: String(billing.email || '').trim() || undefined,
+                  mobile_number: String(billing.phone || '').trim() || undefined
+              }
+            : undefined,
+        payment_methods: paymentMethods,
+        metadata: {
+            businessId: String(business._id),
+            planId: String(selectedPlan.id),
+            months: String(months),
+            amount: String(selectedPlan.amount),
+            requestReferenceNumber: String(referenceNumber),
+            ownerEmail: String(user?.email || '')
         }
     }
 
@@ -375,7 +379,7 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Basic ${Buffer.from(`${paymongoSecretKey}:`).toString('base64')}`
+            Authorization: buildXenditBasicAuthHeader(xenditSecretKey)
         },
         body: JSON.stringify(payload)
     })
@@ -389,17 +393,16 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
         }
     })()
 
-    const checkoutUrl = jsonResponse?.data?.attributes?.checkout_url
-    const checkoutId = jsonResponse?.data?.id || ''
+    const checkoutUrl = jsonResponse?.invoice_url
+    const checkoutId = jsonResponse?.id || ''
     if (!response.ok || !checkoutUrl) {
         const upstreamMessage =
-            jsonResponse?.errors?.[0]?.detail ||
-            jsonResponse?.errors?.[0]?.code ||
-            jsonResponse?.errors?.[0]?.title ||
+            jsonResponse?.message ||
+            jsonResponse?.error_code ||
             jsonResponse?.message ||
             responseText ||
-            'Unknown PayMongo upstream error'
-        throw new Error(`PayMongo checkout create failed (${response.status}): ${upstreamMessage}`)
+            'Unknown Xendit upstream error'
+        throw new Error(`Xendit invoice create failed (${response.status}): ${upstreamMessage}`)
     }
 
     const checkoutData = {
@@ -423,7 +426,7 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
         status: 'PENDING_CHECKOUT',
         startedAt: null,
         expiresAt: null,
-        paymongoCheckoutId: '',
+        xenditCheckoutId: '',
         requestReferenceNumber: checkoutData.requestReferenceNumber || ''
     })
 
@@ -456,106 +459,53 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
     return checkoutData
 }
 
-export const registerPaymongoWebhook = async ({
+export const registerXenditWebhook = async ({
     callbackUrl,
     events = ['checkout_session.payment.paid', 'payment.failed']
 } = {}) => {
-    const paymongoSecretKey = getPaymongoSecretKey()
-    if (!paymongoSecretKey) {
-        throw new Error('PAYMONGO_SECRET_KEY_NOT_CONFIGURED')
+    const xenditSecretKey = getXenditSecretKey()
+    if (!xenditSecretKey) {
+        throw new Error('XENDIT_SECRET_KEY_NOT_CONFIGURED')
     }
-    if (!paymongoSecretKey.startsWith('sk_')) {
-        throw new Error('PAYMONGO_SECRET_KEY_INVALID')
+    if (!xenditSecretKey.startsWith('xnd_')) {
+        throw new Error('XENDIT_SECRET_KEY_INVALID')
     }
 
     const serverPublicUrl = readFirstEnv(['SERVER_PUBLIC_URL', 'WEBHOOK_BASE_URL', 'NGROK_URL'])
-    const resolvedCallbackUrl = callbackUrl || (serverPublicUrl ? `${serverPublicUrl}/api/v1/business/webhooks/paymongo` : '')
+    const resolvedCallbackUrl = callbackUrl || (serverPublicUrl ? `${serverPublicUrl}/api/v1/business/webhooks/xendit` : '')
     if (!resolvedCallbackUrl) {
-        throw new Error('PAYMONGO_WEBHOOK_CALLBACK_URL_NOT_CONFIGURED')
-    }
-
-    const apiBaseUrl = getPaymongoApiBaseUrl()
-    const authHeader = `Basic ${Buffer.from(`${paymongoSecretKey}:`).toString('base64')}`
-
-    const existingResponse = await fetch(`${apiBaseUrl}/webhooks`, {
-        method: 'GET',
-        headers: {
-            Authorization: authHeader
-        }
-    })
-
-    const existingJson = await existingResponse.json().catch(() => ({}))
-    const existingHooks = Array.isArray(existingJson?.data) ? existingJson.data : []
-    const existingMatch = existingHooks.find(
-        (hook) => String(hook?.attributes?.url || '').trim() === resolvedCallbackUrl
-    )
-    if (existingMatch) {
-        return {
-            alreadyExists: true,
-            webhookId: existingMatch.id,
-            url: existingMatch?.attributes?.url || resolvedCallbackUrl,
-            events: existingMatch?.attributes?.events || events,
-            status: existingMatch?.attributes?.status || 'enabled'
-        }
-    }
-
-    const createPayload = {
-        data: {
-            attributes: {
-                url: resolvedCallbackUrl,
-                events
-            }
-        }
-    }
-
-    const createResponse = await fetch(`${apiBaseUrl}/webhooks`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: authHeader
-        },
-        body: JSON.stringify(createPayload)
-    })
-
-    const createText = await createResponse.text()
-    const createJson = (() => {
-        try {
-            return JSON.parse(createText)
-        } catch (_error) {
-            return {}
-        }
-    })()
-
-    if (!createResponse.ok) {
-        const errorMessage =
-            createJson?.errors?.[0]?.detail ||
-            createJson?.errors?.[0]?.title ||
-            createJson?.message ||
-            createText ||
-            'Failed to register PayMongo webhook'
-        throw new Error(`PayMongo webhook registration failed (${createResponse.status}): ${errorMessage}`)
+        throw new Error('XENDIT_WEBHOOK_CALLBACK_URL_NOT_CONFIGURED')
     }
 
     return {
         alreadyExists: false,
-        webhookId: createJson?.data?.id || '',
-        url: createJson?.data?.attributes?.url || resolvedCallbackUrl,
-        events: createJson?.data?.attributes?.events || events,
-        status: createJson?.data?.attributes?.status || 'enabled',
-        secretKey: createJson?.data?.attributes?.secret_key || ''
+        provider: 'XENDIT',
+        url: resolvedCallbackUrl,
+        events: events.length ? events : ['invoice.paid', 'invoice.expired'],
+        status: 'manual_setup_required',
+        note: 'Set this URL in Xendit Dashboard callbacks and ensure XENDIT_WEBHOOK_VERIFICATION_TOKEN matches dashboard token.',
+        apiBaseUrl: getXenditApiBaseUrl(),
+        authConfigured: Boolean(xenditSecretKey)
     }
 }
 
 const resolveWebhookEventName = (payload = {}, headers = {}) =>
     String(
+        payload?.event ||
+        payload?.callback_type ||
+        headers['x-callback-event'] ||
+        headers['x-xendit-event'] ||
         payload?.data?.attributes?.type ||
         payload.type ||
-        payload.event ||
-        headers['x-paymongo-event'] ||
+        headers['x-xendit-event'] ||
         ''
     ).toUpperCase()
 
 const resolveWebhookStatus = (payload = {}) => {
+    const xenditStatus = String(payload?.status || payload?.invoice_status || '').toUpperCase()
+    if (xenditStatus) {
+        return xenditStatus
+    }
     const innerAttrs = payload?.data?.attributes?.data?.attributes
     const payments = innerAttrs?.payments
     const firstPayStatus =
@@ -590,7 +540,7 @@ const extractCheckoutSessionId = (payload = {}) => {
     }
 
     const checkoutUrl = String(attrs.checkout_url || '')
-    const m = checkoutUrl.match(/checkout\.paymongo\.com\/(cs_[a-zA-Z0-9_-]+)/i)
+    const m = checkoutUrl.match(/\/(cs_[a-zA-Z0-9_-]+)/i)
     if (m) {
         return m[1].split(/[#?/]/)[0]
     }
@@ -600,6 +550,10 @@ const extractCheckoutSessionId = (payload = {}) => {
 
 /** Prefer checkout session id `cs_*` so it matches `BusinessSubscription.checkoutSessionId`. */
 const resolveWebhookPaymentId = (payload = {}) => {
+    const invoiceId = String(payload?.id || payload?.invoice_id || '').trim()
+    if (invoiceId) {
+        return invoiceId
+    }
     const fromSession = extractCheckoutSessionId(payload)
     if (fromSession) {
         return fromSession
@@ -617,6 +571,15 @@ const resolveWebhookPaymentId = (payload = {}) => {
 }
 
 const resolveWebhookReferenceNumber = (payload = {}) => {
+    const xenditMeta = payload?.metadata || {}
+    if (xenditMeta && typeof xenditMeta === 'object') {
+        const fromXMeta = String(
+            xenditMeta.requestReferenceNumber || xenditMeta.request_reference_number || payload?.external_id || ''
+        ).trim()
+        if (fromXMeta) {
+            return fromXMeta
+        }
+    }
     const innerAttrs = payload?.data?.attributes?.data?.attributes || {}
     const payments = innerAttrs.payments
     let fromPaymentMeta = ''
@@ -634,6 +597,12 @@ const resolveWebhookReferenceNumber = (payload = {}) => {
 }
 
 const mapWebhookToSessionStatus = ({ eventName, status }) => {
+    if (eventName.includes('INVOICE.PAID') || status === 'PAID' || status === 'SETTLED') {
+        return 'SUCCESS'
+    }
+    if (eventName.includes('INVOICE.EXPIRED') || status === 'EXPIRED') {
+        return 'FAILED'
+    }
     if (eventName.includes('CANCEL') || status.includes('CANCEL')) {
         return 'CANCELLED'
     }
@@ -646,7 +615,7 @@ const mapWebhookToSessionStatus = ({ eventName, status }) => {
     return 'PENDING'
 }
 
-const buildPaymongoDedupeKey = (payload = {}, headers = {}) => {
+const buildXenditDedupeKey = (payload = {}, headers = {}) => {
     const eventName = resolveWebhookEventName(payload, headers)
     const status = resolveWebhookStatus(payload)
     const paymentId = resolveWebhookPaymentId(payload)
@@ -666,8 +635,8 @@ const buildPaymongoDedupeKey = (payload = {}, headers = {}) => {
  * Applies stored PayMongo event JSON to Business billing, Payment, and BusinessSubscription.
  * Safe to call from live webhooks or from the reconcile job (idempotent when subscription already exists).
  */
-export const syncBusinessLedgerFromPaymongoWebhookPayload = async (payload = {}, headers = {}) => {
-    const { dedupeKey, eventName, status, paymentId, requestReferenceNumber } = buildPaymongoDedupeKey(
+export const syncBusinessLedgerFromXenditWebhookPayload = async (payload = {}, headers = {}) => {
+    const { dedupeKey, eventName, status, paymentId, requestReferenceNumber } = buildXenditDedupeKey(
         payload,
         headers
     )
@@ -691,7 +660,7 @@ export const syncBusinessLedgerFromPaymongoWebhookPayload = async (payload = {},
 
     if (!subDoc && paymentId && !String(paymentId).startsWith('cs_')) {
         const payLookup = await Payment.findOne({
-            $or: [{ paymongoPaymentId: String(paymentId) }, { checkoutSessionId: String(paymentId) }]
+            $or: [{ xenditPaymentId: String(paymentId) }, { checkoutSessionId: String(paymentId) }]
         })
         if (payLookup?.subscriptionRecordId) {
             subDoc = await BusinessSubscription.findById(payLookup.subscriptionRecordId)
@@ -798,17 +767,17 @@ export const syncBusinessLedgerFromPaymongoWebhookPayload = async (payload = {},
             planId: effectiveSession.planId || '',
             months: effectiveSession.months,
             checkoutSessionId: effectiveSession.checkoutId || checkoutCsId || paymentId || '',
-            paymongoPaymentId: paymentId && !String(paymentId).startsWith('cs_') ? String(paymentId) : '',
+            xenditPaymentId: paymentId && !String(paymentId).startsWith('cs_') ? String(paymentId) : '',
             requestReferenceNumber: requestReferenceNumber || effectiveSession.requestReferenceNumber || '',
             paidAt: paymentRowStatus === 'PAID' ? new Date() : null
         })
     } else if (paymentDoc) {
         const paySet = {
             status: paymentRowStatus,
-            paymongoPaymentId:
+            xenditPaymentId:
                 paymentId && !String(paymentId).startsWith('cs_')
                     ? String(paymentId)
-                    : paymentDoc.paymongoPaymentId
+                    : paymentDoc.xenditPaymentId
         }
         if (paymentRowStatus === 'PAID') {
             paySet.paidAt = new Date()
@@ -894,7 +863,7 @@ export const syncBusinessLedgerFromPaymongoWebhookPayload = async (payload = {},
                     startedAt,
                     expiresAt,
                     ...periodFields,
-                    paymongoCheckoutId: resolvedCheckoutId || paymentId || ''
+                    xenditCheckoutId: resolvedCheckoutId || paymentId || ''
                 }
             }
         )
@@ -945,7 +914,7 @@ export const syncBusinessLedgerFromPaymongoWebhookPayload = async (payload = {},
             startedAt,
             expiresAt,
             ...periodFields,
-            paymongoCheckoutId: resolvedCheckoutId || paymentId || '',
+            xenditCheckoutId: resolvedCheckoutId || paymentId || '',
             requestReferenceNumber: requestReferenceNumber || effectiveSession.requestReferenceNumber || ''
         })
 
@@ -1023,7 +992,7 @@ const markWebhookLedgerSyncState = async (dedupeKey, syncResult) => {
             syncResult.touristCheckoutSynced === true ||
             terminalSkip
     )
-    await PaymongoWebhookEvent.updateOne(
+    await XenditWebhookEvent.updateOne(
         { dedupeKey },
         {
             $set: {
@@ -1035,18 +1004,26 @@ const markWebhookLedgerSyncState = async (dedupeKey, syncResult) => {
     )
 }
 
-export const processPaymongoWebhookEvent = async (payload = {}, headers = {}) => {
-    const { dedupeKey, eventName, paymentId, requestReferenceNumber, status, eventId } = buildPaymongoDedupeKey(
+export const processXenditWebhookEvent = async (payload = {}, headers = {}) => {
+    const configuredToken = readFirstEnv(['XENDIT_WEBHOOK_VERIFICATION_TOKEN'])
+    if (configuredToken) {
+        const incomingToken = String(headers['x-callback-token'] || headers['x-xendit-callback-token'] || '').trim()
+        if (!incomingToken || incomingToken !== configuredToken) {
+            throw new Error('XENDIT_WEBHOOK_TOKEN_INVALID')
+        }
+    }
+
+    const { dedupeKey, eventName, paymentId, requestReferenceNumber, status, eventId } = buildXenditDedupeKey(
         payload,
         headers
     )
 
-    const existing = await PaymongoWebhookEvent.findOne({ dedupeKey })
+    const existing = await XenditWebhookEvent.findOne({ dedupeKey })
     if (existing) {
         return { duplicate: true, dedupeKey }
     }
 
-    await PaymongoWebhookEvent.create({
+    await XenditWebhookEvent.create({
         dedupeKey,
         eventId,
         eventType: eventName,
@@ -1061,11 +1038,11 @@ export const processPaymongoWebhookEvent = async (payload = {}, headers = {}) =>
         const touristResult = await tryFulfillTouristMenuOrderCheckoutFromWebhook(payload, headers)
         const syncResult = touristResult.handled
             ? touristResult
-            : await syncBusinessLedgerFromPaymongoWebhookPayload(payload, headers)
+            : await syncBusinessLedgerFromXenditWebhookPayload(payload, headers)
         await markWebhookLedgerSyncState(dedupeKey, syncResult)
         return { duplicate: false, ...syncResult }
     } catch (err) {
-        await PaymongoWebhookEvent.updateOne(
+        await XenditWebhookEvent.updateOne(
             { dedupeKey },
             {
                 $set: {
@@ -1081,8 +1058,8 @@ export const processPaymongoWebhookEvent = async (payload = {}, headers = {}) =>
 /**
  * Re-process PayMongo webhook rows that never flipped business billing (e.g. race or ID mismatch on first pass).
  */
-export const reconcilePaymongoWebhooksForBusinessLedger = async ({ limit = 40 } = {}) => {
-    const events = await PaymongoWebhookEvent.find({ businessLedgerSynced: { $ne: true } })
+export const reconcileXenditWebhooksForBusinessLedger = async ({ limit = 40 } = {}) => {
+    const events = await XenditWebhookEvent.find({ businessLedgerSynced: { $ne: true } })
         .sort({ processedAt: -1 })
         .limit(Math.min(Math.max(Number(limit) || 40, 1), 100))
         .lean()
@@ -1092,7 +1069,7 @@ export const reconcilePaymongoWebhooksForBusinessLedger = async ({ limit = 40 } 
 
     for (const ev of events) {
         try {
-            const syncResult = await syncBusinessLedgerFromPaymongoWebhookPayload(ev.payload || {}, {})
+            const syncResult = await syncBusinessLedgerFromXenditWebhookPayload(ev.payload || {}, {})
             await markWebhookLedgerSyncState(ev.dedupeKey, syncResult)
             if (syncResult.applied || syncResult.reason === 'IDEMPOTENT_SUBSCRIPTION_EXISTS') {
                 processed += 1
@@ -1223,32 +1200,6 @@ export const updateBusinessProfileByUserId = async (userId, payload) => {
         ownerName: updatedUser?.name || '',
         ownerEmail: updatedUser?.email || '',
         avatar: updatedUser?.avatar || '',
-        verificationProofs: updatedBusiness.verificationProofs,
-        verificationNotes: updatedBusiness.verificationNotes
-    }
-}
-
-export const updateBusinessThemeColorByUserId = async (userId, themeColor) => {
-    const business = await findBusinessByUserId(userId)
-
-    const updatedBusiness = await Business.findByIdAndUpdate(
-        business._id,
-        {
-            $set: {
-                themeColor,
-                updatedAt: new Date()
-            }
-        },
-        { returnDocument: 'after' }
-    ).populate('category')
-
-    const user = await User.findById(userId).select('name email avatar')
-
-    return {
-        ...extractPublicBusiness(updatedBusiness),
-        ownerName: user?.name || '',
-        ownerEmail: user?.email || '',
-        avatar: user?.avatar || '',
         verificationProofs: updatedBusiness.verificationProofs,
         verificationNotes: updatedBusiness.verificationNotes
     }
@@ -2098,7 +2049,10 @@ const buildTouristMenuOrderReferenceNumber = ({ pendingId, businessId }) => {
     return `TBTOC${b}${p}${Date.now().toString().slice(-6)}`.slice(0, 36)
 }
 
-const extractPaymongoCheckoutSessionMetadata = (payload = {}) => {
+const extractCheckoutSessionMetadata = (payload = {}) => {
+    if (payload?.metadata && typeof payload.metadata === 'object') {
+        return payload.metadata
+    }
     const inner = payload?.data?.attributes?.data?.attributes
     const meta = inner?.metadata
     if (!meta || typeof meta !== 'object') {
@@ -2108,23 +2062,44 @@ const extractPaymongoCheckoutSessionMetadata = (payload = {}) => {
 }
 
 export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}, headers = {}) => {
-    const meta = extractPaymongoCheckoutSessionMetadata(payload)
-    if (String(meta.tbPendingCheckoutKind || '').trim() !== 'tourist_menu_order') {
-        return { handled: false, touristCheckoutSynced: false }
-    }
+    const meta = extractCheckoutSessionMetadata(payload)
+    const requestReferenceNumber = resolveWebhookReferenceNumber(payload)
+    const checkoutSessionId = resolveWebhookPaymentId(payload)
     const pendingId = String(meta.tbPendingCheckoutId || '').trim()
-    if (!pendingId || !mongoose.Types.ObjectId.isValid(pendingId)) {
-        return { handled: true, touristCheckoutSynced: true, applied: false, reason: 'INVALID_PENDING_CHECKOUT_ID' }
+    let pending = null
+    let usesFallbackMatch = false
+
+    if (pendingId && mongoose.Types.ObjectId.isValid(pendingId)) {
+        pending = await TouristMenuOrderCheckout.findById(pendingId)
+    }
+
+    if (!pending) {
+        const byRef = String(requestReferenceNumber || payload?.external_id || '').trim()
+        const or = []
+        if (byRef) {
+            or.push({ requestReferenceNumber: byRef })
+        }
+        if (checkoutSessionId) {
+            or.push({ checkoutSessionId: checkoutSessionId })
+        }
+        if (!or.length) {
+            return { handled: false, touristCheckoutSynced: false }
+        }
+        pending = await TouristMenuOrderCheckout.findOne({ $or: or }).sort({ createdAt: -1 })
+        usesFallbackMatch = true
+    }
+
+    const metaKind = String(meta.tbPendingCheckoutKind || '').trim()
+    if (!pending) {
+        return { handled: usesFallbackMatch, touristCheckoutSynced: true, applied: false, reason: 'PENDING_CHECKOUT_NOT_FOUND' }
+    }
+    if (!usesFallbackMatch && metaKind && metaKind !== 'tourist_menu_order') {
+        return { handled: false, touristCheckoutSynced: false }
     }
 
     const eventName = resolveWebhookEventName(payload, headers)
     const payStatus = resolveWebhookStatus(payload)
     const mapped = mapWebhookToSessionStatus({ eventName, status: payStatus })
-
-    const pending = await TouristMenuOrderCheckout.findById(pendingId)
-    if (!pending) {
-        return { handled: true, touristCheckoutSynced: true, applied: false, reason: 'PENDING_CHECKOUT_NOT_FOUND' }
-    }
 
     if (pending.status === 'PAID' && pending.customerOrderId) {
         return { handled: true, touristCheckoutSynced: true, applied: true, reason: 'IDEMPOTENT_TOURIST_CHECKOUT' }
@@ -2132,9 +2107,9 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
 
     if (mapped !== 'SUCCESS') {
         if (mapped === 'CANCELLED') {
-            await TouristMenuOrderCheckout.updateOne({ _id: pendingId }, { $set: { status: 'CANCELLED' } })
+            await TouristMenuOrderCheckout.updateOne({ _id: pending._id }, { $set: { status: 'CANCELLED' } })
         } else if (mapped === 'FAILED') {
-            await TouristMenuOrderCheckout.updateOne({ _id: pendingId }, { $set: { status: 'FAILED' } })
+            await TouristMenuOrderCheckout.updateOne({ _id: pending._id }, { $set: { status: 'FAILED' } })
         }
         return { handled: true, touristCheckoutSynced: true, applied: false, reason: 'TOURIST_CHECKOUT_NOT_SUCCESS' }
     }
@@ -2185,7 +2160,7 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
     })
 
     await TouristMenuOrderCheckout.updateOne(
-        { _id: pendingId },
+        { _id: pending._id },
         { $set: { status: 'PAID', customerOrderId: order._id } }
     )
 
@@ -2231,19 +2206,19 @@ export const getTouristMenuOrderCheckoutStatusForUser = async (userId, pendingCh
 }
 
 /** Maps app billing choice to PayMongo `payment_method_types` (single method per tourist checkout). */
-const mapTouristCheckoutBillingToPaymongoTypes = (billingType) => {
+const mapTouristCheckoutBillingToXenditMethods = (billingType) => {
     const t = String(billingType || '').toUpperCase()
-    if (t === 'GCASH') return ['gcash']
-    if (t === 'MAYA') return ['paymaya']
-    if (t === 'CARD') return ['card']
-    if (t === 'GRAB_PAY') return ['grab_pay']
-    return ['card', 'gcash', 'paymaya', 'grab_pay']
+    if (t === 'GCASH') return ['GCASH']
+    if (t === 'MAYA') return ['PAYMAYA']
+    if (t === 'CARD') return ['CREDIT_CARD']
+    if (t === 'GRAB_PAY') return ['GRABPAY']
+    return ['CREDIT_CARD', 'GCASH', 'PAYMAYA', 'GRABPAY']
 }
 
 /**
  * Create PayMongo checkout for one restaurant batch; order row is created after payment (webhook).
  */
-export const createTouristMenuOrderPaymongoCheckout = async ({
+export const createTouristMenuOrderXenditCheckout = async ({
     userId,
     businessId,
     customerName,
@@ -2291,18 +2266,24 @@ export const createTouristMenuOrderPaymongoCheckout = async ({
         }
     })
 
-    const paymongoSecretKey = getPaymongoSecretKey()
-    if (!paymongoSecretKey) {
+    const xenditSecretKey = getXenditSecretKey()
+    if (!xenditSecretKey) {
         await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
-        throw new Error('PAYMONGO_SECRET_KEY_NOT_CONFIGURED')
+        throw new Error('XENDIT_SECRET_KEY_NOT_CONFIGURED')
     }
-    const checkoutEndpoint = getPaymongoCheckoutBaseUrl()
+    if (!xenditSecretKey.startsWith('xnd_')) {
+        await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
+        throw new Error('XENDIT_SECRET_KEY_INVALID')
+    }
+    const checkoutEndpoint = getXenditInvoiceBaseUrl()
     if (!checkoutEndpoint) {
         await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
-        throw new Error('PAYMONGO_CHECKOUT_URL_NOT_CONFIGURED')
+        throw new Error('XENDIT_INVOICE_URL_NOT_CONFIGURED')
     }
 
-    const clientBaseUrl = normalizePublicBaseUrl(returnBaseUrl || readFirstEnv(['PAYMONGO_RETURN_BASE_URL', 'CLIENT_URL']))
+    const clientBaseUrl = normalizePublicBaseUrl(
+        returnBaseUrl || readFirstEnv(['CLIENT_URL'])
+    )
     if (!clientBaseUrl) {
         await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
         throw new Error('CHECKOUT_RETURN_BASE_URL_INVALID')
@@ -2322,11 +2303,11 @@ export const createTouristMenuOrderPaymongoCheckout = async ({
         throw new Error('CHECKOUT_RETURN_URLS_INVALID')
     }
 
-    const amountInCentavos = Math.round(Number(totalAmount) * 100)
-    const fromChoice = mapTouristCheckoutBillingToPaymongoTypes(billingType)
-    const enabledFromEnv = readFirstEnv(['PAYMONGO_PAYMENT_METHOD_TYPES'])
+    const amountInPeso = Math.round(Number(totalAmount) * 100) / 100
+    const fromChoice = mapTouristCheckoutBillingToXenditMethods(billingType)
+    const enabledFromEnv = readFirstEnv(['XENDIT_PAYMENT_METHODS'])
         .split(',')
-        .map((value) => value.trim().toLowerCase())
+        .map((value) => normalizeXenditInvoiceMethod(value))
         .filter(Boolean)
     const paymentMethodTypes = enabledFromEnv.length
         ? fromChoice.filter((t) => enabledFromEnv.includes(t))
@@ -2336,47 +2317,21 @@ export const createTouristMenuOrderPaymongoCheckout = async ({
         throw new Error('PAYMENT_METHOD_NOT_ENABLED_FOR_CHECKOUT')
     }
 
-    const lineItems =
-        resolved.length === 1
-            ? [
-                  {
-                      currency: 'PHP',
-                      amount: amountInCentavos,
-                      name: resolved[0].name.slice(0, 120),
-                      quantity: 1,
-                      description: `${resolved[0].qty}× @ PHP ${resolved[0].unit.toFixed(2)}`.slice(0, 255)
-                  }
-              ]
-            : [
-                  {
-                      currency: 'PHP',
-                      amount: amountInCentavos,
-                      name: `Menu order (${resolved.length} items)`,
-                      quantity: 1,
-                      description: productName.slice(0, 255)
-                  }
-              ]
-
     const payload = {
-        data: {
-            attributes: {
-                reference_number: referenceNumber,
-                send_email_receipt: false,
-                show_description: true,
-                show_line_items: true,
-                description: `Order — ${business.name || 'Restaurant'}`,
-                line_items: lineItems,
-                payment_method_types: paymentMethodTypes,
-                success_url: successUrl,
-                cancel_url: cancelUrl,
-                metadata: {
-                    tbPendingCheckoutKind: 'tourist_menu_order',
-                    tbPendingCheckoutId: String(pending._id),
-                    requestReferenceNumber: String(referenceNumber),
-                    businessId: String(business._id),
-                    touristUserId: String(userId)
-                }
-            }
+        external_id: referenceNumber,
+        amount: amountInPeso,
+        currency: 'PHP',
+        description: `Order - ${business.name || 'Restaurant'}`,
+        success_redirect_url: successUrl,
+        failure_redirect_url: cancelUrl,
+        payment_methods: paymentMethodTypes,
+        metadata: {
+            tbPendingCheckoutKind: 'tourist_menu_order',
+            tbPendingCheckoutId: String(pending._id),
+            requestReferenceNumber: String(referenceNumber),
+            businessId: String(business._id),
+            touristUserId: String(userId),
+            productName: productName.slice(0, 255)
         }
     }
 
@@ -2384,7 +2339,7 @@ export const createTouristMenuOrderPaymongoCheckout = async ({
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Basic ${Buffer.from(`${paymongoSecretKey}:`).toString('base64')}`
+            Authorization: buildXenditBasicAuthHeader(xenditSecretKey)
         },
         body: JSON.stringify(payload)
     })
@@ -2398,16 +2353,16 @@ export const createTouristMenuOrderPaymongoCheckout = async ({
         }
     })()
 
-    const checkoutUrl = jsonResponse?.data?.attributes?.checkout_url
-    const checkoutId = jsonResponse?.data?.id || ''
+    const checkoutUrl = jsonResponse?.invoice_url
+    const checkoutId = jsonResponse?.id || ''
     if (!response.ok || !checkoutUrl) {
         await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
         const upstreamMessage =
-            jsonResponse?.errors?.[0]?.detail ||
-            jsonResponse?.errors?.[0]?.code ||
+            jsonResponse?.message ||
+            jsonResponse?.error_code ||
             responseText ||
-            'Unknown PayMongo upstream error'
-        throw new Error(`PayMongo checkout create failed (${response.status}): ${upstreamMessage}`)
+            'Unknown Xendit upstream error'
+        throw new Error(`Xendit invoice create failed (${response.status}): ${upstreamMessage}`)
     }
 
     await TouristMenuOrderCheckout.updateOne(

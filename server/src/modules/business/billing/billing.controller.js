@@ -18,7 +18,7 @@ export const createMyBusinessBillingCheckout = async (req, res) => {
             }
         })
         return res.status(200).json({
-            message: 'PayMongo checkout created successfully',
+            message: 'Xendit checkout created successfully',
             data: checkout
         })
     } catch (error) {
@@ -34,19 +34,19 @@ export const createMyBusinessBillingCheckout = async (req, res) => {
                     'Your current prepaid plan is still active. You can choose a new billing cycle after the current period ends.'
             })
         }
-        if (error.message === 'PAYMONGO_SECRET_KEY_NOT_CONFIGURED') {
-            return res.status(500).json({ message: 'PayMongo secret key is not configured' })
+        if (error.message === 'XENDIT_SECRET_KEY_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'Xendit secret key is not configured' })
         }
-        if (error.message === 'PAYMONGO_SECRET_KEY_INVALID') {
-            return res.status(500).json({ message: 'PayMongo secret key must start with sk_' })
+        if (error.message === 'XENDIT_SECRET_KEY_INVALID') {
+            return res.status(500).json({ message: 'Xendit secret key must start with xnd_' })
         }
-        if (error.message === 'PAYMONGO_CHECKOUT_URL_NOT_CONFIGURED') {
-            return res.status(500).json({ message: 'PayMongo checkout URL is not configured' })
+        if (error.message === 'XENDIT_INVOICE_URL_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'Xendit invoice URL is not configured' })
         }
         if (error.message === 'CHECKOUT_RETURN_BASE_URL_INVALID') {
             return res.status(400).json({
                 message:
-                    'Invalid return base URL. Send returnBaseUrl (e.g. https://your-site.com) or set CLIENT_URL / PAYMONGO_RETURN_BASE_URL to a full http(s) URL.'
+                    'Invalid return base URL. Send returnBaseUrl (e.g. https://your-site.com) or set CLIENT_URL / XENDIT_RETURN_BASE_URL to a full http(s) URL.'
             })
         }
         if (error.message === 'CHECKOUT_RETURN_URLS_INVALID') {

@@ -26,14 +26,6 @@ export const updateBusinessProfileSchema = zod.object({
     })
 })
 
-export const updateBusinessThemeColorSchema = zod.object({
-    body: zod.object({
-        themeColor: zod
-            .string()
-            .regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Theme color must be a valid hex color')
-    })
-})
-
 export const uploadBusinessProfileImageSchema = zod.object({
     body: zod.object({
         profileImage: zod

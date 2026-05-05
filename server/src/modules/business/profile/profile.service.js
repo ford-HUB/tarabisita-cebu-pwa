@@ -4,7 +4,6 @@ export {
     getBusinessProfileByUserId,
     submitBusinessProofByUserId,
     updateBusinessProfileByUserId,
-    updateBusinessThemeColorByUserId,
     uploadBusinessAccountAvatarByUserId,
     uploadBusinessBannerImageByUserId,
     uploadBusinessProfileImageByUserId

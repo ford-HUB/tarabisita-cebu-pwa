@@ -33,7 +33,6 @@ export const sanitizeBusinessPayload = (business) => ({
     coverImage: business.coverImage,
     banner: business.banner || business.coverImage,
     businessLocation: business.businessLocation,
-    themeColor: business.themeColor || '#ff7a1a',
     socialMedia: business.socialMedia,
     category: business.category,
     verificationStatus: business.verificationStatus,
