@@ -7,9 +7,6 @@ const AuthHeader = () => {
           <a className="text-[#1f1f1f] transition hover:text-[#c66b2b]" href="/">
             Home
           </a>
-          <a className="text-[#1f1f1f] transition hover:text-[#c66b2b]" href="/">
-            Explore
-          </a>
         </nav>
       </div>
 

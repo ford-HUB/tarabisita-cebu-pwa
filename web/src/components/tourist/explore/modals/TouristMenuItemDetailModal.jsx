@@ -121,8 +121,10 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
         aria-label="Dismiss dialog"
         onClick={onClose}
       />
-      <div className="relative z-10 flex max-h-[95vh] w-full max-w-lg flex-col overflow-x-hidden overflow-y-hidden rounded-t-2xl border border-[#e7dfd5] bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-2xl">
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
+      <div
+        className="relative z-10 flex max-h-[95vh] w-full max-w-xl flex-col overflow-x-hidden overflow-y-hidden rounded-t-2xl border border-[#e7dfd5] bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-2xl"
+      >
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-[#fbf9f6] [-ms-overflow-style:none] [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
           <div
             className="relative h-44 shrink-0 sm:h-52"
             onTouchStart={(e) => {
@@ -180,7 +182,7 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
                   <FiChevronRight className="h-5 w-5" aria-hidden />
                 </button>
                 <div
-                  className="absolute bottom-[4.25rem] left-0 right-0 z-20 flex justify-center gap-1.5 sm:bottom-[4.5rem]"
+                  className="absolute bottom-17 left-0 right-0 z-20 flex justify-center gap-1.5 sm:bottom-18"
                   role="tablist"
                   aria-label="Photo thumbnails"
                 >
@@ -195,15 +197,14 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
                         e.stopPropagation()
                         setHeroIndex(idx)
                       }}
-                      className={`h-1.5 rounded-full transition-all ${
-                        idx === heroIndex ? 'w-5 bg-[#ff7a1a]' : 'w-1.5 bg-white/70 hover:bg-white'
-                      }`}
+                      className={`h-1.5 rounded-full transition-all ${idx === heroIndex ? 'w-5' : 'w-1.5 bg-white/70 hover:bg-white'}`}
+                      style={idx === heroIndex ? { backgroundColor: '#ff7a1a' } : undefined}
                     />
                   ))}
                 </div>
               </>
             ) : null}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/55 to-transparent" />
             {showAvailable ? (
               <span className="absolute right-3 top-3 z-10 rounded-full bg-emerald-600/95 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
                 Available
@@ -286,7 +287,7 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
 
           <div className="mt-6" aria-label="Map and directions">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a79a8b]">Map &amp; directions</p>
-            <div className="mt-3 rounded-xl border border-[#e7dfd5] bg-[#faf8f5] p-4">
+            <div className="mt-3 flex w-full justify-center rounded-xl border border-[#e7dfd5] bg-[#faf8f5] p-4">
               <TouristDestinationMapPanel
                 key={`${item.businessId}-${item.id}`}
                 placeLabel={item.businessName || business?.name || 'Restaurant'}
@@ -324,7 +325,7 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
                 </button>
                 <span
                   id="menu-item-qty-value"
-                  className="flex min-w-[2.125rem] select-none items-center justify-center border-x border-[#e7dfd5] bg-white px-1.5 text-sm font-semibold tabular-nums leading-none text-[#1f1f1f]"
+                  className="flex min-w-8.5 select-none items-center justify-center border-x border-[#e7dfd5] bg-white px-1.5 text-sm font-semibold tabular-nums leading-none text-[#1f1f1f]"
                   aria-live="polite"
                   aria-atomic="true"
                   title={`Quantity for ${item.name}`}

@@ -14,10 +14,10 @@ import { formatBillingDateTime, formatBillingPeso } from '../shared/utils/billin
 import { useBusinessBillingProfile } from './useBusinessBillingProfile.hook'
 import { useBillingStore } from '../store/billing/billing.store'
 import {
-  assignPaymongoCheckout,
+  assignXenditCheckout,
   isLikelySocialInAppBrowser,
-  isTrustedPaymongoCheckoutUrl
-} from '../shared/utils/paymongoCheckoutRedirect.utils'
+  isTrustedXenditCheckoutUrl
+} from '../shared/utils/xenditCheckoutRedirect.utils'
 
 /**
  * Billing page controller: profile rows, checkout, billing-address save, plan modals, payment return UX.
@@ -28,7 +28,7 @@ export const useBusinessBilling = () => {
   const [processingPlanId, setProcessingPlanId] = useState(null)
   const [isAvailablePlansModalOpen, setIsAvailablePlansModalOpen] = useState(false)
   const [isCompareFeaturesModalOpen, setIsCompareFeaturesModalOpen] = useState(false)
-  const [paymongoInAppCheckoutUrl, setPaymongoInAppCheckoutUrl] = useState(null)
+  const [xenditInAppCheckoutUrl, setXenditInAppCheckoutUrl] = useState(null)
 
   const { ledgerPayments, ledgerSubscriptions, isLedgerLoading } = useBillingStore(
     useShallow((s) => ({
@@ -155,21 +155,21 @@ export const useBusinessBilling = () => {
     setSearchParams(nextParams, { replace: true })
   }, [searchParams, setSearchParams, refetchProfile, loadLedger])
 
-  const closePaymongoInAppCheckoutModal = useCallback(() => {
-    setPaymongoInAppCheckoutUrl(null)
+  const closeXenditInAppCheckoutModal = useCallback(() => {
+    setXenditInAppCheckoutUrl(null)
   }, [])
 
-  const continuePaymongoInAppCheckout = useCallback(() => {
-    if (!paymongoInAppCheckoutUrl) {
+  const continueXenditInAppCheckout = useCallback(() => {
+    if (!xenditInAppCheckoutUrl) {
       return
     }
     try {
-      assignPaymongoCheckout(paymongoInAppCheckoutUrl)
+      assignXenditCheckout(xenditInAppCheckoutUrl)
     } catch {
       toast.error('That payment link is not valid. Please try choosing a plan again.')
-      setPaymongoInAppCheckoutUrl(null)
+      setXenditInAppCheckoutUrl(null)
     }
-  }, [paymongoInAppCheckoutUrl])
+  }, [xenditInAppCheckoutUrl])
 
   const handleChoosePlan = useCallback(async (plan) => {
     if (isPlanSelectionLocked) {
@@ -184,19 +184,19 @@ export const useBusinessBilling = () => {
         months: plan.months,
         returnBaseUrl: window.location.origin
       })
-      if (!isTrustedPaymongoCheckoutUrl(checkoutUrl)) {
+      if (!isTrustedXenditCheckoutUrl(checkoutUrl)) {
         toast.error('Invalid payment session link. Please try again or contact support.')
         setProcessingPlanId(null)
         return
       }
       if (isLikelySocialInAppBrowser()) {
-        setPaymongoInAppCheckoutUrl(checkoutUrl)
+        setXenditInAppCheckoutUrl(checkoutUrl)
         setProcessingPlanId(null)
         return
       }
-      assignPaymongoCheckout(checkoutUrl)
+      assignXenditCheckout(checkoutUrl)
     } catch (error) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to start PayMongo checkout.')
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to start Xendit checkout.')
       setProcessingPlanId(null)
     }
   }, [isPlanSelectionLocked])
@@ -226,9 +226,9 @@ export const useBusinessBilling = () => {
     handleCloseAvailablePlansModal: () => setIsAvailablePlansModalOpen(false),
     handleOpenCompareFeaturesModal: () => setIsCompareFeaturesModalOpen(true),
     handleCloseCompareFeaturesModal: () => setIsCompareFeaturesModalOpen(false),
-    isPaymongoMobileCheckoutModalOpen: Boolean(paymongoInAppCheckoutUrl),
-    paymongoMobileCheckoutUrl: paymongoInAppCheckoutUrl || '',
-    closePaymongoMobileCheckoutModal: closePaymongoInAppCheckoutModal,
-    continuePaymongoMobileCheckout: continuePaymongoInAppCheckout
+    isXenditMobileCheckoutModalOpen: Boolean(xenditInAppCheckoutUrl),
+    xenditMobileCheckoutUrl: xenditInAppCheckoutUrl || '',
+    closeXenditMobileCheckoutModal: closeXenditInAppCheckoutModal,
+    continueXenditMobileCheckout: continueXenditInAppCheckout
   }
 }

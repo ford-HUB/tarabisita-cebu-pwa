@@ -34,21 +34,25 @@ const TouristDestinationMapPanel = ({
     routeInfo?.coordinates && Array.isArray(routeInfo.coordinates) && routeInfo.coordinates.length >= 2
       ? routeInfo.coordinates
       : null
+  const routeDistanceMeters = Number(routeInfo?.distanceMeters) || 0
 
   const staticMapUrl = useMemo(() => {
     if (!coordsOk || !destination) return null
     const w = compact ? 440 : 640
     const h = compact ? 260 : 240
+    const zoom = routeCoordinates ? 8.6 : userOrigin ? 9.2 : 11
+    const fitPadding = routeCoordinates ? (routeDistanceMeters > 30_000 ? 110 : routeDistanceMeters > 12_000 ? 92 : 76) : 56
     return buildMapboxStaticMapUrl({
       lng: destination.lng,
       lat: destination.lat,
       width: w,
       height: h,
-      zoom: 11,
+      zoom,
       routeCoordinates,
-      userLocation: userOrigin
+      userLocation: userOrigin,
+      fitPadding
     })
-  }, [coordsOk, destination, compact, routeCoordinates, userOrigin])
+  }, [coordsOk, destination, compact, routeCoordinates, userOrigin, routeDistanceMeters])
 
   const destLat = destination?.lat
   const destLng = destination?.lng
@@ -125,7 +129,7 @@ const TouristDestinationMapPanel = ({
 
   if (requireEngagementStep && !mapEngaged) {
     return (
-      <div className="flex min-h-[12rem] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[#d4c4b6] bg-white px-4 py-8 text-center">
+      <div className="flex min-h-48 flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-[#d4c4b6] bg-white px-4 py-8 text-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#fff8f2] text-[#9b5a2c] ring-1 ring-[#ff7a1a]/25">
           <FiMap className="h-6 w-6" aria-hidden />
         </span>

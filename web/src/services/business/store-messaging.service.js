@@ -6,6 +6,9 @@ export const getBusinessStoreMessagingConversations = () =>
 export const getBusinessStoreMessagingThread = (conversationId) =>
   apiInstance.get('business/me/store-messaging/thread', { params: { conversationId } })
 
+export const deleteBusinessStoreMessagingConversation = (conversationId) =>
+  apiInstance.delete('business/me/store-messaging/conversations', { params: { conversationId } })
+
 export const getBusinessStoreMessagingNotifications = () =>
   apiInstance.get('business/me/store-messaging/notifications')
 

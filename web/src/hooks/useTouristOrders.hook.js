@@ -8,6 +8,44 @@ import {
 
 const POLL_MS = 5000
 
+const getDateParts = (value) => {
+  const d = value ? new Date(value) : null
+  if (!d || Number.isNaN(d.getTime())) return null
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth(),
+    day: d.getDate()
+  }
+}
+
+const buildLocalDayKey = (value) => {
+  const p = getDateParts(value)
+  if (!p) return 'unknown-day'
+  const mm = String(p.month + 1).padStart(2, '0')
+  const dd = String(p.day).padStart(2, '0')
+  return `${p.year}-${mm}-${dd}`
+}
+
+const buildLocalDayLabel = (value) => {
+  const p = getDateParts(value)
+  if (!p) return 'Unknown date'
+  const now = new Date()
+  const today = { year: now.getFullYear(), month: now.getMonth(), day: now.getDate() }
+  const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+  const yesterday = {
+    year: yesterdayDate.getFullYear(),
+    month: yesterdayDate.getMonth(),
+    day: yesterdayDate.getDate()
+  }
+  if (p.year === today.year && p.month === today.month && p.day === today.day) return 'Today'
+  if (p.year === yesterday.year && p.month === yesterday.month && p.day === yesterday.day) return 'Yesterday'
+  return new Date(p.year, p.month, p.day).toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
 /**
  * Loads the tourist’s menu order history and refreshes on an interval so kitchen status
  * (e.g. PLACED → PROCESSING) stays in sync with the business order board.
@@ -91,10 +129,14 @@ export const useTouristOrders = () => {
   const storeOrderGroups = useMemo(() => {
     const groups = new Map()
     for (const o of orders) {
-      const key = o.businessId || `name:${o.businessName || 'unknown'}`
+      const dayKey = buildLocalDayKey(o.createdAt)
+      const storeKey = o.businessId || `name:${o.businessName || 'unknown'}`
+      const key = `${storeKey}|${dayKey}`
       if (!groups.has(key)) {
         groups.set(key, {
           key,
+          dayKey,
+          dayLabel: buildLocalDayLabel(o.createdAt),
           businessId: o.businessId,
           businessName: o.businessName || 'Store',
           businessStoreImage: o.businessStoreImage || '',

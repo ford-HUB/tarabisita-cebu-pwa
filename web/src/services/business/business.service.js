@@ -17,11 +17,6 @@ export const updateMyBusinessProfile = async (data) => {
   return response
 }
 
-export const updateMyBusinessThemeColor = async (themeColor) => {
-  const response = await apiInstance.patch('business/me/theme-color', { themeColor })
-  return response
-}
-
 export const uploadMyBusinessProfileImage = async (profileImage) => {
   const response = await apiInstance.post('business/me/profile-image', { profileImage })
   return response

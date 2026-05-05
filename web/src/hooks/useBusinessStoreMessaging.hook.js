@@ -3,6 +3,7 @@ import { io } from 'socket.io-client'
 import { toast } from 'sonner'
 import { getSocketBaseUrl } from '../shared/utils/socketBase.utils.js'
 import {
+  deleteBusinessStoreMessagingConversation,
   getBusinessStoreMessagingConversations,
   getBusinessStoreMessagingThread
 } from '../services/business/store-messaging.service.js'
@@ -147,5 +148,38 @@ export const useBusinessStoreMessaging = ({ conversationId }) => {
     })
   }, [])
 
-  return { hub, room, sendMessage }
+  const deleteConversation = useCallback(
+    async (targetConversationId) => {
+      const cid = String(targetConversationId || '').trim()
+      if (!cid) return false
+
+      try {
+        await deleteBusinessStoreMessagingConversation(cid)
+        setHub((h) => ({
+          ...h,
+          items: Array.isArray(h.items) ? h.items.filter((item) => String(item?.conversationId) !== cid) : []
+        }))
+
+        if (String(conversationId || '') === cid) {
+          const s = socketRef.current
+          socketRef.current = null
+          s?.removeAllListeners()
+          s?.disconnect()
+          setRoom({ session: null, messages: [], loading: false, error: null, socketConnected: false })
+          conversationIdRef.current = null
+        }
+
+        void useBusinessStoreNotificationsStore.getState().fetchSummary()
+        toast.success('Conversation deleted.')
+        return true
+      } catch (e) {
+        const msg = e?.response?.data?.message || e?.message || 'Could not delete conversation.'
+        toast.error(msg)
+        return false
+      }
+    },
+    [conversationId]
+  )
+
+  return { hub, room, sendMessage, deleteConversation }
 }

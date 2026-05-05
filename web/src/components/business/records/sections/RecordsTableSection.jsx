@@ -28,7 +28,7 @@ const RecordsTableSection = ({ orders }) => {
                 <p>{order.items}</p>
                 <span
                   className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${
-                    order.status === 'CANCELLED' ? 'bg-[#fff0f0] text-[#b54747]' : 'bg-[#e8f8ec] text-[#2a7b45]'
+                    order.status === 'FAILED' ? 'bg-[#fff0f0] text-[#b54747]' : 'bg-[#e8f8ec] text-[#2a7b45]'
                   }`}
                 >
                   {order.status}

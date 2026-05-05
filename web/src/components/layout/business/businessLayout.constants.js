@@ -85,7 +85,7 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
       path: `/${toEncryptedRoute('business/dashboard/billing')}`
     },
     {
-      label: 'Records',
+      label: 'Order Records',
       icon: FiDatabase,
       path: `/${toEncryptedRoute('business/dashboard/records')}`
     },
@@ -93,7 +93,16 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
     {
       label: 'Reports',
       icon: FiBarChart2,
-      children: ['Daily Sales', 'Traffic Insights']
+      children: [
+        {
+          label: 'Daily Sales',
+          path: `/${toEncryptedRoute('business/dashboard/reports/daily-sales')}`
+        },
+        {
+          label: 'Traffic Insights',
+          path: `/${toEncryptedRoute('business/dashboard/reports/traffic-insights')}`
+        }
+      ]
     },
     {
       label: 'Security & Activity Log',

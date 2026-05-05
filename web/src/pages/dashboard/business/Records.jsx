@@ -15,8 +15,8 @@ const Records = () => {
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-[#1f1f1f]">Records</h1>
-        <p className="mt-1 text-sm text-[#6d645d]">Database</p>
+        <h1 className="text-2xl font-semibold text-[#1f1f1f]">Order Records</h1>
+        <p className="mt-1 text-sm text-[#6d645d]">Track completed customer order outcomes: success or failed.</p>
       </div>
 
       <div className="rounded-2xl border border-[#ece3d9] bg-white p-4 shadow-sm md:p-5">

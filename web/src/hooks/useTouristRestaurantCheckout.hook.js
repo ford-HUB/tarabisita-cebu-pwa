@@ -11,7 +11,11 @@ import { groupCartItemsByBusiness, useTouristCartItemStore } from '../store/tour
 import { getTouristMenuOrderCheckoutStatus, postTouristCustomerOrderCheckout } from '../services/tourist/touristCustomerOrder.service.js'
 import { putTouristCartItems } from '../services/tourist/tourist-cart-item.service.js'
 import { touristCartHref, touristExploreHref } from '../components/layout/tourist/touristLayout.constants.js'
-import { assignPaymongoCheckout, isLikelySocialInAppBrowser, isTrustedPaymongoCheckoutUrl } from '../shared/utils/paymongoCheckoutRedirect.utils.js'
+import {
+  assignXenditCheckout,
+  isLikelySocialInAppBrowser,
+  isTrustedXenditCheckoutUrl
+} from '../shared/utils/xenditCheckoutRedirect.utils.js'
 
 const formatPhp = (n) => {
   const num = Number(n)
@@ -30,7 +34,7 @@ export const useTouristRestaurantCheckout = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [paymongoInAppCheckoutUrl, setPaymongoInAppCheckoutUrl] = useState(null)
+  const [xenditInAppCheckoutUrl, setXenditInAppCheckoutUrl] = useState(null)
 
   const {
     items,
@@ -103,7 +107,7 @@ export const useTouristRestaurantCheckout = () => {
     return opt?.label || 'Online payment'
   }, [billingTypeWatch])
 
-  const clearPaymongoReturnParams = useCallback(() => {
+  const clearXenditReturnParams = useCallback(() => {
     const next = new URLSearchParams(searchParams)
     next.delete('payment')
     next.delete('pending')
@@ -119,7 +123,7 @@ export const useTouristRestaurantCheckout = () => {
 
     if (payment === 'cancelled') {
       toast.message('Payment was cancelled.')
-      clearPaymongoReturnParams()
+      clearXenditReturnParams()
       return undefined
     }
 
@@ -149,7 +153,7 @@ export const useTouristRestaurantCheckout = () => {
             /* background cart sync hook will retry later */
           }
           toast.success(`Order placed — ${data.order.productName || 'Your order'}`)
-          clearPaymongoReturnParams()
+          clearXenditReturnParams()
           navigate(touristExploreHref)
           return
         }
@@ -161,7 +165,7 @@ export const useTouristRestaurantCheckout = () => {
         toast.error(
           'Payment may still be processing. Check your Orders page in a moment, or contact support if you were charged but see no order.'
         )
-        clearPaymongoReturnParams()
+        clearXenditReturnParams()
         return
       }
       timerId = window.setTimeout(poll, POLL_MS)
@@ -174,21 +178,21 @@ export const useTouristRestaurantCheckout = () => {
       cancelled = true
       if (timerId) window.clearTimeout(timerId)
     }
-  }, [searchParams, clearPaymongoReturnParams, navigate, removeItemsForBusiness])
+  }, [searchParams, clearXenditReturnParams, navigate, removeItemsForBusiness])
 
-  const closePaymongoInAppCheckoutModal = useCallback(() => {
-    setPaymongoInAppCheckoutUrl(null)
+  const closeXenditInAppCheckoutModal = useCallback(() => {
+    setXenditInAppCheckoutUrl(null)
   }, [])
 
-  const continuePaymongoInAppCheckout = useCallback(() => {
-    if (!paymongoInAppCheckoutUrl) return
+  const continueXenditInAppCheckout = useCallback(() => {
+    if (!xenditInAppCheckoutUrl) return
     try {
-      assignPaymongoCheckout(paymongoInAppCheckoutUrl)
+      assignXenditCheckout(xenditInAppCheckoutUrl)
     } catch {
       toast.error('That payment link is not valid. Please try again.')
-      setPaymongoInAppCheckoutUrl(null)
+      setXenditInAppCheckoutUrl(null)
     }
-  }, [paymongoInAppCheckoutUrl])
+  }, [xenditInAppCheckoutUrl])
 
   const placeOrders = form.handleSubmit(async (values) => {
     const st = useTouristCartItemStore.getState()
@@ -222,15 +226,15 @@ export const useTouristRestaurantCheckout = () => {
     try {
       const res = await postTouristCustomerOrderCheckout(g.businessId, payloadBase)
       const checkoutUrl = res?.data?.data?.checkoutUrl
-      if (!checkoutUrl || !isTrustedPaymongoCheckoutUrl(checkoutUrl)) {
+      if (!checkoutUrl || !isTrustedXenditCheckoutUrl(checkoutUrl)) {
         toast.error(res?.data?.message || 'Invalid payment session link.')
         return
       }
       if (isLikelySocialInAppBrowser()) {
-        setPaymongoInAppCheckoutUrl(checkoutUrl)
+        setXenditInAppCheckoutUrl(checkoutUrl)
         return
       }
-      assignPaymongoCheckout(checkoutUrl)
+      assignXenditCheckout(checkoutUrl)
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Could not start payment.'
       toast.error(msg)
@@ -266,9 +270,9 @@ export const useTouristRestaurantCheckout = () => {
     toggleItemSelected,
     goExplore,
     goCart,
-    isPaymongoMobileCheckoutModalOpen: Boolean(paymongoInAppCheckoutUrl),
-    paymongoMobileCheckoutUrl: paymongoInAppCheckoutUrl || '',
-    closePaymongoMobileCheckoutModal: closePaymongoInAppCheckoutModal,
-    continuePaymongoMobileCheckout: continuePaymongoInAppCheckout
+    isXenditMobileCheckoutModalOpen: Boolean(xenditInAppCheckoutUrl),
+    xenditMobileCheckoutUrl: xenditInAppCheckoutUrl || '',
+    closeXenditMobileCheckoutModal: closeXenditInAppCheckoutModal,
+    continueXenditMobileCheckout: continueXenditInAppCheckout
   }
 }

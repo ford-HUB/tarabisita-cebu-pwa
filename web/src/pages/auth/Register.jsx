@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FiEye, FiEyeOff, FiMapPin, FiBriefcase } from 'react-icons/fi'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
+import { motion } from 'motion/react'
 import { registerSchema } from '../../shared/validators/auth.validator'
 import { useAuthStore } from '../../store/auth/auth.store'
 import { showErrorToast, showSuccessToast } from '../../shared/ui/toast.util'
@@ -82,7 +83,10 @@ const Register = () => {
 
   return (
     <main className="grid min-h-[calc(100svh-57px)] grid-cols-1 lg:grid-cols-2">
-      <section
+      <motion.section
+        initial={{ opacity: 0, x: -30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
         className="relative hidden overflow-hidden lg:block"
         style={{
           backgroundImage:
@@ -95,9 +99,14 @@ const Register = () => {
           <p className="text-sm tracking-[0.16em] uppercase">JOIN THE COMMUNITY</p>
           <h1 className="mt-2 text-5xl leading-tight font-semibold">Tara na, Sugbo!</h1>
         </div>
-      </section>
+      </motion.section>
 
-      <section className="flex items-center justify-center px-6 py-4 lg:px-10 lg:py-5">
+      <motion.section
+        initial={{ opacity: 0, x: 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
+        className="flex items-center justify-center px-6 py-4 lg:px-10 lg:py-5"
+      >
         <div className="w-full max-w-[440px]">
         <p className="mb-5 text-2xl text-[#c66b2b]">✶ <span>T a r a - B i s i t a C e b u</span></p>
         <h2 className="text-[42px] leading-tight font-semibold text-[#22211f]">Create an account</h2>
@@ -369,7 +378,7 @@ const Register = () => {
             </div>
           </form>
         </div>
-      </section>
+      </motion.section>
     </main>
   )
 }

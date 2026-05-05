@@ -3,7 +3,6 @@ import { FiCamera } from 'react-icons/fi'
 const InterfaceHeaderSection = ({
   businessLabel,
   categoryLabel,
-  themeColor,
   bannerUrl,
   isEditingHeader,
   bannerFileData,
@@ -15,9 +14,6 @@ const InterfaceHeaderSection = ({
   setBusinessNameInput,
   businessDescriptionInput,
   setBusinessDescriptionInput,
-  handleSaveThemeColor,
-  isSavingThemeColor,
-  setThemeColor,
   handleHeaderAction,
   hasHeaderChanges,
   isSavingHeader
@@ -27,7 +23,7 @@ const InterfaceHeaderSection = ({
       className="overflow-visible rounded-2xl shadow-sm"
       style={{
         backgroundColor: '#ffffff',
-        border: `1px solid ${themeColor}22`
+        border: '1px solid #e7ddd2'
       }}
     >
       <div
@@ -35,7 +31,7 @@ const InterfaceHeaderSection = ({
         style={{
           background: bannerUrl
             ? `linear-gradient(0deg, rgba(255,255,255,0.18), rgba(255,255,255,0.18)), url(${bannerUrl}) center/cover no-repeat`
-            : `linear-gradient(90deg, ${themeColor}20, #f6f0ff, #fff0e1)`
+            : 'linear-gradient(90deg, #efe7dc, #f8f3ec, #fff7ed)'
         }}
       >
         {isEditingHeader && (
@@ -94,57 +90,12 @@ const InterfaceHeaderSection = ({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {!isEditingHeader && (
-              <button
-                type="button"
-                className="rounded-full px-3.5 py-2 text-xs font-medium text-white transition"
-                style={{ backgroundColor: themeColor }}
-              >
-                View as User
-              </button>
-            )}
-            <label
-              className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition ${
-                isEditingHeader ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
-              }`}
-              style={{
-                borderColor: `${themeColor}4d`,
-                backgroundColor: `${themeColor}14`,
-                color: '#7a4a22'
-              }}
-              title={isEditingHeader ? undefined : 'Click Edit to enable theme color changes'}
-            >
-              <input
-                type="color"
-                value={themeColor}
-                onChange={(event) => setThemeColor(event.target.value)}
-                disabled={!isEditingHeader}
-                className={`h-4 w-4 rounded border-0 bg-transparent p-0 disabled:cursor-not-allowed ${
-                  isEditingHeader ? 'cursor-pointer' : 'cursor-not-allowed'
-                }`}
-              />
-              Change Theme Color
-            </label>
-            <button
-              type="button"
-              onClick={handleSaveThemeColor}
-              disabled={!isEditingHeader || isSavingThemeColor}
-              title={isEditingHeader ? undefined : 'Click Edit to enable saving theme color'}
-              className="rounded-full border px-3.5 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
-              style={{
-                borderColor: `${themeColor}52`,
-                backgroundColor: `${themeColor}1a`,
-                color: '#7a4a22'
-              }}
-            >
-              {isSavingThemeColor ? 'Saving...' : 'Save Theme'}
-            </button>
             <button
               type="button"
               onClick={handleHeaderAction}
               disabled={isSavingHeader}
               className="rounded-full border bg-white px-3.5 py-2 text-xs font-medium text-[#2f2f2f] transition disabled:cursor-not-allowed disabled:opacity-60"
-              style={{ borderColor: `${themeColor}2e` }}
+              style={{ borderColor: '#d7cbbb' }}
             >
               {!isEditingHeader ? 'Edit' : hasHeaderChanges ? (isSavingHeader ? 'Saving...' : 'Save') : 'Cancel Edit'}
             </button>
