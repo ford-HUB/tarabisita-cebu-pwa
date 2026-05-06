@@ -1,5 +1,4 @@
 import { transporter } from "../../configs/nodemailer.js";
-import { templateReader } from "../../shared/utils/templateReaderExtractor.js";
 
 export const sendMailer = async (to, subject, html) => {
     await new Promise((resolve, reject) => {
