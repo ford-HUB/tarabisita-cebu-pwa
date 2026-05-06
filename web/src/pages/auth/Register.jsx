@@ -48,7 +48,25 @@ const Register = () => {
 
   const onSubmit = async (data) => {
     try {
-      await registerUser(data)
+      const isBusinessAccount = data.accountType === 'BUSINESS'
+      const normalizedPayload = isBusinessAccount
+        ? {
+            ...data,
+            businessName: data.businessName?.trim() || '',
+            businessDescription: data.businessDescription?.trim() || '',
+            businessAddress: data.businessAddress?.trim() || '',
+            businessContact: data.businessContact?.trim() || '',
+            businessCategory: data.businessCategory?.trim() || '',
+          }
+        : {
+            name: data.name,
+            email: data.email,
+            password: data.password,
+            confirmPassword: data.confirmPassword,
+            accountType: data.accountType,
+          }
+
+      await registerUser(normalizedPayload)
       const response = await sendVerificationCode({ email: data.email })
       const sessionToken = response.data.properties.sessionToken
       const expiresAt = response.data.properties.expiresAt
