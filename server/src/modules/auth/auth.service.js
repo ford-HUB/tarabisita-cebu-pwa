@@ -1,16 +1,13 @@
 import { transporter } from "../../configs/nodemailer.js";
 
 export const sendMailer = async (to, subject, html) => {
-    try {
-        const message = await transporter.sendMail({ 
-            from: process.env.BREVO_LOGIN,to,
-            subject,
-            html
-        })
-        return console.log(message.response)
-    } catch (error) {
-        console.error(error)
-    }
+    const message = await transporter.sendMail({
+        from: process.env.EMAIL_USER || process.env.BREVO_LOGIN,
+        to,
+        subject,
+        html
+    })
+    return message
 }
 
 
