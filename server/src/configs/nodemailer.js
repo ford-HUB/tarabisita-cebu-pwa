@@ -38,20 +38,24 @@ export const sendBrevoEmail = async ({ to, subject, html, attachments = [] }) =>
         throw new Error('No recipient email was provided')
     }
 
-    const fromEmail = process.env.BREVO_LOGIN
+    const fromEmail = (process.env.BREVO_LOGIN).trim()
     if (!fromEmail) {
         throw new Error('Email sender is not configured. Set EMAIL_USER or BREVO_LOGIN.')
     }
 
-    const apiKey = process.env.BREVO_APIKEY
+    const apiKey = String(process.env.BREVO_APIKEY).trim()
     if (!apiKey) {
-        throw new Error('BREVO_APIKEY is missing')
+        throw new Error('Brevo API key is missing. Set BREVO_API_KEY (preferred) or BREVO_APIKEY.')
+    }
+
+    if (apiKey.startsWith('xsmtpsib-')) {
+        throw new Error('Detected Brevo SMTP key (xsmtpsib). Use a Brevo HTTP API key (xkeysib) for API sending.')
     }
 
     const payload = {
         sender: {
             email: fromEmail,
-            name: 'tarabisita-noreply@gmail.com'
+            name: 'tarabisita-cebu'
         },
         to: recipients,
         subject,
