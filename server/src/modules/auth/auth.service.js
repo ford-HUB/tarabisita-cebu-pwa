@@ -1,20 +1,16 @@
 import { transporter } from "../../configs/nodemailer.js";
 
 export const sendMailer = async (to, subject, html) => {
-    await new Promise((resolve, reject) => {
-        try {
-            const message = transporter.sendMail({
-                from: process.env.EMAIL_USER,
-                to,
-                subject,
-                html
-            })
-            resolve(message.response)
-            return console.log(message.response)
-        } catch (error) {
-            reject(error)
-        }
-    })
+    try {
+        const message = await transporter.sendMail({ 
+            from: process.env.BREVO_LOGIN,to,
+            subject,
+            html
+        })
+        return console.log(message.response)
+    } catch (error) {
+        throw error
+    }
 }
 
 
@@ -28,7 +24,7 @@ export const sendMailerWithAttachments = async (to, subject, html, attachments =
         }))
 
     const message = await transporter.sendMail({
-        from: process.env.EMAIL_USER,
+        from: process.env.EMAIL_USER || process.env.BREVO_LOGIN,
         to,
         subject,
         html,
