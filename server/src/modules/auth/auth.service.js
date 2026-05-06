@@ -9,7 +9,7 @@ export const sendMailer = async (to, subject, html) => {
         })
         return console.log(message.response)
     } catch (error) {
-        throw error
+        console.error(error)
     }
 }
 
