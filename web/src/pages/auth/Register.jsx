@@ -22,6 +22,7 @@ const Register = () => {
     watch,
     setValue,
     trigger,
+    clearErrors,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm({
@@ -80,6 +81,20 @@ const Register = () => {
     'h-11 w-full rounded-xl border border-[#d7d2ca] bg-[#f5f3ef] px-4 text-sm text-[#2a2927] outline-none transition focus:border-[#c66b2b]'
 
   const errorTextClassName = 'mt-1 text-xs text-[#bb3a2d]'
+  const resetBusinessFields = () => {
+    const businessFields = [
+      'businessName',
+      'businessDescription',
+      'businessAddress',
+      'businessContact',
+      'businessCategory',
+    ]
+
+    businessFields.forEach((field) => {
+      setValue(field, '', { shouldValidate: false, shouldDirty: false, shouldTouch: false })
+    })
+    clearErrors(businessFields)
+  }
 
   return (
     <main className="grid min-h-[calc(100svh-57px)] grid-cols-1 lg:grid-cols-2">
@@ -124,6 +139,7 @@ const Register = () => {
                 onClick={() => {
                   setValue('accountType', 'TOURIST', { shouldValidate: true })
                   setBusinessStep(1)
+                  resetBusinessFields()
                 }}
               >
                 <FiMapPin className="text-[#8b7e70]" size={16} />
@@ -143,6 +159,7 @@ const Register = () => {
                 onClick={() => {
                   setValue('accountType', 'BUSINESS', { shouldValidate: true })
                   setBusinessStep(1)
+                  resetBusinessFields()
                 }}
               >
                 <FiBriefcase className="text-[#8b7e70]" size={16} />

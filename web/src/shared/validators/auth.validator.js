@@ -13,7 +13,7 @@ const baseSchema = z.object({
   businessDescription: z.string().optional(),
   businessAddress: z.string().optional(),
   businessContact: z.string().optional(),
-  businessCategory: z.enum(businessCategoryValues).optional(),
+  businessCategory: z.string().optional(),
 })
 
 export const loginSchema = z.object({
@@ -84,5 +84,13 @@ export const registerSchema = baseSchema.superRefine((data, ctx) => {
         })
       }
     })
+
+    if (data.businessCategory && !businessCategoryValues.includes(data.businessCategory)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Please select a valid business category',
+        path: ['businessCategory'],
+      })
+    }
   }
 })
