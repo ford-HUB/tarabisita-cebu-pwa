@@ -9,7 +9,7 @@ export const transporter = nodemailer.createTransport({
         user: process.env.BREVO_LOGIN,
         pass: process.env.BREVO_APIKEY
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 20000,
 })
