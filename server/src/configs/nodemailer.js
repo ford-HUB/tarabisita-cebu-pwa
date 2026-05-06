@@ -38,7 +38,7 @@ export const sendBrevoEmail = async ({ to, subject, html, attachments = [] }) =>
         throw new Error('No recipient email was provided')
     }
 
-    const fromEmail = (process.env.BREVO_LOGIN).trim()
+    const fromEmail = (process.env.EMAIL_USER).trim()
     if (!fromEmail) {
         throw new Error('Email sender is not configured. Set EMAIL_USER or BREVO_LOGIN.')
     }
