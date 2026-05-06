@@ -1,5 +1,5 @@
 import zod from 'zod'
-import { BUSINESS_CATEGORIES } from '../../../shared/constants/businessCategories.js'
+import { BUSINESS_CATEGORIES } from '../../shared/constants/businessCategories.js'
 
 const businessCategoryEnum = zod.enum(BUSINESS_CATEGORIES)
 
@@ -58,3 +58,4 @@ export const resetPasswordSchema = zod.object({
         path: ['confirmPassword']
     })
 })
+
