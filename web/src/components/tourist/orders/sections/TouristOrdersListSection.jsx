@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -47,10 +47,18 @@ const StoreAvatar = ({ src }) => {
  *   orders?: Record<string, unknown>[],
  *   isLoading: boolean,
  *   errorMessage: string | null,
- *   variant?: 'grouped' | 'history'
+ *   variant?: 'grouped' | 'history',
+ *   excludeStatuses?: string[]
  * }} props
  */
-const TouristOrdersListSection = ({ groups = [], orders = [], isLoading, errorMessage, variant = 'grouped' }) => {
+const TouristOrdersListSection = ({
+  groups = [],
+  orders = [],
+  isLoading,
+  errorMessage,
+  variant = 'grouped',
+  excludeStatuses = []
+}) => {
   const navigate = useNavigate()
   const [expandedKeys, setExpandedKeys] = useState(() => new Set())
   const [messagingOrderId, setMessagingOrderId] = useState(null)
@@ -101,8 +109,26 @@ const TouristOrdersListSection = ({ groups = [], orders = [], isLoading, errorMe
     })
   }, [])
 
+  const hiddenStatuses = useMemo(
+    () => new Set((Array.isArray(excludeStatuses) ? excludeStatuses : []).map((s) => String(s || '').toUpperCase())),
+    [excludeStatuses]
+  )
+
+  const visibleGroups = useMemo(() => {
+    if (variant === 'history' || !hiddenStatuses.size) return groups
+    return groups
+      .map((group) => ({
+        ...group,
+        orders: (Array.isArray(group.orders) ? group.orders : []).filter(
+          (order) => !hiddenStatuses.has(String(order?.statusKey || '').toUpperCase())
+        )
+      }))
+      .filter((group) => group.orders.length > 0)
+  }, [groups, hiddenStatuses, variant])
+
   const historyOrders = Array.isArray(orders) ? orders : []
-  const totalOrders = variant === 'history' ? historyOrders.length : groups.reduce((n, g) => n + g.orders.length, 0)
+  const totalOrders =
+    variant === 'history' ? historyOrders.length : visibleGroups.reduce((n, g) => n + g.orders.length, 0)
 
   if (isLoading) {
     return (
@@ -249,7 +275,7 @@ const TouristOrdersListSection = ({ groups = [], orders = [], isLoading, errorMe
   return (
     <>
       <div className="space-y-3">
-        {groups.map((group, groupIndex) => {
+        {visibleGroups.map((group, groupIndex) => {
           const isOpen = expandedKeys.has(group.key)
           const panelId = `tourist-store-orders-panel-${groupIndex}`
           const headerId = `tourist-store-orders-h-${groupIndex}`

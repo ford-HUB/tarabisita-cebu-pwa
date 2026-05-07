@@ -18,6 +18,7 @@ export const useBillingStore = create((set, get) => ({
 
   ledgerPayments: [],
   ledgerSubscriptions: [],
+  monthlyCapacity: null,
   isLedgerLoading: true,
 
   publicCatalog: null,
@@ -44,10 +45,11 @@ export const useBillingStore = create((set, get) => ({
       const data = res?.data?.data
       set({
         ledgerPayments: Array.isArray(data?.payments) ? data.payments : [],
-        ledgerSubscriptions: Array.isArray(data?.subscriptions) ? data.subscriptions : []
+        ledgerSubscriptions: Array.isArray(data?.subscriptions) ? data.subscriptions : [],
+        monthlyCapacity: data?.monthlyCapacity ?? null
       })
     } catch {
-      set({ ledgerPayments: [], ledgerSubscriptions: [] })
+      set({ ledgerPayments: [], ledgerSubscriptions: [], monthlyCapacity: null })
     } finally {
       set({ isLedgerLoading: false })
     }

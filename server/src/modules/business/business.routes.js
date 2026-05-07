@@ -8,6 +8,7 @@ import customerOrdersRoutes from './customer-orders/customer-orders.routes.js'
 import businessStoreMessagingRoutes from './store-messaging/store-messaging.routes.js'
 import dailySalesReportRoutes from './daily-sales-report/daily-sales-report.routes.js'
 import trafficInsightsRoutes from './traffic-insights/traffic-insights.routes.js'
+import dashboardRoutes from './dashboard/dashboard.routes.js'
 
 const businessRoutes = express.Router()
 
@@ -20,5 +21,6 @@ businessRoutes.use(customerOrdersRoutes)
 businessRoutes.use(businessStoreMessagingRoutes)
 businessRoutes.use(dailySalesReportRoutes)
 businessRoutes.use(trafficInsightsRoutes)
+businessRoutes.use(dashboardRoutes)
 
 export default businessRoutes

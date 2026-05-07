@@ -30,10 +30,11 @@ export const useBusinessBilling = () => {
   const [isCompareFeaturesModalOpen, setIsCompareFeaturesModalOpen] = useState(false)
   const [xenditInAppCheckoutUrl, setXenditInAppCheckoutUrl] = useState(null)
 
-  const { ledgerPayments, ledgerSubscriptions, isLedgerLoading } = useBillingStore(
+  const { ledgerPayments, ledgerSubscriptions, monthlyCapacity, isLedgerLoading } = useBillingStore(
     useShallow((s) => ({
       ledgerPayments: s.ledgerPayments,
       ledgerSubscriptions: s.ledgerSubscriptions,
+      monthlyCapacity: s.monthlyCapacity,
       isLedgerLoading: s.isLedgerLoading
     }))
   )
@@ -211,6 +212,7 @@ export const useBusinessBilling = () => {
     planSubscriptionSummary,
     showPastOrFailedPlan,
     billingAccountSummary,
+    monthlyCapacity,
     ledgerPayments,
     ledgerSubscriptions,
     isLedgerLoading,

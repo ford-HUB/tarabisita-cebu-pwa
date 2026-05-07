@@ -16,7 +16,12 @@ const Orders = () => {
   return (
     <div className="space-y-8 md:space-y-10">
       <TouristOrdersHeaderSection />
-      <TouristOrdersListSection groups={storeOrderGroups} isLoading={isLoading} errorMessage={errorMessage} />
+      <TouristOrdersListSection
+        groups={storeOrderGroups}
+        isLoading={isLoading}
+        errorMessage={errorMessage}
+        excludeStatuses={['FINISHED']}
+      />
     </div>
   )
 }

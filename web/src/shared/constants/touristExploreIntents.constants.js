@@ -14,17 +14,5 @@ export const TOURIST_SERVICE_INTENTS = [
     label: 'Book a stay',
     description: 'Resorts & hotels',
     categoryLabels: ['Resort', 'Hotel']
-  },
-  {
-    id: 'INTENT_RENTAL',
-    label: 'Rentals & rides',
-    description: 'Transport & getting around',
-    categoryLabels: ['Transport']
-  },
-  {
-    id: 'INTENT_EXPERIENCES',
-    label: 'Things to do',
-    description: 'Tours, wellness & fun',
-    categoryLabels: ['Tour', 'Entertainment', 'Wellness']
   }
 ]

@@ -1,6 +1,7 @@
 import { FiCheckCircle, FiClock, FiPackage } from 'react-icons/fi'
 
-/** Kanban columns for customer order board (keys match API `status` except FINISHED column includes CANCELED). */
+/** Kanban columns for customer order board. Each column key matches its API `status`; canceled orders
+ * are intentionally excluded from the board and remain visible only in Today's Record and history. */
 export const ORDER_BOARD_COLUMNS = [
   { key: 'PLACED', title: 'New Order', icon: FiPackage, countClassName: 'bg-[#fff0e3] text-[#9b5a2c]' },
   { key: 'PROCESSING', title: 'Being Processed', icon: FiClock, countClassName: 'bg-[#fff8dd] text-[#9c6a12]' },
