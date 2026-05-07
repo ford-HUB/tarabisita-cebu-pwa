@@ -7,7 +7,8 @@ const CollapsedOrderList = ({
   isRestaurantAccount = false,
   onOpenCustomerNotes,
   onAdvanceStatus,
-  onOpenCancelModal
+  onOpenCancelModal,
+  getFinishedCountdownLabel
 }) => {
   return (
     <div
@@ -91,9 +92,16 @@ const CollapsedOrderList = ({
                 Canceled
               </span>
             ) : (
-              <span className="mt-2 inline-flex rounded-full bg-[#e8f8ec] px-2.5 py-1 text-xs font-semibold text-[#2a7b45]">
-                Completed
-              </span>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="inline-flex rounded-full bg-[#e8f8ec] px-2.5 py-1 text-xs font-semibold text-[#2a7b45]">
+                  Completed
+                </span>
+                {order.status === 'FINISHED' ? (
+                  <span className="text-[11px] font-semibold text-[#2a7b45]">
+                    Auto-hide in {getFinishedCountdownLabel?.(order)}
+                  </span>
+                ) : null}
+              </div>
             )}
         </article>
       ))}

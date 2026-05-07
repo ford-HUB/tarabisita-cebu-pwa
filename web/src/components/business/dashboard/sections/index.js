@@ -1,0 +1,7 @@
+export { default as KpiCardsSection } from './KpiCardsSection'
+export { default as MonthlySalesSection } from './MonthlySalesSection'
+export { default as MonthlyTargetSection } from './MonthlyTargetSection'
+export { default as StatisticsSection } from './StatisticsSection'
+export { default as RecentOrdersSection } from './RecentOrdersSection'
+export { default as TopProductsSection } from './TopProductsSection'
+export { default as OrderStatusCountsSection } from './OrderStatusCountsSection'

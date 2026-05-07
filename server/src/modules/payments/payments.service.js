@@ -18,6 +18,7 @@ import TouristMenuOrderCheckout from '../tourist/menu-order-checkout/menu-order-
 import { removeTouristCartItemsForBusiness } from '../tourist/tourist-cart-item/tourist-cart-item.service.js'
 import { resolveBillingPlanForCheckout } from '../admin/manage-subscription/manage-subscription.service.js'
 import { BUSINESS_CATEGORY_LABELS } from '../../shared/constants/businessCategories.js'
+import { scheduleTouristOrderCompletionEmailForOrder } from '../../jobs/touristOrderCompletionEmail.job.js'
 
 const extractPublicBusiness = (business) => ({
     _id: business._id,
@@ -145,6 +146,88 @@ const computeSubscriptionExpiresAt = (startedAt, months) => {
     const end = new Date(startedAt.getTime())
     end.setMonth(end.getMonth() + Math.max(0, Number(months) || 0))
     return end
+}
+
+const MONTHLY_ORDER_CAP_BY_PLAN_ID = {
+    'starter-3-months': 10000,
+    'growth-6-months': 25000,
+    'pro-12-months': null
+}
+
+const resolveCurrentMonthUtcRange = () => {
+    const now = new Date()
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0))
+    const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0))
+    return { monthStart, nextMonthStart }
+}
+
+const resolveMonthlyOrderCapFromPlanId = (planId) => {
+    const normalized = String(planId || '').trim().toLowerCase()
+    if (!normalized) return null
+    if (Object.prototype.hasOwnProperty.call(MONTHLY_ORDER_CAP_BY_PLAN_ID, normalized)) {
+        return MONTHLY_ORDER_CAP_BY_PLAN_ID[normalized]
+    }
+    if (normalized.includes('starter')) return 10000
+    if (normalized.includes('growth')) return 25000
+    if (normalized.includes('pro')) return null
+    return null
+}
+
+const resolveMonthlyOrderCapForBusiness = (business) => {
+    const sub = business?.subscription || {}
+    if (sub.status !== 'ACTIVE') {
+        return null
+    }
+    const expiresAt = sub.expiresAt ? new Date(sub.expiresAt) : null
+    if (expiresAt && Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() <= Date.now()) {
+        return null
+    }
+    return resolveMonthlyOrderCapFromPlanId(sub.planId)
+}
+
+const assertBusinessMonthlyOrderCapacity = async ({ business, incomingOrders = 1 }) => {
+    const cap = resolveMonthlyOrderCapForBusiness(business)
+    if (cap == null) {
+        return
+    }
+    const increment = Math.max(1, Number(incomingOrders) || 1)
+    const { monthStart, nextMonthStart } = resolveCurrentMonthUtcRange()
+    const currentMonthlyOrders = await CustomerOrder.countDocuments({
+        businessId: business._id,
+        createdAt: { $gte: monthStart, $lt: nextMonthStart }
+    })
+    if (currentMonthlyOrders + increment > cap) {
+        throw new Error(`MONTHLY_ORDER_CAP_REACHED:${cap}`)
+    }
+}
+
+const buildCurrentMonthOrderCapacityPayload = async (business) => {
+    const cap = resolveMonthlyOrderCapForBusiness(business)
+    const { monthStart, nextMonthStart } = resolveCurrentMonthUtcRange()
+    const used = await CustomerOrder.countDocuments({
+        businessId: business._id,
+        createdAt: { $gte: monthStart, $lt: nextMonthStart }
+    })
+
+    if (cap == null) {
+        return {
+            used,
+            cap: null,
+            remaining: null,
+            capLabel: 'Unlimited',
+            monthStart,
+            nextMonthStart
+        }
+    }
+
+    return {
+        used,
+        cap,
+        remaining: Math.max(cap - used, 0),
+        capLabel: String(cap),
+        monthStart,
+        nextMonthStart
+    }
 }
 
 /** True while a prepaid period is still in effect (blocks starting another checkout for a different term). */
@@ -1085,6 +1168,7 @@ export const reconcileXenditWebhooksForBusinessLedger = async ({ limit = 40 } = 
 export const getBusinessProfileByUserId = async (userId) => {
     const business = await findBusinessByUserId(userId)
     const user = await User.findById(userId).select('name email avatar')
+    const monthlyCapacity = await buildCurrentMonthOrderCapacityPayload(business)
 
     return {
         ...extractPublicBusiness(business),
@@ -1094,12 +1178,14 @@ export const getBusinessProfileByUserId = async (userId) => {
         verificationProofs: business.verificationProofs,
         verificationNotes: business.verificationNotes,
         subscription: buildSubscriptionProfilePayload(business),
-        billing: buildBillingSummaryPayload(business)
+        billing: buildBillingSummaryPayload(business),
+        monthlyCapacity
     }
 }
 
 export const getBusinessBillingLedgerByUserId = async (userId) => {
     const business = await findBusinessByUserId(userId)
+    const monthlyCapacity = await buildCurrentMonthOrderCapacityPayload(business)
     const [payments, subscriptions] = await Promise.all([
         Payment.find({ businessId: business._id }).sort({ createdAt: -1 }).limit(50).lean(),
         BusinessSubscription.find({ businessId: business._id }).sort({ createdAt: -1 }).limit(30).lean()
@@ -1107,6 +1193,7 @@ export const getBusinessBillingLedgerByUserId = async (userId) => {
 
     return {
         billing: buildBillingSummaryPayload(business),
+        monthlyCapacity,
         payments: payments.map(serializeLedgerPayment),
         subscriptions: subscriptions.map(serializeLedgerSubscription)
     }
@@ -1874,7 +1961,8 @@ const mapCustomerOrderToClient = (doc) => {
         time: relativeTimeLabel(row.createdAt),
         status: row.status,
         cancelReason: row.cancelReason || '',
-        createdAt: row.createdAt
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt
     }
 }
 
@@ -2020,6 +2108,7 @@ export const createTouristCustomerOrder = async ({
 }) => {
     const { business, resolved, totalAmount, totalCount, productName, productLines } =
         await resolveTouristCustomerMenuOrderPayload({ businessId, lines })
+    await assertBusinessMonthlyOrderCapacity({ business, incomingOrders: 1 })
     const productDetails = buildProductDetailsBlock({
         billingType,
         customerPhone,
@@ -2124,6 +2213,7 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
     if (!business) {
         return { handled: true, touristCheckoutSynced: true, applied: false, reason: 'BUSINESS_MISSING_FOR_FULFILL' }
     }
+    await assertBusinessMonthlyOrderCapacity({ business, incomingOrders: 1 })
 
     const resolved = lines.map((r) => ({
         menuItemId: r.menuItemId,
@@ -2230,6 +2320,7 @@ export const createTouristMenuOrderXenditCheckout = async ({
 }) => {
     const { business, resolved, totalAmount, totalCount, productName, productLines } =
         await resolveTouristCustomerMenuOrderPayload({ businessId, lines })
+    await assertBusinessMonthlyOrderCapacity({ business, incomingOrders: 1 })
     if (totalAmount <= 0) {
         throw new Error('INVALID_ORDER_AMOUNT')
     }
@@ -2424,6 +2515,11 @@ export const advanceMyCustomerOrderStatusByUserId = async (userId, orderId) => {
         throw new Error('INVALID_STATUS_TRANSITION')
     }
     await order.save()
+    if (order.status === 'FINISHED') {
+        scheduleTouristOrderCompletionEmailForOrder(order._id).catch((err) =>
+            console.error('Failed to schedule tourist order completion email', err?.message || err)
+        )
+    }
     return mapCustomerOrderToClient(order)
 }
 

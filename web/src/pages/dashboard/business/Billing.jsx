@@ -12,6 +12,7 @@ const Billing = () => {
     planSubscriptionSummary,
     showPastOrFailedPlan,
     billingAccountSummary,
+    monthlyCapacity,
     ledgerPayments,
     ledgerSubscriptions,
     isLedgerLoading,
@@ -54,6 +55,7 @@ const Billing = () => {
         planSubscriptionSummary={planSubscriptionSummary}
         showPastOrFailedPlan={showPastOrFailedPlan}
         billingAccountSummary={billingAccountSummary}
+        monthlyCapacity={monthlyCapacity}
         ledgerPayments={ledgerPayments}
         ledgerSubscriptions={ledgerSubscriptions}
         isLedgerLoading={isLedgerLoading}

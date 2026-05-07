@@ -14,7 +14,8 @@ const ExpandedOrdersPanel = ({
   isRestaurantAccount = false,
   onOpenCustomerNotes,
   onAdvanceStatus,
-  onOpenCancelModal
+  onOpenCancelModal,
+  getFinishedCountdownLabel
 }) => {
   const noActiveFilters = !String(searchQuery || '').trim() && itemFilter === 'ALL'
   const emptyListMessage =
@@ -87,7 +88,9 @@ const ExpandedOrdersPanel = ({
               <span className="font-medium text-[#2f2f2f]">{order.customer}</span>
               <span>{order.items} item(s)</span>
               <span className="font-semibold text-[#9b5a2c]">{order.total}</span>
-              <span className="text-[#8a7f74]">{order.time}</span>
+              <span className="text-[#8a7f74]">
+                {order.status === 'FINISHED' ? `Auto-hide in ${getFinishedCountdownLabel?.(order)}` : order.time}
+              </span>
               <span>
                 <button
                   type="button"

@@ -14,32 +14,36 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [businessStep, setBusinessStep] = useState(1)
+  const [hasAttemptedBusinessSubmit, setHasAttemptedBusinessSubmit] = useState(false)
   const registerUser = useAuthStore((state) => state.register)
   const sendVerificationCode = useAuthStore((state) => state.sendVerificationCode)
   const setVerificationExpiry = useAuthStore((state) => state.setVerificationExpiry)
+  const defaultFormValues = {
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    accountType: 'TOURIST',
+    businessName: '',
+    businessDescription: '',
+    businessAddress: '',
+    businessContact: '',
+    businessCategory: '',
+  }
   const {
     register,
     watch,
     setValue,
     trigger,
+    reset,
     clearErrors,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, submitCount, touchedFields },
   } = useForm({
-    defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-      accountType: 'TOURIST',
-      businessName: '',
-      businessDescription: '',
-      businessAddress: '',
-      businessContact: '',
-      businessCategory: '',
-    },
+    defaultValues: defaultFormValues,
     resolver: zodResolver(registerSchema),
-    mode: 'onBlur',
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
   })
 
   const accountType = watch('accountType')
@@ -77,6 +81,7 @@ const Register = () => {
       })
       navigate(`/verify-email?${query.toString()}`)
       showSuccessToast('Verification code sent to your email. Please check your inbox.')
+      setHasAttemptedBusinessSubmit(false)
     } catch (error) {
       console.error(error)
       throw error
@@ -87,6 +92,7 @@ const Register = () => {
     const isStepValid = await trigger(['name', 'email', 'password', 'confirmPassword'])
     if (isStepValid) {
       setBusinessStep(2)
+      setHasAttemptedBusinessSubmit(false)
       showSuccessToast('Step 1 complete. Continue with your business details.', {
         duration: 2200,
       })
@@ -113,6 +119,10 @@ const Register = () => {
     })
     clearErrors(businessFields)
   }
+
+  const shouldShowStep1Errors = !isBusiness && submitCount > 0
+  const shouldShowBusinessDetailsErrors = hasAttemptedBusinessSubmit
+  const shouldShowTouchedError = (fieldName) => Boolean(touchedFields?.[fieldName])
 
   return (
     <main className="grid min-h-[calc(100svh-57px)] grid-cols-1 lg:grid-cols-2">
@@ -155,9 +165,9 @@ const Register = () => {
                 }`}
                 type="button"
                 onClick={() => {
-                  setValue('accountType', 'TOURIST', { shouldValidate: true })
+                  reset(defaultFormValues)
                   setBusinessStep(1)
-                  resetBusinessFields()
+                  setHasAttemptedBusinessSubmit(false)
                 }}
               >
                 <FiMapPin className="text-[#8b7e70]" size={16} />
@@ -175,9 +185,12 @@ const Register = () => {
                 }`}
                 type="button"
                 onClick={() => {
-                  setValue('accountType', 'BUSINESS', { shouldValidate: true })
+                  reset({
+                    ...defaultFormValues,
+                    accountType: 'BUSINESS',
+                  })
                   setBusinessStep(1)
-                  resetBusinessFields()
+                  setHasAttemptedBusinessSubmit(false)
                 }}
               >
                 <FiBriefcase className="text-[#8b7e70]" size={16} />
@@ -209,7 +222,9 @@ const Register = () => {
                     type="text"
                     {...register('name')}
                   />
-                  {errors.name && <p className={errorTextClassName}>{errors.name.message}</p>}
+                  {(shouldShowStep1Errors || shouldShowTouchedError('name')) && errors.name && (
+                    <p className={errorTextClassName}>{errors.name.message}</p>
+                  )}
                 </div>
 
                 <div>
@@ -223,7 +238,9 @@ const Register = () => {
                     type="email"
                     {...register('email')}
                   />
-                  {errors.email && <p className={errorTextClassName}>{errors.email.message}</p>}
+                  {(shouldShowStep1Errors || shouldShowTouchedError('email')) && errors.email && (
+                    <p className={errorTextClassName}>{errors.email.message}</p>
+                  )}
                 </div>
 
                 <div>
@@ -247,7 +264,9 @@ const Register = () => {
                       {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                     </button>
                   </div>
-                  {errors.password && <p className={errorTextClassName}>{errors.password.message}</p>}
+                  {(shouldShowStep1Errors || shouldShowTouchedError('password')) && errors.password && (
+                    <p className={errorTextClassName}>{errors.password.message}</p>
+                  )}
                 </div>
 
                 <div>
@@ -274,7 +293,8 @@ const Register = () => {
                       {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                     </button>
                   </div>
-                  {errors.confirmPassword && (
+                  {(shouldShowStep1Errors || shouldShowTouchedError('confirmPassword')) &&
+                    errors.confirmPassword && (
                     <p className={errorTextClassName}>{errors.confirmPassword.message}</p>
                   )}
                 </div>
@@ -299,7 +319,7 @@ const Register = () => {
                     type="text"
                     {...register('businessName')}
                   />
-                  {errors.businessName && (
+                  {shouldShowBusinessDetailsErrors && errors.businessName && (
                     <p className={errorTextClassName}>{errors.businessName.message}</p>
                   )}
                 </div>
@@ -318,7 +338,7 @@ const Register = () => {
                     type="text"
                     {...register('businessDescription')}
                   />
-                  {errors.businessDescription && (
+                  {shouldShowBusinessDetailsErrors && errors.businessDescription && (
                     <p className={errorTextClassName}>{errors.businessDescription.message}</p>
                   )}
                 </div>
@@ -337,7 +357,7 @@ const Register = () => {
                     type="text"
                     {...register('businessAddress')}
                   />
-                  {errors.businessAddress && (
+                  {shouldShowBusinessDetailsErrors && errors.businessAddress && (
                     <p className={errorTextClassName}>{errors.businessAddress.message}</p>
                   )}
                 </div>
@@ -356,7 +376,7 @@ const Register = () => {
                     type="text"
                     {...register('businessContact')}
                   />
-                  {errors.businessContact && (
+                  {shouldShowBusinessDetailsErrors && errors.businessContact && (
                     <p className={errorTextClassName}>{errors.businessContact.message}</p>
                   )}
                 </div>
@@ -380,7 +400,7 @@ const Register = () => {
                       </option>
                     ))}
                   </select>
-                  {errors.businessCategory && (
+                  {shouldShowBusinessDetailsErrors && errors.businessCategory && (
                     <p className={errorTextClassName}>{errors.businessCategory.message}</p>
                   )}
                 </div>
@@ -392,7 +412,10 @@ const Register = () => {
                 <button
                   className="flex h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-[#d7d2ca] bg-[#f5f3ef] font-semibold text-[#2a2927] transition hover:bg-[#ece8e2]"
                   type="button"
-                  onClick={() => setBusinessStep(1)}
+                  onClick={() => {
+                    setBusinessStep(1)
+                    setHasAttemptedBusinessSubmit(false)
+                  }}
                 >
                   Back
                 </button>
@@ -402,7 +425,13 @@ const Register = () => {
                 className="flex h-11 w-full cursor-pointer items-center justify-center rounded-xl bg-[#ff7a1a] font-semibold text-white transition hover:bg-[#eb6c12] disabled:cursor-not-allowed disabled:opacity-75"
                 disabled={isSubmitting}
                 type={isBusiness && businessStep === 1 ? 'button' : 'submit'}
-                onClick={isBusiness && businessStep === 1 ? handleBusinessNext : undefined}
+                onClick={
+                  isBusiness && businessStep === 1
+                    ? handleBusinessNext
+                    : isBusinessDetailsStep
+                      ? () => setHasAttemptedBusinessSubmit(true)
+                      : undefined
+                }
               >
                 {isBusiness && businessStep === 1
                   ? 'Next: Business details'

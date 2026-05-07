@@ -4,7 +4,7 @@ import TouristOrdersHeaderSection from '../../../components/tourist/orders/secti
 import TouristOrdersListSection from '../../../components/tourist/orders/sections/TouristOrdersListSection'
 
 const History = () => {
-  const { orders, isLoading, errorMessage } = useTouristOrders()
+  const { orders, isLoading, errorMessage } = useTouristOrders({ includeFinished: true })
 
   useEffect(() => {
     document.title = 'History | Tara - Bisita Cebu'

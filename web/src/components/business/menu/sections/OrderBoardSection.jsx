@@ -42,7 +42,8 @@ const OrderBoardSection = () => {
     openCancelModal,
     handleCancelOrder,
     toggleActionMenu,
-    toggleExpandedColumn
+    toggleExpandedColumn,
+    getFinishedCountdownLabel
   } = useOrderBoard()
 
   const isEmpty = orders.length === 0
@@ -117,6 +118,7 @@ const OrderBoardSection = () => {
                     onOpenCustomerNotes={openCustomerNotesModal}
                     onAdvanceStatus={handleAdvanceOrderStatus}
                     onOpenCancelModal={openCancelModal}
+                    getFinishedCountdownLabel={getFinishedCountdownLabel}
                   />
                 ) : (
                   <CollapsedOrderList
@@ -127,6 +129,7 @@ const OrderBoardSection = () => {
                     onOpenCustomerNotes={openCustomerNotesModal}
                     onAdvanceStatus={handleAdvanceOrderStatus}
                     onOpenCancelModal={openCancelModal}
+                    getFinishedCountdownLabel={getFinishedCountdownLabel}
                   />
                 )}
               </article>

@@ -14,11 +14,7 @@ export const useOrderBoard = () => {
   const ordersByColumn = useMemo(
     () =>
       ORDER_BOARD_COLUMNS.reduce((accumulator, column) => {
-        accumulator[column.key] = orders.filter((order) =>
-          column.key === 'FINISHED'
-            ? order.status === 'FINISHED' || order.status === 'CANCELED'
-            : order.status === column.key
-        )
+        accumulator[column.key] = orders.filter((order) => order.status === column.key)
         return accumulator
       }, {}),
     [orders]
@@ -33,6 +29,27 @@ export const useOrderBoard = () => {
   const [cancelTargetOrderId, setCancelTargetOrderId] = useState(null)
   const [cancelReason, setCancelReason] = useState(defaultCancelReasons[0])
   const [cancelNotes, setCancelNotes] = useState(defaultCancelReasons[0])
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    const tick = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(tick)
+  }, [])
+
+  const getFinishedOrderRemainingMs = useCallback(
+    (order) => {
+      if (order.status !== 'FINISHED') return null
+      const sourceTime = order.updatedAt || order.createdAt
+      const startedAtMs = new Date(sourceTime).getTime()
+      if (!Number.isFinite(startedAtMs)) return null
+      const remainingMs = startedAtMs + 5 * 60 * 1000 - nowMs
+      return remainingMs
+    },
+    [nowMs]
+  )
 
   useEffect(() => {
     const oid = searchParams.get('o')
@@ -105,6 +122,32 @@ export const useOrderBoard = () => {
     [expandedColumnKey]
   )
 
+  const getFinishedCountdownLabel = useCallback(
+    (order) => {
+      const remainingMs = getFinishedOrderRemainingMs(order)
+      if (remainingMs == null) return '--:--'
+      const clampedSeconds = Math.max(0, Math.ceil(remainingMs / 1000))
+      const minutes = Math.floor(clampedSeconds / 60)
+      const seconds = clampedSeconds % 60
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+    },
+    [getFinishedOrderRemainingMs]
+  )
+
+  const activeOrdersByColumn = useMemo(
+    () =>
+      ORDER_BOARD_COLUMNS.reduce((accumulator, column) => {
+        const sourceOrders = ordersByColumn[column.key] || []
+        accumulator[column.key] = sourceOrders.filter((order) => {
+          if (order.status !== 'FINISHED') return true
+          const remainingMs = getFinishedOrderRemainingMs(order)
+          return remainingMs == null || remainingMs > 0
+        })
+        return accumulator
+      }, {}),
+    [ordersByColumn, getFinishedOrderRemainingMs]
+  )
+
   const openCustomerNotesModal = useCallback((order) => {
     setCustomerNotesOrder(order)
     setOpenActionMenu(null)
@@ -128,7 +171,7 @@ export const useOrderBoard = () => {
   return {
     orders,
     isLoading,
-    ordersByColumn,
+    ordersByColumn: activeOrdersByColumn,
     expandedColumnKey,
     visibleColumns,
     searchQuery,
@@ -152,6 +195,7 @@ export const useOrderBoard = () => {
     openCancelModal,
     handleCancelOrder,
     toggleActionMenu,
-    toggleExpandedColumn
+    toggleExpandedColumn,
+    getFinishedCountdownLabel
   }
 }

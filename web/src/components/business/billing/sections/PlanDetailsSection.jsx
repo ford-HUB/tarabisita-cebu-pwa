@@ -19,11 +19,20 @@ const PlanDetailsSection = ({
   isPlanSelectionLocked = false,
   planSubscriptionSummary = null,
   showPastOrFailedPlan = false,
+  monthlyCapacity = null,
   planBenefits = defaultPlanBenefits,
   freeTierSummary = defaultFreeTierSummary,
   onOpenAvailablePlans,
   onOpenCompareFeatures
 }) => {
+  const usedOrders = Number(monthlyCapacity?.used) || 0
+  const capOrders = Number.isFinite(Number(monthlyCapacity?.cap)) ? Number(monthlyCapacity.cap) : null
+  const remainingOrders =
+    Number.isFinite(Number(monthlyCapacity?.remaining)) && capOrders != null
+      ? Math.max(Number(monthlyCapacity.remaining), 0)
+      : null
+  const formatCount = (value) => new Intl.NumberFormat('en-PH').format(Number(value) || 0)
+
   return (
     <article className="rounded-2xl border border-[#e7dfd5] bg-white shadow-sm">
       <header className="border-b border-[#f0e8de] px-5 py-4">
@@ -63,6 +72,17 @@ const PlanDetailsSection = ({
               <div>
                 <p className="text-xs uppercase tracking-wide text-[#a19384]">Period end</p>
                 <p className="mt-1 text-base font-semibold text-[#2f2f2f]">{planSubscriptionSummary.expiresAtLabel}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[#a19384]">This month order capacity</p>
+                <p className="mt-1 text-base font-semibold text-[#2f2f2f]">
+                  {formatCount(usedOrders)} / {capOrders == null ? 'Unlimited' : formatCount(capOrders)}
+                </p>
+                {remainingOrders != null ? (
+                  <p className="mt-1 text-xs text-[#6d645d]">{formatCount(remainingOrders)} remaining this month</p>
+                ) : (
+                  <p className="mt-1 text-xs text-[#6d645d]">No monthly cap on your active plan</p>
+                )}
               </div>
             </div>
 

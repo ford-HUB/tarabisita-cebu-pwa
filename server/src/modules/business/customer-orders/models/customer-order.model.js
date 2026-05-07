@@ -120,6 +120,12 @@ const customerOrderSchema = new mongoose.Schema(
     cancelReason: {
       type: String,
       default: ''
+    },
+    /** Set when the consolidated "your order is ready" email has been sent for this order's checkout group. */
+    completionEmailSentAt: {
+      type: Date,
+      default: null,
+      index: true
     }
   },
   { timestamps: true, collection: 'customerorders' }
@@ -128,6 +134,7 @@ const customerOrderSchema = new mongoose.Schema(
 customerOrderSchema.index({ businessId: 1, createdAt: -1 })
 customerOrderSchema.index({ businessId: 1, orderCode: 1 }, { unique: true })
 customerOrderSchema.index({ placedByUserId: 1, createdAt: -1 })
+customerOrderSchema.index({ placedByUserId: 1, businessId: 1, status: 1, completionEmailSentAt: 1 })
 
 const CustomerOrder = mongoose.model('CustomerOrder', customerOrderSchema)
 
