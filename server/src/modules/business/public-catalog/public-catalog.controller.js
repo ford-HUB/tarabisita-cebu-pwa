@@ -72,6 +72,13 @@ export const postTouristCustomerOrderCheckout = async (req, res) => {
                     'This payment method is disabled in server settings. Choose another option or ask the site admin to update XENDIT_PAYMENT_METHODS.'
             })
         }
+        if (msg.startsWith('MONTHLY_ORDER_CAP_REACHED')) {
+            const [, cap] = msg.split(':')
+            const limitLabel = cap ? Number(cap).toLocaleString('en-PH') : 'the current'
+            return res.status(409).json({
+                message: `This business reached its monthly order limit (${limitLabel}) for the active plan.`
+            })
+        }
         return res.status(500).json({ message: error.message || 'Could not start checkout.' })
     }
 }
@@ -97,6 +104,13 @@ export const postTouristCustomerOrder = async (req, res) => {
         }
         if (msg === 'INVALID_PRICE') {
             return res.status(400).json({ message: 'Could not validate menu prices.' })
+        }
+        if (msg.startsWith('MONTHLY_ORDER_CAP_REACHED')) {
+            const [, cap] = msg.split(':')
+            const limitLabel = cap ? Number(cap).toLocaleString('en-PH') : 'the current'
+            return res.status(409).json({
+                message: `This business reached its monthly order limit (${limitLabel}) for the active plan.`
+            })
         }
         return res.status(500).json({ message: error.message || 'Could not place order.' })
     }

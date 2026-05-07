@@ -1,4 +1,42 @@
+import { useEffect, useMemo, useState } from 'react'
+
+const FINISHED_VISIBILITY_WINDOW_MS = 5 * 60 * 1000
+
+const getFinishedOrderRemainingMs = (order, nowMs) => {
+  if (order.status !== 'FINISHED') return null
+  const sourceTime = order.updatedAt || order.createdAt
+  const finishedAtMs = new Date(sourceTime).getTime()
+  if (!Number.isFinite(finishedAtMs)) return null
+  return finishedAtMs + FINISHED_VISIBILITY_WINDOW_MS - nowMs
+}
+
+const formatCountdown = (remainingMs) => {
+  const clampedSeconds = Math.max(0, Math.ceil(remainingMs / 1000))
+  const minutes = Math.floor(clampedSeconds / 60)
+  const seconds = clampedSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
 const ResolvedOrdersSection = ({ orders }) => {
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    const tick = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(tick)
+  }, [])
+
+  const visibleOrders = useMemo(
+    () =>
+      orders.filter((order) => {
+        const remainingMs = getFinishedOrderRemainingMs(order, nowMs)
+        return remainingMs == null || remainingMs > 0
+      }),
+    [orders, nowMs]
+  )
+
   return (
     <section className="mt-6 rounded-xl border border-[#ecdfd1] bg-white">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f0e4d7] bg-[#fff7ee] px-3 py-2">
@@ -7,16 +45,16 @@ const ResolvedOrdersSection = ({ orders }) => {
           <h4 className="text-sm font-semibold text-[#2f2f2f]">Completed & Canceled Orders</h4>
         </div>
         <span className="rounded-full bg-[#f6efe7] px-2.5 py-1 text-xs font-semibold text-[#7d5b3b]">
-          {orders.length} order(s)
+          {visibleOrders.length} order(s)
         </span>
       </header>
 
-      {orders.length === 0 ? (
+      {visibleOrders.length === 0 ? (
         <div className="px-3 py-8 text-center text-sm text-[#8f8377]">No finished or canceled orders for today.</div>
       ) : (
         <div className="max-h-[260px] overflow-y-auto">
           <div className="divide-y divide-[#f2e8dc]">
-            {orders.map((order) => (
+            {visibleOrders.map((order) => (
               <article
                 key={`resolved-${order.id}`}
                 className="grid grid-cols-[1fr_1.6fr_1.2fr_0.9fr_0.9fr] items-center gap-2 px-3 py-2 text-xs md:text-sm"
@@ -35,6 +73,11 @@ const ResolvedOrdersSection = ({ orders }) => {
                 >
                   {order.status === 'CANCELED' ? 'Canceled' : 'Finished'}
                 </span>
+                {order.status === 'FINISHED' ? (
+                  <p className="col-span-full text-[11px] font-semibold text-[#2a7b45]">
+                    Auto-hide in {formatCountdown(getFinishedOrderRemainingMs(order, nowMs) || 0)}
+                  </p>
+                ) : null}
               </article>
             ))}
           </div>

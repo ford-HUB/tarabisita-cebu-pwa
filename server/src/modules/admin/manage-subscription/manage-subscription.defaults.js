@@ -37,15 +37,13 @@ export const defaultManageSubscriptionCatalog = {
         }
     ],
     benefits: [
-        { label: '25,500 orders per month', included: true },
+        { label: 'Plan-based monthly order capacity', included: true },
         { label: 'Unlimited partner listings', included: true },
         { label: 'Priority discovery placement', included: true },
         { label: 'Cloud storage access', included: true },
-        { label: 'Custom branded templates', included: false },
-        { label: 'Advanced marketing tools', included: false }
+        { label: 'AI analytics', included: true }
     ],
     columns: [
-        { key: 'free', title: 'Free access', subtitle: 'No subscription' },
         { key: 'starter', title: 'Starter', subtitle: '3-month billing' },
         { key: 'growth', title: 'Growth', subtitle: '6-month billing', highlighted: true },
         { key: 'pro', title: 'Pro', subtitle: '12-month billing' }
@@ -53,47 +51,43 @@ export const defaultManageSubscriptionCatalog = {
     rows: [
         {
             label: 'Published on the tourist map & search',
-            values: { free: 'no', starter: 'yes', growth: 'yes', pro: 'yes' }
+            values: { starter: 'yes', growth: 'yes', pro: 'yes' }
         },
         {
             label: 'Monthly order capacity (platform cap)',
-            values: { free: 'limited', starter: '25,500', growth: '25,500', pro: '25,500' }
+            values: { starter: '10,000', growth: '25,000', pro: 'Unlimited' }
         },
         {
             label: 'Partner / cross-listings',
-            values: { free: 'no', starter: 'yes', growth: 'yes', pro: 'yes' }
+            values: { starter: 'yes', growth: 'yes', pro: 'yes' }
         },
         {
             label: 'Priority placement in discovery',
-            values: { free: 'no', starter: 'yes', growth: 'yes', pro: 'yes' }
+            values: { starter: 'yes', growth: 'yes', pro: 'yes' }
         },
         {
             label: 'Cloud storage for menus, photos & proofs',
-            values: { free: 'limited', starter: 'yes', growth: 'yes', pro: 'yes' }
+            values: { starter: 'yes', growth: 'yes', pro: 'yes' }
         },
         {
-            label: 'Checkout & renewals via PayMongo',
-            values: { free: 'dash', starter: 'yes', growth: 'yes', pro: 'yes' }
+            label: 'Checkout & renewals via Xendit',
+            values: { starter: 'yes', growth: 'yes', pro: 'yes' }
         },
         {
-            label: 'Custom branded templates',
-            values: { free: 'no', starter: 'no', growth: 'no', pro: 'no' }
-        },
-        {
-            label: 'Advanced marketing tools',
-            values: { free: 'no', starter: 'no', growth: 'no', pro: 'no' }
+            label: 'AI analytics',
+            values: { starter: 'yes', growth: 'yes', pro: 'yes' }
         },
         {
             label: 'Billing cycle length',
-            values: { free: '—', starter: '3 months', growth: '6 months', pro: '12 months' }
+            values: { starter: '3 months', growth: '6 months', pro: '12 months' }
         },
         {
             label: 'Total per cycle (before taxes)',
-            values: { free: '—', starter: 'PHP 2,397', growth: 'PHP 5,994', pro: 'PHP 14,388' }
+            values: { starter: 'PHP 2,397', growth: 'PHP 5,994', pro: 'PHP 14,388' }
         },
         {
             label: 'Effective from (shown as monthly)',
-            values: { free: '—', starter: 'PHP 799 / mo', growth: 'PHP 999 / mo', pro: 'PHP 1,199 / mo' }
+            values: { starter: 'PHP 799 / mo', growth: 'PHP 999 / mo', pro: 'PHP 1,199 / mo' }
         }
     ],
     freeTier: [

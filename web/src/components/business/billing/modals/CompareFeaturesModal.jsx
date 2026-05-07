@@ -64,8 +64,8 @@ const CompareFeaturesModal = ({
               Compare features
             </h2>
             <p className="mt-1 text-sm text-[#6d645d]">
-              See what changes when you move from free access to a paid TaraBisita subscription. All paid cycles include
-              the same feature set; longer plans reduce your effective monthly cost.
+              Compare paid TaraBisita subscription cycles. Core tools remain consistent, while monthly order capacity
+              varies per plan and billing cycle.
             </p>
           </div>
           <button
