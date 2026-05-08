@@ -8,6 +8,32 @@ import {
 } from './public-catalog.service.js'
 import { sanitizeBusinessPayload } from '../../../shared/utils/business-controller.helpers.js'
 
+const hasActivePaidSubscription = (business) => {
+    const sub = business?.subscription || {}
+    if (sub.status !== 'ACTIVE') {
+        return false
+    }
+    const startedAt = sub.startedAt ? new Date(sub.startedAt) : null
+    const expiresAt = sub.expiresAt ? new Date(sub.expiresAt) : null
+    if (!startedAt || Number.isNaN(startedAt.getTime())) {
+        return false
+    }
+    if (!expiresAt || Number.isNaN(expiresAt.getTime())) {
+        return false
+    }
+    const now = Date.now()
+    return startedAt.getTime() <= now && expiresAt.getTime() > now
+}
+
+const TOURIST_CHECKOUT_METHOD_CODES = ['GCASH', 'MAYA', 'GRAB_PAY', 'CARD']
+
+const resolveAvailableTouristPaymentMethods = (business) => {
+    const paymentMethods = business?.settings?.paymentMethods || {}
+    return TOURIST_CHECKOUT_METHOD_CODES.filter(
+        (code) => paymentMethods?.[code]?.enabled !== false && Boolean(paymentMethods?.[code]?.isVerified)
+    )
+}
+
 export const getPublicMenuFeed = async (req, res) => {
     try {
         const menuCategory =
@@ -38,7 +64,7 @@ export const postTouristCustomerOrderCheckout = async (req, res) => {
     } catch (error) {
         const msg = error?.message || ''
         if (msg === 'BUSINESS_NOT_FOUND' || msg === 'MENU_CATALOG_NOT_SUPPORTED') {
-            return res.status(404).json({ message: 'Business not found or not available for menu orders.' })
+            return res.status(404).json({ message: 'Business not found or not available for booking/orders.' })
         }
         if (msg.startsWith('MENU_ITEM_NOT_FOUND') || msg.startsWith('MENU_ITEM_UNAVAILABLE')) {
             return res
@@ -72,6 +98,11 @@ export const postTouristCustomerOrderCheckout = async (req, res) => {
                     'This payment method is disabled in server settings. Choose another option or ask the site admin to update XENDIT_PAYMENT_METHODS.'
             })
         }
+        if (msg === 'PAYMENT_METHOD_NOT_AVAILABLE_FOR_BUSINESS') {
+            return res.status(409).json({
+                message: 'This payment method is currently unavailable for this business. Please choose another option.'
+            })
+        }
         if (msg.startsWith('MONTHLY_ORDER_CAP_REACHED')) {
             const [, cap] = msg.split(':')
             const limitLabel = cap ? Number(cap).toLocaleString('en-PH') : 'the current'
@@ -95,7 +126,7 @@ export const postTouristCustomerOrder = async (req, res) => {
     } catch (error) {
         const msg = error?.message || ''
         if (msg === 'BUSINESS_NOT_FOUND' || msg === 'MENU_CATALOG_NOT_SUPPORTED') {
-            return res.status(404).json({ message: 'Business not found or not available for menu orders.' })
+            return res.status(404).json({ message: 'Business not found or not available for booking/orders.' })
         }
         if (msg.startsWith('MENU_ITEM_NOT_FOUND') || msg.startsWith('MENU_ITEM_UNAVAILABLE')) {
             return res
@@ -123,7 +154,7 @@ export const getPublicBusinesses = async (_req, res) => {
             .sort({ publicProfileViewCount: -1, createdAt: -1 })
 
         return res.status(200).json({
-            data: businesses.map(sanitizeBusinessPayload)
+            data: businesses.filter(hasActivePaidSubscription).map(sanitizeBusinessPayload)
         })
     } catch (error) {
         return res.status(500).json({ message: error.message })
@@ -159,13 +190,17 @@ export const getBusinessById = async (req, res) => {
         if (business.verificationStatus !== 'VERIFIED') {
             return res.status(403).json({ message: 'Business is not yet publicly available' })
         }
+        if (!hasActivePaidSubscription(business)) {
+            return res.status(403).json({ message: 'Business is not yet publicly available' })
+        }
 
         const menuItems = listPublicMenuItemsFromBusinessDoc(business)
 
         return res.status(200).json({
             data: {
                 ...sanitizeBusinessPayload(business),
-                menuItems
+                menuItems,
+                availablePaymentMethods: resolveAvailableTouristPaymentMethods(business)
             }
         })
     } catch (error) {

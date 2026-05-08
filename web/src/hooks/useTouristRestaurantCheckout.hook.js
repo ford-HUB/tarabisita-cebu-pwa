@@ -7,6 +7,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useAuth } from './useAuth.hook'
 import { touristCheckoutFormSchema } from '../shared/validators/touristCheckout.validator.js'
 import { TOURIST_MENU_CHECKOUT_PAYMENT_OPTIONS } from '../components/tourist/checkout/touristBillingPaymentOptions.jsx'
+import { fetchPublicBusinessById } from '../services/tourist/touristExplore.service.js'
 import { groupCartItemsByBusiness, useTouristCartItemStore } from '../store/tourist/tourist-cart-item.store.js'
 import { getTouristMenuOrderCheckoutStatus, postTouristCustomerOrderCheckout } from '../services/tourist/touristCustomerOrder.service.js'
 import { putTouristCartItems } from '../services/tourist/tourist-cart-item.service.js'
@@ -35,6 +36,7 @@ export const useTouristRestaurantCheckout = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [xenditInAppCheckoutUrl, setXenditInAppCheckoutUrl] = useState(null)
+  const [availablePaymentMethods, setAvailablePaymentMethods] = useState(['GCASH', 'MAYA', 'GRAB_PAY', 'CARD'])
 
   const {
     items,
@@ -75,6 +77,10 @@ export const useTouristRestaurantCheckout = () => {
   )
 
   const selectedItemRowCount = selectedItems.length
+  const selectedBusinessId =
+    groupsForCheckout.length === 1 && groupsForCheckout[0]?.businessId
+      ? String(groupsForCheckout[0].businessId)
+      : ''
 
   const selectedCount = useMemo(() => selectedItems.reduce((n, it) => n + it.qty, 0), [selectedItems])
 
@@ -101,6 +107,50 @@ export const useTouristRestaurantCheckout = () => {
   }, [user?.name, form])
 
   const billingTypeWatch = useWatch({ control: form.control, name: 'billingType' })
+
+  useEffect(() => {
+    let active = true
+    const run = async () => {
+      if (!selectedBusinessId) {
+        setAvailablePaymentMethods(['GCASH', 'MAYA', 'GRAB_PAY', 'CARD'])
+        return
+      }
+      try {
+        const res = await fetchPublicBusinessById(selectedBusinessId)
+        if (!active) return
+        const methods = Array.isArray(res?.data?.data?.availablePaymentMethods)
+          ? res.data.data.availablePaymentMethods
+          : ['GCASH', 'MAYA', 'GRAB_PAY', 'CARD']
+        setAvailablePaymentMethods(methods)
+      } catch {
+        if (!active) return
+        setAvailablePaymentMethods(['GCASH', 'MAYA', 'GRAB_PAY', 'CARD'])
+      }
+    }
+    void run()
+    return () => {
+      active = false
+    }
+  }, [selectedBusinessId])
+
+  useEffect(() => {
+    const current = String(form.getValues('billingType') || '')
+    if (availablePaymentMethods.includes(current)) return
+    const fallback = availablePaymentMethods[0]
+    if (fallback) {
+      form.setValue('billingType', fallback, { shouldValidate: true, shouldDirty: true })
+    }
+  }, [availablePaymentMethods, form])
+
+  const billingPaymentOptions = useMemo(
+    () =>
+      TOURIST_MENU_CHECKOUT_PAYMENT_OPTIONS.map((option) => ({
+        ...option,
+        disabled: !availablePaymentMethods.includes(option.value)
+      })),
+    [availablePaymentMethods]
+  )
+  const hasAvailablePaymentOptions = availablePaymentMethods.length > 0
 
   const billingMethodLabel = useMemo(() => {
     const opt = TOURIST_MENU_CHECKOUT_PAYMENT_OPTIONS.find((o) => o.value === billingTypeWatch)
@@ -259,7 +309,8 @@ export const useTouristRestaurantCheckout = () => {
     selectedTotal,
     billingMethodLabel,
     formatPhp,
-    billingPaymentOptions: TOURIST_MENU_CHECKOUT_PAYMENT_OPTIONS,
+    billingPaymentOptions,
+    hasAvailablePaymentOptions,
     form,
     placeOrders,
     isSubmitting: form.formState.isSubmitting,

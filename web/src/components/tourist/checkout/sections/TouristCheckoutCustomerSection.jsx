@@ -47,13 +47,20 @@ const TouristCheckoutCustomerSection = ({ register, errors, control, billingPaym
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 sm:items-stretch xl:grid-cols-4">
               {billingPaymentOptions.map((opt) => {
                 const selected = field.value === opt.value
+                const disabled = Boolean(opt.disabled)
                 return (
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => field.onChange(opt.value)}
+                    onClick={() => {
+                      if (disabled) return
+                      field.onChange(opt.value)
+                    }}
+                    disabled={disabled}
                     className={`flex h-full min-h-[4.75rem] w-full items-center gap-2.5 rounded-xl border px-2.5 py-2.5 text-left transition sm:min-h-[4.5rem] sm:gap-3 sm:px-3 sm:py-3 ${
-                      selected
+                      disabled
+                        ? 'cursor-not-allowed border-[#ece5dc] bg-[#f5f1eb] text-[#9a938a] opacity-65'
+                        : selected
                         ? 'border-[#ff7a1a] bg-[#fff8f2] shadow-sm ring-2 ring-[#ff7a1a]/30'
                         : 'border-[#e7dfd5] bg-[#f8f5f0] hover:border-[#d4c4b6] hover:bg-white'
                     }`}
@@ -66,7 +73,9 @@ const TouristCheckoutCustomerSection = ({ register, errors, control, billingPaym
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold leading-tight text-[#1f1f1f]">{opt.label}</span>
-                      <span className="mt-0.5 block truncate text-[11px] leading-tight text-[#5b5b5b]">{opt.description}</span>
+                      <span className="mt-0.5 block truncate text-[11px] leading-tight text-[#5b5b5b]">
+                        {disabled ? 'Unavailable for this business' : opt.description}
+                      </span>
                     </span>
                   </button>
                 )

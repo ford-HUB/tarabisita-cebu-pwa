@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Booking Approved</title>
+</head>
+<body style="margin:0;padding:0;background:#f6f8fb;font-family:Arial,sans-serif;color:#1f2937;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+                    <tr>
+                        <td style="padding:22px 24px;background:#0f172a;color:#ffffff;">
+                            <h1 style="margin:0;font-size:20px;line-height:1.3;">Your booking is approved</h1>
+                            <p style="margin:8px 0 0;font-size:13px;opacity:0.9;">Complete payment to finalize your reservation.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:22px 24px;">
+                            <p style="margin:0 0 12px;font-size:14px;">Hi {{touristName}},</p>
+                            <p style="margin:0 0 14px;font-size:14px;line-height:1.6;">
+                                {{businessName}} approved your booking request.
+                            </p>
+
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;">
+                                <tr>
+                                    <td style="padding:12px 14px;font-size:13px;line-height:1.6;">
+                                        <div><strong>Booking code:</strong> {{orderCode}}</div>
+                                        <div><strong>Amount:</strong> {{orderTotal}}</div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            {{#if hasPayUrl}}
+                            <p style="margin:18px 0 0;">
+                                <a href="{{payUrl}}" style="display:inline-block;padding:10px 18px;border-radius:999px;background:#f97316;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">
+                                    Pay now
+                                </a>
+                            </p>
+                            <p style="margin:12px 0 0;font-size:12px;color:#6b7280;">
+                                If the button does not work, open this link: {{payUrl}}
+                            </p>
+                            <p style="margin:8px 0 0;font-size:12px;color:#6b7280;">
+                                For security, this payment link expires in 24 hours.
+                            </p>
+                            {{else}}
+                            <p style="margin:18px 0 0;font-size:13px;color:#374151;">
+                                Open your TaraBisita tourist orders page in the app to complete payment.
+                            </p>
+                            {{/if}}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

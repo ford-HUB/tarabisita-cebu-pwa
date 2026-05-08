@@ -5,11 +5,22 @@ const StatusCountTile = ({ label, value }) => (
   </article>
 )
 
-const OrderStatusCountsSection = ({ totals }) => (
-  <section className="grid gap-4 sm:grid-cols-3">
-    <StatusCountTile label="Delivered Orders" value={totals.delivered} />
-    <StatusCountTile label="Pending Orders" value={totals.pending} />
-    <StatusCountTile label="Canceled Orders" value={totals.canceled} />
+const OrderStatusCountsSection = ({
+  totals,
+  labels = {
+    delivered: 'Delivered Orders',
+    pending: 'Pending Orders',
+    canceled: 'Canceled Orders'
+  },
+  showWaitingForPayment = false
+}) => (
+  <section className={`grid gap-4 ${showWaitingForPayment ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
+    <StatusCountTile label={labels.delivered} value={totals.delivered} />
+    <StatusCountTile label={labels.pending} value={totals.pending} />
+    {showWaitingForPayment ? (
+      <StatusCountTile label={labels.waitingForPayment || 'Waiting for Payment'} value={totals.waitingForPayment} />
+    ) : null}
+    <StatusCountTile label={labels.canceled} value={totals.canceled} />
   </section>
 )
 

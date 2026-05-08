@@ -70,8 +70,22 @@ const customerOrderSchema = new mongoose.Schema(
     },
     billingType: {
       type: String,
-      enum: ['PAY_AT_PICKUP', 'PREPAID_ONLINE', 'GCASH', 'MAYA', 'GRAB_PAY', 'BANK_TRANSFER', 'CARD'],
+      enum: [
+        'PAY_AT_PICKUP',
+        'PREPAID_ONLINE',
+        'GCASH',
+        'MAYA',
+        'GRAB_PAY',
+        'BANK_TRANSFER',
+        'CARD'
+      ],
       default: 'PAY_AT_PICKUP',
+      trim: true
+    },
+    orderType: {
+      type: String,
+      enum: ['MENU_ORDER', 'BOOKING_REQUEST'],
+      default: 'MENU_ORDER',
       trim: true
     },
     notes: {

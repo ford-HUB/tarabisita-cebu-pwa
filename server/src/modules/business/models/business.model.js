@@ -58,6 +58,16 @@ const menuItemSchema = new mongoose.Schema({
         type: [String],
         default: []
     },
+    addOns: {
+        type: [
+            {
+                id: { type: String, default: '' },
+                name: { type: String, required: true },
+                price: { type: Number, required: true, min: 0 }
+            }
+        ],
+        default: []
+    },
     createdAt: {
         type: Date,
         default: Date.now
@@ -139,6 +149,62 @@ const businessSchema = new mongoose.Schema({
     verificationNotes: {
         type: String,
         default: null
+    },
+    settings: {
+        receiveOrderEmailAlerts: {
+            type: Boolean,
+            default: true
+        },
+        receiveChatNotifications: {
+            type: Boolean,
+            default: true
+        },
+        autoAcceptOrders: {
+            type: Boolean,
+            default: false
+        },
+        prepTimeMinutes: {
+            type: Number,
+            default: 20
+        },
+        lowStockThreshold: {
+            type: Number,
+            default: 10
+        },
+        paymentMethods: {
+            GCASH: {
+                enabled: { type: Boolean, default: false },
+                accountName: { type: String, default: '' },
+                accountNumber: { type: String, default: '' },
+                instructions: { type: String, default: '' },
+                isVerified: { type: Boolean, default: false },
+                verifiedAt: { type: Date, default: null }
+            },
+            MAYA: {
+                enabled: { type: Boolean, default: false },
+                accountName: { type: String, default: '' },
+                accountNumber: { type: String, default: '' },
+                instructions: { type: String, default: '' },
+                isVerified: { type: Boolean, default: false },
+                verifiedAt: { type: Date, default: null }
+            },
+            GRAB_PAY: {
+                enabled: { type: Boolean, default: false },
+                accountName: { type: String, default: '' },
+                accountNumber: { type: String, default: '' },
+                instructions: { type: String, default: '' },
+                isVerified: { type: Boolean, default: false },
+                verifiedAt: { type: Date, default: null }
+            },
+            CARD: {
+                enabled: { type: Boolean, default: false },
+                accountName: { type: String, default: '' },
+                accountNumber: { type: String, default: '' },
+                instructions: { type: String, default: '' },
+                isVerified: { type: Boolean, default: false },
+                verifiedAt: { type: Date, default: null }
+            }
+        }
     },
     category: {
         type: mongoose.Schema.Types.ObjectId,

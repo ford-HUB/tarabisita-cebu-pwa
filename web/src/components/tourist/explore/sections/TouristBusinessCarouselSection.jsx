@@ -12,7 +12,7 @@ const TouristBusinessCarouselSection = ({ title, items, onOpen }) => {
         className={
           'gap-3 pb-2 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto max-md:pb-3 ' +
           'max-md:[-ms-overflow-style:none] max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden ' +
-          'md:grid md:grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] md:gap-4 md:overflow-visible'
+          'md:grid md:grid-cols-[repeat(auto-fill,minmax(12rem,14rem))] md:justify-start md:gap-4 md:overflow-visible'
         }
       >
         {items.map((business) => {
@@ -23,7 +23,7 @@ const TouristBusinessCarouselSection = ({ title, items, onOpen }) => {
               key={String(business._id)}
               type="button"
               onClick={() => onOpen(business)}
-              className="group relative max-md:w-44 max-md:max-w-[min(85vw,13.5rem)] max-md:snap-start max-md:shrink-0 overflow-hidden rounded-xl border border-[#e7dfd5] bg-[#1a120c] text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:min-w-0 md:w-full"
+              className="group relative max-md:w-44 max-md:max-w-[min(85vw,13.5rem)] max-md:snap-start max-md:shrink-0 overflow-hidden rounded-xl border border-[#e7dfd5] bg-[#1a120c] text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:min-w-0 md:w-full md:max-w-56"
             >
               <div className="relative aspect-[4/5] w-full overflow-hidden">
                 {img ? (

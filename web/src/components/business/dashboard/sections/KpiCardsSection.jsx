@@ -19,7 +19,7 @@ const TrendBadge = ({ deltaPct }) => {
   )
 }
 
-const KpiCardsSection = ({ totals }) => (
+const KpiCardsSection = ({ totals, orderCountLabel = 'Orders' }) => (
   <div className="grid gap-4 sm:grid-cols-2">
     <article className="rounded-2xl border border-[#ece3d9] bg-white p-5 shadow-sm">
       <div className="inline-flex rounded-xl bg-[#fff2e6] p-2 text-[#9b5a2c]">
@@ -34,7 +34,7 @@ const KpiCardsSection = ({ totals }) => (
       <div className="inline-flex rounded-xl bg-[#fff2e6] p-2 text-[#9b5a2c]">
         <FiShoppingBag size={18} />
       </div>
-      <p className="mt-4 text-sm text-[#6f665d]">Orders</p>
+      <p className="mt-4 text-sm text-[#6f665d]">{orderCountLabel}</p>
       <p className="mt-1 text-3xl font-bold text-[#202020]">{totals.orders.toLocaleString()}</p>
       <TrendBadge deltaPct={totals.ordersDeltaPct} />
     </article>

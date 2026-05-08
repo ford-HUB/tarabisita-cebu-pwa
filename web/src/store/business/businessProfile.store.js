@@ -87,7 +87,7 @@ export const useBusinessProfileStore = create((set, get) => ({
   loadProfile: async (user) => {
     set({ isLoadingProfile: true })
     try {
-      const response = await getMyBusinessProfile()
+      const response = await getMyBusinessProfile({ businessCategory: user?.businessCategory })
       const data = response?.data?.data
       const formValues = buildFormValues(data, user)
       const loc = buildLocation(data)

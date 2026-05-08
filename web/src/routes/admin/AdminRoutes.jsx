@@ -6,6 +6,7 @@ import Report from '../../pages/dashboard/admin/Report'
 import Subscription from '../../pages/dashboard/admin/Subscription'
 import Transactions from '../../pages/dashboard/admin/Transactions'
 import ManageUsers from '../../pages/dashboard/admin/ManageUsers'
+import SystemPerformance from '../../pages/dashboard/admin/SystemPerformance'
 import { ProtectedRoute } from '../ProtectedRoute'
 
 export const AdminRoutes = [
@@ -44,6 +45,10 @@ export const AdminRoutes = [
       {
         path: 'transactions',
         element: <Transactions />
+      },
+      {
+        path: 'system-performance',
+        element: <SystemPerformance />
       }
     ]
   }
