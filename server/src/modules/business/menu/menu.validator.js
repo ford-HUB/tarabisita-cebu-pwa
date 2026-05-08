@@ -1,5 +1,11 @@
 import zod from 'zod'
 
+const addOnSchema = zod.object({
+    id: zod.string().optional().default(''),
+    name: zod.string().min(1, 'Add-on name is required'),
+    price: zod.number().min(0, 'Add-on price cannot be negative')
+})
+
 export const createBusinessMenuItemSchema = zod.object({
     body: zod.object({
         name: zod.string().min(2, 'Menu name is required'),
@@ -11,6 +17,7 @@ export const createBusinessMenuItemSchema = zod.object({
         servingSize: zod.string().optional().default(''),
         spiceLevel: zod.string().min(1, 'Spice level is required').default('No Spice'),
         allergens: zod.string().optional().default(''),
+        addOns: zod.array(addOnSchema).optional().default([]),
         isAvailable: zod.boolean().default(true),
         images: zod.array(
             zod.string().refine((value) => value.startsWith('data:image/'), 'Invalid menu image format')
@@ -53,6 +60,7 @@ export const updateBusinessMenuItemSchema = zod.object({
         servingSize: zod.string().optional().default(''),
         spiceLevel: zod.string().min(1, 'Spice level is required').default('No Spice'),
         allergens: zod.string().optional().default(''),
+        addOns: zod.array(addOnSchema).optional().default([]),
         stockStatus: zod.enum(['AVAILABLE_TO_ORDER', 'OUT_OF_STOCK']).default('AVAILABLE_TO_ORDER'),
         imageReplacements: zod.array(
             zod.object({

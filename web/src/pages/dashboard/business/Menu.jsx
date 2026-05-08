@@ -10,7 +10,9 @@ import { getBusinessCategoryLabel } from '../../../shared/constants/businessCate
 const Menu = () => {
   const { user } = useAuth()
   const categoryLabel = getBusinessCategoryLabel(user?.businessCategory)
-  const addLabel = categoryLabel === 'Restaurant' ? 'Menus' : 'Products'
+  const normalizedCategory = String(user?.businessCategory || '').trim().toUpperCase()
+  const isAccommodationBusiness = normalizedCategory === 'RESORT' || normalizedCategory === 'HOTEL'
+  const addLabel = categoryLabel === 'Restaurant' ? 'Menus' : isAccommodationBusiness ? 'Manage' : 'Products'
 
   const {
     form,
@@ -40,20 +42,29 @@ const Menu = () => {
     closeEditModal,
     handleEditMenuItem,
     menuCategoryPresets,
+    menuFlavorPresets,
     pickMenuCategoryPreset,
+    pickMenuFlavorPreset,
     handleCategoryFieldKeyDown,
+    handleFlavorFieldKeyDown,
     isSaveMenuCategoryPresetOpen,
     pendingMenuCategoryPreset,
     confirmSaveMenuCategoryPreset,
     dismissSaveMenuCategoryPreset,
-    deleteMenuCategoryPreset
-  } = useBusinessItemList(user)
+    deleteMenuCategoryPreset,
+    isSaveMenuFlavorPresetOpen,
+    pendingMenuFlavorPreset,
+    confirmSaveMenuFlavorPreset,
+    dismissSaveMenuFlavorPreset,
+    deleteMenuFlavorPreset
+  } = useBusinessItemList(user, { isAccommodationBusiness })
 
   return (
     <div className="space-y-6 rounded-2xl bg-white p-5 shadow-sm">
       <ItemListHeaderSection
         categoryLabel={categoryLabel}
         addLabel={addLabel}
+          isAccommodationBusiness={isAccommodationBusiness}
         isAddingMenu={isAddingMenu}
         setIsAddingMenu={setIsAddingMenu}
         deletedCount={deletedMenuItems.length}
@@ -63,6 +74,8 @@ const Menu = () => {
       {isAddingMenu && (
         <ItemListFormSection
           form={form}
+          categoryLabel={categoryLabel}
+          isAccommodationBusiness={isAccommodationBusiness}
           isImageLoading={isImageLoading}
           isSavingMenuItem={isSavingMenuItem}
           setField={setField}
@@ -70,13 +83,21 @@ const Menu = () => {
           handleRemoveImage={handleRemoveImage}
           handleAddMenuItem={handleAddMenuItem}
           menuCategoryPresets={menuCategoryPresets}
+          menuFlavorPresets={menuFlavorPresets}
           pickMenuCategoryPreset={pickMenuCategoryPreset}
+          pickMenuFlavorPreset={pickMenuFlavorPreset}
           handleCategoryFieldKeyDown={handleCategoryFieldKeyDown}
+          handleFlavorFieldKeyDown={handleFlavorFieldKeyDown}
           isSaveMenuCategoryPresetOpen={isSaveMenuCategoryPresetOpen}
           pendingMenuCategoryPreset={pendingMenuCategoryPreset}
           confirmSaveMenuCategoryPreset={confirmSaveMenuCategoryPreset}
           dismissSaveMenuCategoryPreset={dismissSaveMenuCategoryPreset}
           deleteMenuCategoryPreset={deleteMenuCategoryPreset}
+          isSaveMenuFlavorPresetOpen={isSaveMenuFlavorPresetOpen}
+          pendingMenuFlavorPreset={pendingMenuFlavorPreset}
+          confirmSaveMenuFlavorPreset={confirmSaveMenuFlavorPreset}
+          dismissSaveMenuFlavorPreset={dismissSaveMenuFlavorPreset}
+          deleteMenuFlavorPreset={deleteMenuFlavorPreset}
         />
       )}
 
@@ -84,6 +105,7 @@ const Menu = () => {
         menuItems={menuItems}
         isLoadingMenuItems={isLoadingMenuItems}
         addLabel={addLabel}
+        isAccommodationBusiness={isAccommodationBusiness}
         activeDeleteId={activeDeleteId}
         activeStockId={activeStockId}
         handleDeleteMenuItem={handleDeleteMenuItem}

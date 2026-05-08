@@ -16,6 +16,7 @@ const RestaurantCheckout = () => {
     billingMethodLabel,
     formatPhp,
     billingPaymentOptions,
+    hasAvailablePaymentOptions,
     form,
     placeOrders,
     isSubmitting,
@@ -114,13 +115,19 @@ const RestaurantCheckout = () => {
         </div>
         <button
           type="button"
-          disabled={isSubmitting || selectedCount === 0}
+          disabled={isSubmitting || selectedCount === 0 || !hasAvailablePaymentOptions}
           onClick={placeOrders}
           className="rounded-full bg-[#1f1f1f] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isSubmitting ? 'Starting payment…' : 'Continue to payment'}
         </button>
       </div>
+
+      {!hasAvailablePaymentOptions ? (
+        <p className="rounded-xl border border-[#f0dcc7] bg-[#fff9f3] px-3 py-2 text-center text-xs text-[#7a624e]">
+          This business has no online payment methods enabled right now.
+        </p>
+      ) : null}
 
       <p className="text-center text-xs text-[#6b6b6b]">
         Totals use current catalog prices on our server. Online prepayment is one restaurant at a time.

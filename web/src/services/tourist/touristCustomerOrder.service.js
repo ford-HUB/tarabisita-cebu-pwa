@@ -23,3 +23,27 @@ export const getMyTouristCustomerOrders = async () => {
   const response = await apiInstance.get('tourist/my-customer-orders')
   return response
 }
+
+export const postMyBookingRequestPaymentCheckout = async (orderId, body = {}) => {
+  const response = await apiInstance.post(
+    `tourist/my-customer-orders/${encodeURIComponent(orderId)}/booking-payment-checkout`,
+    body
+  )
+  return response
+}
+
+export const postMyBookingPaymentLinkResolve = async (paymentToken) => {
+  const response = await apiInstance.post('tourist/booking-payment-link/public/resolve', {
+    paymentToken: String(paymentToken || '')
+  })
+  return response
+}
+
+export const postMyBookingPaymentLinkCheckout = async (paymentToken, body = {}) => {
+  const response = await apiInstance.post('tourist/booking-payment-link/public/checkout', {
+    paymentToken: String(paymentToken || ''),
+    paymentMethod: String(body?.paymentMethod || 'GCASH'),
+    ...body
+  })
+  return response
+}

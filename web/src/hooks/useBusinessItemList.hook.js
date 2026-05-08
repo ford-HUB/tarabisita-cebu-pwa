@@ -3,10 +3,19 @@ import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
 import { useBusinessMenuItemsStore } from '../store/business/menuItems.store'
 import {
+  getMyBusinessProfile,
+  updateMyResortListingStock
+} from '../services/business/business.service'
+import {
   addMenuCategoryPreset,
   readMenuCategoryPresets,
   removeMenuCategoryPreset
 } from '../shared/utils/menuCategoryPresets.utils'
+import {
+  addMenuFlavorPreset,
+  readMenuFlavorPresets,
+  removeMenuFlavorPreset
+} from '../shared/utils/menuFlavorPresets.utils'
 
 const MAX_IMAGE_COUNT = 6
 
@@ -25,7 +34,7 @@ const toDataUrl = (file) =>
     reader.readAsDataURL(file)
   })
 
-const createBlankForm = () => ({
+const createBlankForm = ({ isAccommodationBusiness = false } = {}) => ({
   name: '',
   description: '',
   flavor: '',
@@ -33,22 +42,28 @@ const createBlankForm = () => ({
   category: '',
   preparationTime: '',
   servingSize: '',
-  spiceLevel: 'No Spice',
+  spiceLevel: isAccommodationBusiness ? 'Standard' : 'No Spice',
   allergens: '',
+  addOns: [],
   isAvailable: true,
   images: []
 })
 
-export const useBusinessItemList = (user) => {
-  const [form, setForm] = useState(createBlankForm)
+export const useBusinessItemList = (user, { isAccommodationBusiness = false } = {}) => {
+  const normalizedCategory = String(user?.businessCategory || '').trim().toUpperCase()
+  const isMenuItemsSupported = normalizedCategory === 'RESTAURANT'
+  const [form, setForm] = useState(() => createBlankForm({ isAccommodationBusiness }))
   const [isAddingMenu, setIsAddingMenu] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(false)
   const [isDeletedModalOpen, setIsDeletedModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedEditItem, setSelectedEditItem] = useState(null)
   const [menuCategoryPresets, setMenuCategoryPresets] = useState([])
+  const [menuFlavorPresets, setMenuFlavorPresets] = useState([])
   const [isSaveMenuCategoryPresetOpen, setIsSaveMenuCategoryPresetOpen] = useState(false)
   const [pendingMenuCategoryPreset, setPendingMenuCategoryPreset] = useState('')
+  const [isSaveMenuFlavorPresetOpen, setIsSaveMenuFlavorPresetOpen] = useState(false)
+  const [pendingMenuFlavorPreset, setPendingMenuFlavorPreset] = useState('')
 
   const {
     isLoadingMenuItems,
@@ -77,15 +92,41 @@ export const useBusinessItemList = (user) => {
       useBusinessMenuItemsStore.getState().clearMenuLists()
       return
     }
+    if (!isMenuItemsSupported) {
+      const run = async () => {
+        try {
+          useBusinessMenuItemsStore.getState().setIsLoadingMenuItems(true)
+          const response = await getMyBusinessProfile({ businessCategory: user?.businessCategory })
+          const business = response?.data?.data
+          const allItems = Array.isArray(business?.menuItems) ? business.menuItems : []
+          const normalized = allItems.map((item) => ({
+            ...item,
+            id: item?.id || item?._id || ''
+          }))
+          useBusinessMenuItemsStore.getState().setMenuItems(normalized.filter((item) => !item?.isDeleted))
+          useBusinessMenuItemsStore.getState().setDeletedMenuItems(
+            normalized.filter((item) => item?.isDeleted)
+          )
+        } catch {
+          useBusinessMenuItemsStore.getState().clearMenuLists()
+        } finally {
+          useBusinessMenuItemsStore.getState().setIsLoadingMenuItems(false)
+        }
+      }
+      void run()
+      return
+    }
     void useBusinessMenuItemsStore.getState().fetchMenuItems()
-  }, [user?._id])
+  }, [user?._id, isMenuItemsSupported])
 
   useEffect(() => {
     if (!user?._id) {
       setMenuCategoryPresets([])
+      setMenuFlavorPresets([])
       return
     }
     setMenuCategoryPresets(readMenuCategoryPresets(user._id))
+    setMenuFlavorPresets(readMenuFlavorPresets(user._id))
   }, [user?._id])
 
   const setField = (field, value) => {
@@ -107,6 +148,21 @@ export const useBusinessItemList = (user) => {
     setIsSaveMenuCategoryPresetOpen(true)
   }
 
+  const pickMenuFlavorPreset = (label) => {
+    setField('flavor', label)
+  }
+
+  const handleFlavorFieldKeyDown = (event) => {
+    if (event.key !== 'Enter') return
+    const value = form.flavor.trim()
+    if (!value) return
+    event.preventDefault()
+    const exists = menuFlavorPresets.some((entry) => entry.toLowerCase() === value.toLowerCase())
+    if (exists) return
+    setPendingMenuFlavorPreset(value)
+    setIsSaveMenuFlavorPresetOpen(true)
+  }
+
   const confirmSaveMenuCategoryPreset = () => {
     if (!user?._id || !pendingMenuCategoryPreset.trim()) {
       setIsSaveMenuCategoryPresetOpen(false)
@@ -124,6 +180,23 @@ export const useBusinessItemList = (user) => {
     setPendingMenuCategoryPreset('')
   }
 
+  const confirmSaveMenuFlavorPreset = () => {
+    if (!user?._id || !pendingMenuFlavorPreset.trim()) {
+      setIsSaveMenuFlavorPresetOpen(false)
+      setPendingMenuFlavorPreset('')
+      return
+    }
+    const next = addMenuFlavorPreset(user._id, pendingMenuFlavorPreset)
+    setMenuFlavorPresets(next)
+    setIsSaveMenuFlavorPresetOpen(false)
+    setPendingMenuFlavorPreset('')
+  }
+
+  const dismissSaveMenuFlavorPreset = () => {
+    setIsSaveMenuFlavorPresetOpen(false)
+    setPendingMenuFlavorPreset('')
+  }
+
   const deleteMenuCategoryPreset = (label) => {
     if (!user?._id) return
     const next = removeMenuCategoryPreset(user._id, label)
@@ -131,6 +204,18 @@ export const useBusinessItemList = (user) => {
     setForm((previous) => {
       if (previous.category.trim().toLowerCase() === String(label).trim().toLowerCase()) {
         return { ...previous, category: '' }
+      }
+      return previous
+    })
+  }
+
+  const deleteMenuFlavorPreset = (label) => {
+    if (!user?._id) return
+    const next = removeMenuFlavorPreset(user._id, label)
+    setMenuFlavorPresets(next)
+    setForm((previous) => {
+      if (previous.flavor.trim().toLowerCase() === String(label).trim().toLowerCase()) {
+        return { ...previous, flavor: '' }
       }
       return previous
     })
@@ -172,15 +257,23 @@ export const useBusinessItemList = (user) => {
   }
 
   const resetForm = () => {
-    setForm(createBlankForm())
+    setForm(createBlankForm({ isAccommodationBusiness }))
   }
 
   const validateForm = () => {
-    if (form.name.trim().length < 2) return 'Menu name must be at least 2 characters.'
+    if (form.name.trim().length < 2) {
+      return isAccommodationBusiness
+        ? 'Listing title must be at least 2 characters.'
+        : 'Menu name must be at least 2 characters.'
+    }
     if (form.description.trim().length < 10) return 'Description must be at least 10 characters.'
-    if (form.flavor.trim().length < 2) return 'Flavor profile is required.'
+    if (form.flavor.trim().length < 2) {
+      return isAccommodationBusiness ? 'Accommodation type is required.' : 'Flavor profile is required.'
+    }
     if (!Number.isFinite(Number(form.price)) || Number(form.price) <= 0) return 'Price must be greater than zero.'
-    if (form.images.length < 2) return 'Add at least 2 menu photos.'
+    if (form.images.length < 2) {
+      return isAccommodationBusiness ? 'Add at least 2 listing photos.' : 'Add at least 2 menu photos.'
+    }
     return ''
   }
 
@@ -201,6 +294,7 @@ export const useBusinessItemList = (user) => {
       servingSize: form.servingSize.trim(),
       spiceLevel: form.spiceLevel,
       allergens: form.allergens.trim(),
+      addOns: Array.isArray(form.addOns) ? form.addOns : [],
       isAvailable: Boolean(form.isAvailable),
       images: form.images
     })
@@ -216,6 +310,24 @@ export const useBusinessItemList = (user) => {
   }
 
   const handleStockStatusChange = async (id, stockStatus) => {
+    if (!isMenuItemsSupported) {
+      useBusinessMenuItemsStore.getState().setActiveStockId(id)
+      try {
+        const response = await updateMyResortListingStock(id, stockStatus)
+        const updatedItem = response?.data?.data
+        if (updatedItem?.id) {
+          useBusinessMenuItemsStore.getState().setMenuItems((items) =>
+            items.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+          )
+        }
+        toast.success(stockStatus === 'OUT_OF_STOCK' ? 'Marked as unavailable.' : 'Marked as available to book.')
+      } catch (error) {
+        toast.error(error?.response?.data?.message || 'Failed to update listing availability.')
+      } finally {
+        useBusinessMenuItemsStore.getState().setActiveStockId('')
+      }
+      return
+    }
     await useBusinessMenuItemsStore.getState().updateStock(id, stockStatus)
   }
 
@@ -271,12 +383,20 @@ export const useBusinessItemList = (user) => {
     closeEditModal,
     handleEditMenuItem,
     menuCategoryPresets,
+    menuFlavorPresets,
     pickMenuCategoryPreset,
+    pickMenuFlavorPreset,
     handleCategoryFieldKeyDown,
+    handleFlavorFieldKeyDown,
     isSaveMenuCategoryPresetOpen,
     pendingMenuCategoryPreset,
     confirmSaveMenuCategoryPreset,
     dismissSaveMenuCategoryPreset,
-    deleteMenuCategoryPreset
+    deleteMenuCategoryPreset,
+    isSaveMenuFlavorPresetOpen,
+    pendingMenuFlavorPreset,
+    confirmSaveMenuFlavorPreset,
+    dismissSaveMenuFlavorPreset,
+    deleteMenuFlavorPreset
   }
 }

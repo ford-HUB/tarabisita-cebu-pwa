@@ -1,7 +1,36 @@
 import { apiInstance } from '../../api/_base_.js'
 
-export const getMyBusinessProfile = async () => {
-  const response = await apiInstance.get('business/me')
+const resolveBusinessProfileScopePath = (businessCategory) => {
+  const normalized = String(businessCategory || '').trim().toUpperCase()
+  if (normalized === 'RESTAURANT') return 'restaurant'
+  if (normalized === 'RESORT' || normalized === 'HOTEL') return 'resort'
+  return ''
+}
+
+export const getMyBusinessProfile = async ({ businessCategory } = {}) => {
+  const scopePath = resolveBusinessProfileScopePath(businessCategory)
+  const endpoint = scopePath ? `business/me/${scopePath}` : 'business/me'
+  const response = await apiInstance.get(endpoint)
+  return response
+}
+
+export const getMyBusinessSettings = async () => {
+  const response = await apiInstance.get('business/me/settings')
+  return response
+}
+
+export const updateMyBusinessSettings = async (data) => {
+  const response = await apiInstance.put('business/me/settings', data)
+  return response
+}
+
+export const verifyMyBusinessPaymentMethod = async (data) => {
+  const response = await apiInstance.post('business/me/settings/payment-methods/verify', data)
+  return response
+}
+
+export const createMyBusinessPaymentMethodSetupCheckout = async (data) => {
+  const response = await apiInstance.post('business/me/settings/payment-methods/setup-checkout', data)
   return response
 }
 
@@ -66,6 +95,13 @@ export const updateMyBusinessMenuItem = async (menuItemId, data) => {
 
 export const updateMyBusinessMenuItemStock = async (menuItemId, stockStatus) => {
   const response = await apiInstance.patch(`business/me/menu-items/${menuItemId}/stock`, { stockStatus })
+  return response
+}
+
+export const updateMyResortListingStock = async (menuItemId, stockStatus) => {
+  const response = await apiInstance.patch(`business/me/resort/listings/${menuItemId}/stock`, {
+    stockStatus
+  })
   return response
 }
 

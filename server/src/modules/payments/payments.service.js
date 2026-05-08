@@ -12,13 +12,19 @@ import { sendMailer } from '../auth/auth.service.js'
 import { templateReader } from '../../shared/utils/templateReaderExtractor.js'
 import {
     buildSignedBusinessBillingReturnUrl,
-    buildSignedTouristCheckoutReturnUrl
+    buildSignedBusinessPaymentMethodsReturnUrl,
+    buildSignedTouristCheckoutReturnUrl,
+    buildSignedTouristExploreReturnUrl
 } from '../../shared/utils/routeSignature.utils.js'
 import TouristMenuOrderCheckout from '../tourist/menu-order-checkout/menu-order-checkout.model.js'
 import { removeTouristCartItemsForBusiness } from '../tourist/tourist-cart-item/tourist-cart-item.service.js'
 import { resolveBillingPlanForCheckout } from '../admin/manage-subscription/manage-subscription.service.js'
 import { BUSINESS_CATEGORY_LABELS } from '../../shared/constants/businessCategories.js'
 import { scheduleTouristOrderCompletionEmailForOrder } from '../../jobs/touristOrderCompletionEmail.job.js'
+import {
+    sealBookingPaymentPayload,
+    openBookingPaymentPayload
+} from '../../shared/utils/bookingPaymentToken.utils.js'
 
 const extractPublicBusiness = (business) => ({
     _id: business._id,
@@ -47,6 +53,15 @@ const extractMenuItem = (menuItem) => ({
     servingSize: menuItem.servingSize || '',
     spiceLevel: menuItem.spiceLevel || 'No Spice',
     allergens: menuItem.allergens || '',
+    addOns: Array.isArray(menuItem.addOns)
+        ? menuItem.addOns
+            .map((row) => ({
+                id: String(row?.id || row?._id || '').trim(),
+                name: String(row?.name || '').trim(),
+                price: Number(row?.price) || 0
+            }))
+            .filter((row) => row.name)
+        : [],
     isAvailable: Boolean(menuItem.isAvailable),
     stockStatus: menuItem.stockStatus || (menuItem.isAvailable ? 'AVAILABLE_TO_ORDER' : 'OUT_OF_STOCK'),
     isDeleted: Boolean(menuItem.isDeleted),
@@ -54,6 +69,25 @@ const extractMenuItem = (menuItem) => ({
     images: Array.isArray(menuItem.images) ? menuItem.images : [],
     createdAt: menuItem.createdAt
 })
+
+const normalizeAddOnList = (addOns = []) => {
+    if (!Array.isArray(addOns)) return []
+    return addOns
+        .map((row) => {
+            const name = String(row?.name || '').trim()
+            const price = Number(row?.price)
+            if (!name || !Number.isFinite(price) || price < 0) return null
+            const id = String(row?.id || name.toLowerCase().replace(/\s+/g, '-'))
+                .trim()
+                .slice(0, 80)
+            return {
+                id,
+                name,
+                price: Math.round(price * 100) / 100
+            }
+        })
+        .filter(Boolean)
+}
 
 const findBusinessByUserId = async (userId) => {
     const business = await Business.findOne({ userId }).populate('category')
@@ -89,6 +123,8 @@ const buildPaymentReferenceNumber = ({ businessId, planId }) => {
     return candidate.slice(0, 36)
 }
 
+const isTouristCheckoutReferenceNumber = (value) => /^TBTOC/i.test(String(value || '').trim())
+
 const getXenditInvoiceBaseUrl = () =>
     readFirstEnv(['XENDIT_INVOICE_URL'])
 
@@ -115,6 +151,78 @@ const normalizeXenditInvoiceMethod = (value = '') => {
     if (normalized === 'GRAB_PAY' || normalized === 'GRABPAY') return 'GRABPAY'
     if (normalized === 'BANK_TRANSFER') return 'BANK_TRANSFER'
     return normalized
+}
+
+const TOURIST_CHECKOUT_METHOD_CODES = ['GCASH', 'MAYA', 'GRAB_PAY', 'CARD']
+
+const DEFAULT_BUSINESS_PAYMENT_METHODS = {
+    GCASH: { enabled: false, accountName: '', accountNumber: '', instructions: '', isVerified: false, verifiedAt: null },
+    MAYA: { enabled: false, accountName: '', accountNumber: '', instructions: '', isVerified: false, verifiedAt: null },
+    GRAB_PAY: { enabled: false, accountName: '', accountNumber: '', instructions: '', isVerified: false, verifiedAt: null },
+    CARD: { enabled: false, accountName: '', accountNumber: '', instructions: '', isVerified: false, verifiedAt: null }
+}
+
+const normalizeBusinessPaymentMethods = (paymentMethods = {}) => {
+    const source = paymentMethods && typeof paymentMethods === 'object' ? paymentMethods : {}
+    return TOURIST_CHECKOUT_METHOD_CODES.reduce((acc, code) => {
+        const raw = source?.[code] || {}
+        const parsedVerifiedAt = raw?.verifiedAt ? new Date(raw.verifiedAt) : null
+        acc[code] = {
+            enabled: raw?.enabled === true,
+            accountName: String(raw?.accountName || '').trim().slice(0, 120),
+            accountNumber: String(raw?.accountNumber || '').trim().slice(0, 120),
+            instructions: String(raw?.instructions || '').trim().slice(0, 500),
+            isVerified: Boolean(raw?.isVerified),
+            verifiedAt: parsedVerifiedAt && Number.isFinite(parsedVerifiedAt.getTime()) ? parsedVerifiedAt : null
+        }
+        return acc
+    }, {})
+}
+
+const mapTouristMethodToXenditMethod = (methodCode) => {
+    if (methodCode === 'GCASH') return 'GCASH'
+    if (methodCode === 'MAYA') return 'PAYMAYA'
+    if (methodCode === 'GRAB_PAY') return 'GRABPAY'
+    if (methodCode === 'CARD') return 'CREDIT_CARD'
+    return ''
+}
+
+const getEnabledBusinessTouristPaymentMethods = (business) => {
+    const normalizedSettings = normalizeBusinessPaymentMethods(business?.settings?.paymentMethods || {})
+    const enabledByBusiness = TOURIST_CHECKOUT_METHOD_CODES.filter(
+        (code) => normalizedSettings?.[code]?.enabled !== false && Boolean(normalizedSettings?.[code]?.isVerified)
+    )
+    const enabledFromEnv = readFirstEnv(['XENDIT_PAYMENT_METHODS'])
+        .split(',')
+        .map((value) => normalizeXenditInvoiceMethod(value))
+        .filter(Boolean)
+    if (!enabledFromEnv.length) {
+        return enabledByBusiness
+    }
+    return enabledByBusiness.filter((code) => {
+        const xenditMethod = mapTouristMethodToXenditMethod(code)
+        return xenditMethod && enabledFromEnv.includes(xenditMethod)
+    })
+}
+
+const ensureEnabledBusinessMethodsAreVerified = (paymentMethods = {}) => {
+    for (const code of TOURIST_CHECKOUT_METHOD_CODES) {
+        const row = paymentMethods?.[code] || {}
+        if (row.enabled !== false) {
+            const hasRequiredDetails = String(row.accountName || '').trim() && String(row.accountNumber || '').trim()
+            if (!hasRequiredDetails || !row.isVerified) {
+                throw new Error('PAYMENT_METHOD_REQUIRES_VERIFICATION')
+            }
+        }
+    }
+}
+
+const mapWebhookToSetupStatus = ({ eventName, status }) => {
+    const mapped = mapWebhookToSessionStatus({ eventName, status })
+    if (mapped === 'SUCCESS') return 'SUCCESS'
+    if (mapped === 'FAILED') return 'FAILED'
+    if (mapped === 'CANCELLED') return 'CANCELLED'
+    return 'PENDING'
 }
 
 const buildXenditBasicAuthHeader = (secretKey) => `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`
@@ -236,11 +344,16 @@ const isBusinessSubscriptionInActivePaidWindow = (business) => {
     if (sub.status !== 'ACTIVE') {
         return false
     }
+    const startedAt = sub.startedAt ? new Date(sub.startedAt) : null
     const expiresAt = sub.expiresAt ? new Date(sub.expiresAt) : null
-    if (!expiresAt || Number.isNaN(expiresAt.getTime())) {
-        return true
+    if (!startedAt || Number.isNaN(startedAt.getTime())) {
+        return false
     }
-    return expiresAt.getTime() > Date.now()
+    if (!expiresAt || Number.isNaN(expiresAt.getTime())) {
+        return false
+    }
+    const now = Date.now()
+    return startedAt.getTime() <= now && expiresAt.getTime() > now
 }
 
 const buildSubscriptionProfilePayload = (business) => {
@@ -338,6 +451,39 @@ const serializeLedgerSubscription = (s) => ({
     updatedAt: s.updatedAt
 })
 
+const buildPaymentLegacyIndexFields = ({ requestReferenceNumber, checkoutSessionId, paymentId } = {}) => {
+    const ref = String(requestReferenceNumber || '').trim()
+    const checkout = String(checkoutSessionId || '').trim()
+    const externalPayment = String(paymentId || '').trim()
+    return {
+        orderId: ref || checkout || externalPayment,
+        transactionId: checkout || externalPayment || ref
+    }
+}
+
+const getSubscriptionCreatedTime = (subscription) => {
+    const createdAt = subscription?.createdAt ? new Date(subscription.createdAt).getTime() : 0
+    const startedAt = subscription?.startedAt ? new Date(subscription.startedAt).getTime() : 0
+    return createdAt || startedAt || 0
+}
+
+const findNewerActiveSubscription = async (businessId, candidateSubscription) => {
+    if (!candidateSubscription?._id) {
+        return null
+    }
+    const active = await BusinessSubscription.findOne({
+        businessId,
+        status: 'ACTIVE',
+        _id: { $ne: candidateSubscription._id }
+    })
+        .sort({ createdAt: -1 })
+        .lean()
+    if (!active) {
+        return null
+    }
+    return getSubscriptionCreatedTime(active) > getSubscriptionCreatedTime(candidateSubscription) ? active : null
+}
+
 /** Pre-fills Xendit hosted checkout (esp. card billing) from business profile + owner. */
 const buildCheckoutBillingPayload = (user, business) => {
     const name = String(user?.name || '').trim()
@@ -372,6 +518,14 @@ const buildCheckoutBillingPayload = (user, business) => {
     }
 
     return billing
+}
+
+const parseXenditJsonResponse = (responseText = '') => {
+    try {
+        return JSON.parse(responseText)
+    } catch (_error) {
+        return {}
+    }
 }
 
 export const createBusinessBillingCheckoutSessionByUserId = async (userId, months, { returnBaseUrl } = {}) => {
@@ -468,15 +622,9 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
     })
 
     const responseText = await response.text()
-    const jsonResponse = (() => {
-        try {
-            return JSON.parse(responseText)
-        } catch (_error) {
-            return {}
-        }
-    })()
-
-    const checkoutUrl = jsonResponse?.invoice_url
+    const jsonResponse = parseXenditJsonResponse(responseText)
+    const hostedCheckoutUrl = String(jsonResponse?.invoice_url || '').trim()
+    const checkoutUrl = hostedCheckoutUrl
     const checkoutId = jsonResponse?.id || ''
     if (!response.ok || !checkoutUrl) {
         const upstreamMessage =
@@ -487,7 +635,6 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
             'Unknown Xendit upstream error'
         throw new Error(`Xendit invoice create failed (${response.status}): ${upstreamMessage}`)
     }
-
     const checkoutData = {
         checkoutId,
         checkoutUrl,
@@ -533,7 +680,11 @@ export const createBusinessBillingCheckoutSessionByUserId = async (userId, month
             planId: selectedPlan.id,
             months,
             checkoutSessionId: checkoutData.checkoutId || '',
-            requestReferenceNumber: checkoutData.requestReferenceNumber || ''
+            requestReferenceNumber: checkoutData.requestReferenceNumber || '',
+            ...buildPaymentLegacyIndexFields({
+                requestReferenceNumber: checkoutData.requestReferenceNumber,
+                checkoutSessionId: checkoutData.checkoutId
+            })
         })
     } catch (_error) {
         // Avoid failing checkout if ledger row already exists
@@ -852,7 +1003,12 @@ export const syncBusinessLedgerFromXenditWebhookPayload = async (payload = {}, h
             checkoutSessionId: effectiveSession.checkoutId || checkoutCsId || paymentId || '',
             xenditPaymentId: paymentId && !String(paymentId).startsWith('cs_') ? String(paymentId) : '',
             requestReferenceNumber: requestReferenceNumber || effectiveSession.requestReferenceNumber || '',
-            paidAt: paymentRowStatus === 'PAID' ? new Date() : null
+            paidAt: paymentRowStatus === 'PAID' ? new Date() : null,
+            ...buildPaymentLegacyIndexFields({
+                requestReferenceNumber: requestReferenceNumber || effectiveSession.requestReferenceNumber,
+                checkoutSessionId: effectiveSession.checkoutId || checkoutCsId,
+                paymentId
+            })
         })
     } else if (paymentDoc) {
         const paySet = {
@@ -895,7 +1051,11 @@ export const syncBusinessLedgerFromXenditWebhookPayload = async (payload = {}, h
     if (mappedStatus === 'SUCCESS' && effectiveSession && paymentDoc?.subscriptionRecordId) {
         const existingSub = await BusinessSubscription.findById(paymentDoc.subscriptionRecordId)
         if (existingSub?.status === 'SUPERSEDED') {
-            return { dedupeKey, applied: true, reason: 'IDEMPOTENT_SUBSCRIPTION_EXISTS' }
+            const newerActive = await findNewerActiveSubscription(business._id, existingSub)
+            if (newerActive) {
+                return { dedupeKey, applied: true, reason: 'STALE_SUBSCRIPTION_SUPERSEDED' }
+            }
+            subDoc = existingSub
         }
         if (existingSub?.status === 'ACTIVE') {
             if (legacySession) {
@@ -927,9 +1087,37 @@ export const syncBusinessLedgerFromXenditWebhookPayload = async (payload = {}, h
         }
     }
 
-    if (mappedStatus === 'SUCCESS' && effectiveSession && paymentDoc && subDoc && subDoc.status === 'PENDING_CHECKOUT') {
+    if (
+        mappedStatus === 'SUCCESS' &&
+        effectiveSession &&
+        paymentDoc &&
+        subDoc &&
+        ['PENDING_CHECKOUT', 'SUPERSEDED'].includes(subDoc.status)
+    ) {
         const startedAt = paymentDoc?.paidAt ? new Date(paymentDoc.paidAt) : new Date()
         const expiresAt = computeSubscriptionExpiresAt(startedAt, effectiveSession.months)
+        const newerActive = await findNewerActiveSubscription(business._id, subDoc)
+        if (newerActive) {
+            const periodFields = BusinessSubscription.buildPeriodFields(startedAt, expiresAt)
+            await BusinessSubscription.updateOne(
+                { _id: subDoc._id },
+                {
+                    $set: {
+                        status: 'SUPERSEDED',
+                        paymentId: paymentDoc._id,
+                        startedAt,
+                        expiresAt,
+                        ...periodFields,
+                        xenditCheckoutId: resolvedCheckoutId || paymentId || ''
+                    }
+                }
+            )
+            await Payment.updateOne(
+                { _id: paymentDoc._id },
+                { $set: { subscriptionRecordId: subDoc._id, paidAt: paymentDoc.paidAt || new Date() } }
+            )
+            return { dedupeKey, applied: true, reason: 'STALE_SUBSCRIPTION_SUPERSEDED' }
+        }
 
         await BusinessSubscription.updateMany(
             { businessId: business._id, status: 'ACTIVE' },
@@ -1119,9 +1307,14 @@ export const processXenditWebhookEvent = async (payload = {}, headers = {}) => {
 
     try {
         const touristResult = await tryFulfillTouristMenuOrderCheckoutFromWebhook(payload, headers)
+        const paymentMethodSetupResult = touristResult.handled
+            ? { handled: false }
+            : await tryFulfillBusinessPaymentMethodVerificationFromWebhook(payload, headers)
         const syncResult = touristResult.handled
             ? touristResult
-            : await syncBusinessLedgerFromXenditWebhookPayload(payload, headers)
+            : paymentMethodSetupResult.handled
+                ? paymentMethodSetupResult
+                : await syncBusinessLedgerFromXenditWebhookPayload(payload, headers)
         await markWebhookLedgerSyncState(dedupeKey, syncResult)
         return { duplicate: false, ...syncResult }
     } catch (err) {
@@ -1142,7 +1335,9 @@ export const processXenditWebhookEvent = async (payload = {}, headers = {}) => {
  * Re-process PayMongo webhook rows that never flipped business billing (e.g. race or ID mismatch on first pass).
  */
 export const reconcileXenditWebhooksForBusinessLedger = async ({ limit = 40 } = {}) => {
-    const events = await XenditWebhookEvent.find({ businessLedgerSynced: { $ne: true } })
+    const events = await XenditWebhookEvent.find({
+        $or: [{ businessLedgerSynced: { $ne: true } }, { businessLedgerSyncError: 'PENDING_CHECKOUT_NOT_FOUND' }]
+    })
         .sort({ processedAt: -1 })
         .limit(Math.min(Math.max(Number(limit) || 40, 1), 100))
         .lean()
@@ -1167,8 +1362,25 @@ export const reconcileXenditWebhooksForBusinessLedger = async ({ limit = 40 } = 
 
 export const getBusinessProfileByUserId = async (userId) => {
     const business = await findBusinessByUserId(userId)
+    return buildBusinessProfilePayload({ business, userId })
+}
+
+const normalizeBusinessCategorySlug = (value) => String(value || '').trim().toLowerCase()
+
+const resolveBusinessCategorySlug = (business) => {
+    const categoryName = business?.category?.name
+    const normalizedName = normalizeBusinessCategorySlug(categoryName)
+    if (normalizedName === 'restaurant') return 'restaurant'
+    if (normalizedName === 'resort' || normalizedName === 'hotel') return 'resort'
+    return normalizedName
+}
+
+const buildBusinessProfilePayload = async ({ business, userId }) => {
     const user = await User.findById(userId).select('name email avatar')
     const monthlyCapacity = await buildCurrentMonthOrderCapacityPayload(business)
+    const menuItems = Array.isArray(business.menuItems)
+        ? business.menuItems.map((item) => extractMenuItem(item))
+        : []
 
     return {
         ...extractPublicBusiness(business),
@@ -1179,16 +1391,34 @@ export const getBusinessProfileByUserId = async (userId) => {
         verificationNotes: business.verificationNotes,
         subscription: buildSubscriptionProfilePayload(business),
         billing: buildBillingSummaryPayload(business),
-        monthlyCapacity
+        monthlyCapacity,
+        menuItems
     }
+}
+
+export const getBusinessProfileByUserIdForCategory = async (userId, categoryScope) => {
+    const business = await findBusinessByUserId(userId)
+    const normalizedScope = normalizeBusinessCategorySlug(categoryScope)
+    const currentScope = resolveBusinessCategorySlug(business)
+    if (!normalizedScope || !currentScope || normalizedScope !== currentScope) {
+        throw new Error('BUSINESS_CATEGORY_MISMATCH')
+    }
+    return buildBusinessProfilePayload({ business, userId })
 }
 
 export const getBusinessBillingLedgerByUserId = async (userId) => {
     const business = await findBusinessByUserId(userId)
     const monthlyCapacity = await buildCurrentMonthOrderCapacityPayload(business)
+    const paidSubscriptionStatuses = ['ACTIVE', 'EXPIRED', 'SUPERSEDED']
     const [payments, subscriptions] = await Promise.all([
-        Payment.find({ businessId: business._id }).sort({ createdAt: -1 }).limit(50).lean(),
-        BusinessSubscription.find({ businessId: business._id }).sort({ createdAt: -1 }).limit(30).lean()
+        Payment.find({ businessId: business._id, status: 'PAID' }).sort({ createdAt: -1 }).limit(50).lean(),
+        BusinessSubscription.find({
+            businessId: business._id,
+            $or: [{ startedAt: { $type: 'date' } }, { status: { $in: paidSubscriptionStatuses } }]
+        })
+            .sort({ createdAt: -1 })
+            .limit(30)
+            .lean()
     ])
 
     return {
@@ -1242,6 +1472,211 @@ export const getBusinessActivityLogsByUserId = async (userId, { limit = 30 } = {
         .limit(normalizedLimit)
 
     return logs.map(extractActivityLog)
+}
+
+const DEFAULT_BUSINESS_SETTINGS = {
+    receiveOrderEmailAlerts: true,
+    receiveChatNotifications: true,
+    autoAcceptOrders: false,
+    prepTimeMinutes: 20,
+    lowStockThreshold: 10,
+    paymentMethods: DEFAULT_BUSINESS_PAYMENT_METHODS
+}
+
+const normalizeBusinessSettings = (settings = {}) => ({
+    receiveOrderEmailAlerts: Boolean(settings.receiveOrderEmailAlerts),
+    receiveChatNotifications: Boolean(settings.receiveChatNotifications),
+    autoAcceptOrders: Boolean(settings.autoAcceptOrders),
+    prepTimeMinutes: Number(settings.prepTimeMinutes) || DEFAULT_BUSINESS_SETTINGS.prepTimeMinutes,
+    lowStockThreshold: Number(settings.lowStockThreshold) || DEFAULT_BUSINESS_SETTINGS.lowStockThreshold,
+    paymentMethods: normalizeBusinessPaymentMethods(settings.paymentMethods || DEFAULT_BUSINESS_PAYMENT_METHODS)
+})
+
+export const getBusinessSettingsByUserId = async (userId) => {
+    const business = await findBusinessByUserId(userId)
+    return normalizeBusinessSettings({
+        ...DEFAULT_BUSINESS_SETTINGS,
+        ...(business.settings || {})
+    })
+}
+
+export const updateBusinessSettingsByUserId = async (userId, payload) => {
+    const business = await findBusinessByUserId(userId)
+    const currentSettings = normalizeBusinessSettings({
+        ...DEFAULT_BUSINESS_SETTINGS,
+        ...(business.settings || {})
+    })
+    const nextSettings = normalizeBusinessSettings(payload)
+
+    for (const code of TOURIST_CHECKOUT_METHOD_CODES) {
+        const prevRow = currentSettings?.paymentMethods?.[code] || {}
+        const nextRow = nextSettings?.paymentMethods?.[code] || {}
+        const detailsChanged =
+            String(prevRow.accountName || '') !== String(nextRow.accountName || '') ||
+            String(prevRow.accountNumber || '') !== String(nextRow.accountNumber || '')
+        if (detailsChanged || nextRow.enabled === false) {
+            nextRow.isVerified = false
+            nextRow.verifiedAt = null
+        }
+    }
+
+    ensureEnabledBusinessMethodsAreVerified(nextSettings.paymentMethods || {})
+
+    const updatedBusiness = await Business.findByIdAndUpdate(
+        business._id,
+        {
+            $set: {
+                settings: nextSettings,
+                updatedAt: new Date()
+            }
+        },
+        { returnDocument: 'after' }
+    )
+
+    return normalizeBusinessSettings(updatedBusiness?.settings || nextSettings)
+}
+
+export const verifyBusinessPaymentMethodByUserId = async (userId, { methodCode, accountName, accountNumber }) => {
+    const business = await findBusinessByUserId(userId)
+    const code = String(methodCode || '').trim().toUpperCase()
+    if (!TOURIST_CHECKOUT_METHOD_CODES.includes(code)) {
+        throw new Error('PAYMENT_METHOD_NOT_SUPPORTED')
+    }
+
+    const xenditSecretKey = getXenditSecretKey()
+    if (!xenditSecretKey) {
+        throw new Error('XENDIT_SECRET_KEY_NOT_CONFIGURED')
+    }
+    if (!xenditSecretKey.startsWith('xnd_')) {
+        throw new Error('XENDIT_SECRET_KEY_INVALID')
+    }
+    const checkoutEndpoint = getXenditInvoiceBaseUrl()
+    if (!checkoutEndpoint) {
+        throw new Error('XENDIT_INVOICE_URL_NOT_CONFIGURED')
+    }
+    const enabledFromEnv = readFirstEnv(['XENDIT_PAYMENT_METHODS'])
+        .split(',')
+        .map((value) => normalizeXenditInvoiceMethod(value))
+        .filter(Boolean)
+    const mappedMethod = mapTouristMethodToXenditMethod(code)
+    if (enabledFromEnv.length && !enabledFromEnv.includes(mappedMethod)) {
+        throw new Error('XENDIT_METHOD_NOT_ENABLED')
+    }
+
+    const probeId = `tb-verify-${Date.now()}-${Math.round(Math.random() * 10000)}`
+    const probeUrl = `${String(checkoutEndpoint).replace(/\/+$/, '')}/${probeId}`
+    const response = await fetch(probeUrl, {
+        method: 'GET',
+        headers: {
+            Authorization: buildXenditBasicAuthHeader(xenditSecretKey)
+        }
+    })
+    if (response.status === 401 || response.status === 403) {
+        throw new Error('XENDIT_AUTH_FAILED')
+    }
+
+    const now = new Date()
+    const normalized = normalizeBusinessSettings({
+        ...DEFAULT_BUSINESS_SETTINGS,
+        ...(business.settings || {})
+    })
+    normalized.paymentMethods[code] = {
+        ...normalized.paymentMethods[code],
+        enabled: false,
+        accountName: String(accountName || '').trim().slice(0, 120),
+        accountNumber: String(accountNumber || '').trim().slice(0, 120),
+        isVerified: true,
+        verifiedAt: now
+    }
+
+    await Business.findByIdAndUpdate(
+        business._id,
+        {
+            $set: {
+                settings: normalized,
+                updatedAt: now
+            }
+        },
+        { returnDocument: 'after' }
+    )
+
+    return {
+        methodCode: code,
+        isVerified: true,
+        verifiedAt: now.toISOString(),
+        verificationProvider: 'XENDIT'
+    }
+}
+
+export const createBusinessPaymentMethodSetupCheckoutByUserId = async (
+    userId,
+    { methodCode, returnBaseUrl = '' } = {}
+) => {
+    const business = await findBusinessByUserId(userId)
+    const code = String(methodCode || '').trim().toUpperCase()
+    if (!TOURIST_CHECKOUT_METHOD_CODES.includes(code)) {
+        throw new Error('PAYMENT_METHOD_NOT_SUPPORTED')
+    }
+
+    const xenditSecretKey = getXenditSecretKey()
+    if (!xenditSecretKey) throw new Error('XENDIT_SECRET_KEY_NOT_CONFIGURED')
+    if (!xenditSecretKey.startsWith('xnd_')) throw new Error('XENDIT_SECRET_KEY_INVALID')
+    const checkoutEndpoint = getXenditInvoiceBaseUrl()
+    if (!checkoutEndpoint) throw new Error('XENDIT_INVOICE_URL_NOT_CONFIGURED')
+
+    const clientBaseUrl = normalizePublicBaseUrl(returnBaseUrl || readFirstEnv(['CLIENT_URL']))
+    if (!clientBaseUrl) throw new Error('CHECKOUT_RETURN_BASE_URL_INVALID')
+    const successUrl = buildSignedBusinessPaymentMethodsReturnUrl(clientBaseUrl, { payment: 'success', method: code })
+    const cancelUrl = buildSignedBusinessPaymentMethodsReturnUrl(clientBaseUrl, { payment: 'cancelled', method: code })
+    if (!successUrl || !cancelUrl) throw new Error('CHECKOUT_RETURN_URLS_INVALID')
+
+    const mappedMethod = mapTouristMethodToXenditMethod(code)
+    const enabledFromEnv = readFirstEnv(['XENDIT_PAYMENT_METHODS'])
+        .split(',')
+        .map((value) => normalizeXenditInvoiceMethod(value))
+        .filter(Boolean)
+    if (enabledFromEnv.length && !enabledFromEnv.includes(mappedMethod)) {
+        throw new Error('PAYMENT_METHOD_NOT_ENABLED_FOR_CHECKOUT')
+    }
+
+    const externalId = `TBPMV${String(business._id).slice(-6).toUpperCase()}${Date.now().toString().slice(-8)}`
+    const payload = {
+        external_id: externalId.slice(0, 36),
+        amount: Number(readFirstEnv(['XENDIT_PM_VERIFY_AMOUNT']) || 1),
+        currency: 'PHP',
+        description: `Payment method setup verification - ${code}`,
+        success_redirect_url: successUrl,
+        failure_redirect_url: cancelUrl,
+        payment_methods: [mappedMethod],
+        metadata: {
+            tbPendingCheckoutKind: 'business_payment_method_verification',
+            businessId: String(business._id),
+            methodCode: code
+        }
+    }
+    const response = await fetch(checkoutEndpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: buildXenditBasicAuthHeader(xenditSecretKey)
+        },
+        body: JSON.stringify(payload)
+    })
+    const responseText = await response.text()
+    const jsonResponse = parseXenditJsonResponse(responseText)
+    const checkoutUrl = String(jsonResponse?.invoice_url || '').trim()
+    const checkoutId = String(jsonResponse?.id || '').trim()
+    if (!response.ok || !checkoutUrl) {
+        const upstreamMessage = jsonResponse?.message || jsonResponse?.error_code || responseText || 'Unknown Xendit upstream error'
+        throw new Error(`Xendit invoice create failed (${response.status}): ${upstreamMessage}`)
+    }
+
+    return {
+        methodCode: code,
+        checkoutUrl,
+        checkoutId,
+        requestReferenceNumber: payload.external_id
+    }
 }
 
 export const updateBusinessProfileByUserId = async (userId, payload) => {
@@ -1467,11 +1902,17 @@ export const incrementPublicBusinessProfileViewCount = async (businessId) => {
         return null
     }
 
-    return Business.findOneAndUpdate(
-        { _id: businessId, verificationStatus: 'VERIFIED' },
-        { $inc: { publicProfileViewCount: 1 }, $set: { updatedAt: new Date() } },
-        { returnDocument: 'after' }
-    ).populate('category', 'name description')
+    const business = await Business.findOne({ _id: businessId, verificationStatus: 'VERIFIED' }).populate(
+        'category',
+        'name description'
+    )
+    if (!business || !isBusinessSubscriptionInActivePaidWindow(business)) {
+        return null
+    }
+    business.publicProfileViewCount = Math.max(0, Number(business.publicProfileViewCount) || 0) + 1
+    business.updatedAt = new Date()
+    await business.save()
+    return business
 }
 
 export const getBusinessApprovalRequests = async ({ status }) => {
@@ -1480,6 +1921,9 @@ export const getBusinessApprovalRequests = async ({ status }) => {
     if (status && allowedVerificationStatuses.includes(status)) {
         query.verificationStatus = status
     }
+
+    // Approval queue should only include businesses that submitted at least one document/proof.
+    query['verificationProofs.0'] = { $exists: true }
 
     const businesses = await Business.find(query)
         .populate('category', 'name')
@@ -1646,6 +2090,14 @@ const supportsPublicMenuCatalog = (business) => {
     return normalized === expected || normalized === 'restaurant'
 }
 
+/** Public listing catalog support for tourist business detail pages (restaurant + stay). */
+const supportsPublicListingCatalog = (business) => {
+    const name = business?.category?.name
+    if (typeof name !== 'string') return false
+    const normalized = name.trim().toLowerCase()
+    return normalized === 'restaurant' || normalized === 'resort' || normalized === 'hotel'
+}
+
 /**
  * Public menu feed for verified businesses that support the public menu catalog. Only items that are not deleted,
  * `isAvailable` is true, and `stockStatus` is not OUT_OF_STOCK.
@@ -1657,13 +2109,14 @@ export const listPublicMenuFeedItems = async ({ menuCategory = 'ALL' } = {}) => 
 
     const businesses = await Business.find({ verificationStatus: 'VERIFIED' })
         .populate('category')
-        .select('_id name logo menuItems')
+        .select('_id name logo menuItems subscription')
         .lean()
 
     const eligible = []
 
     for (const b of businesses) {
         if (!supportsPublicMenuCatalog(b)) continue
+        if (!isBusinessSubscriptionInActivePaidWindow(b)) continue
         const menuItems = Array.isArray(b.menuItems) ? b.menuItems : []
         for (const m of menuItems) {
             if (!m || m.isDeleted) continue
@@ -1704,7 +2157,7 @@ export const listPublicMenuFeedItems = async ({ menuCategory = 'ALL' } = {}) => 
 /** Public menu lines for a single verified business with a supported menu catalog (available, in stock, not deleted). */
 export const listPublicMenuItemsFromBusinessDoc = (business) => {
     if (!business) return []
-    if (!supportsPublicMenuCatalog(business)) return []
+    if (!supportsPublicListingCatalog(business)) return []
     const menuItems = Array.isArray(business.menuItems) ? business.menuItems : []
     return menuItems
         .filter((m) => m && !m.isDeleted && m.isAvailable && m.stockStatus !== 'OUT_OF_STOCK')
@@ -1724,6 +2177,7 @@ export const createBusinessMenuItemByUserId = async (userId, payload) => {
         servingSize = '',
         spiceLevel = 'No Spice',
         allergens = '',
+        addOns = [],
         isAvailable = true,
         images = []
     } = payload
@@ -1746,6 +2200,7 @@ export const createBusinessMenuItemByUserId = async (userId, payload) => {
         servingSize: servingSize.trim(),
         spiceLevel: spiceLevel.trim() || 'No Spice',
         allergens: allergens.trim(),
+        addOns: normalizeAddOnList(addOns),
         isAvailable: Boolean(isAvailable),
         stockStatus: isAvailable ? 'AVAILABLE_TO_ORDER' : 'OUT_OF_STOCK',
         isDeleted: false,
@@ -1827,6 +2282,7 @@ export const updateBusinessMenuItemByUserId = async (userId, menuItemId, payload
         servingSize = '',
         spiceLevel = 'No Spice',
         allergens = '',
+        addOns = [],
         stockStatus = 'AVAILABLE_TO_ORDER',
         imageReplacements = []
     } = payload
@@ -1840,6 +2296,7 @@ export const updateBusinessMenuItemByUserId = async (userId, menuItemId, payload
     item.servingSize = servingSize.trim()
     item.spiceLevel = spiceLevel.trim() || 'No Spice'
     item.allergens = allergens.trim()
+    item.addOns = normalizeAddOnList(addOns)
     item.stockStatus = stockStatus
     item.isAvailable = stockStatus === 'AVAILABLE_TO_ORDER'
     item.images = Array.isArray(item.images) ? item.images : []
@@ -1941,6 +2398,18 @@ const mapCustomerOrderToClient = (doc) => {
               image: String(li.image || '')
           }))
         : []
+    const orderType = String(row.orderType || 'MENU_ORDER')
+    const status = String(row.status || '')
+    const isBookingAwaitingPayment =
+        orderType.toUpperCase() === 'BOOKING_REQUEST' && status.toUpperCase() === 'PROCESSING'
+    const paymentLinkToken =
+        isBookingAwaitingPayment && row.placedByUserId
+            ? createTouristBookingPaymentLinkToken({
+                  touristUserId: row.placedByUserId,
+                  customerOrderId: row._id
+              })
+            : null
+    const bookingPaymentLink = buildTouristBookingPaymentUrlFromToken({ paymentToken: paymentLinkToken?.token || '' })
 
     return {
         id: String(row._id),
@@ -1951,6 +2420,7 @@ const mapCustomerOrderToClient = (doc) => {
         customer: row.customerName,
         customerPhone: row.customerPhone || '',
         billingType: row.billingType || 'PAY_AT_PICKUP',
+        orderType,
         notes: row.notes || '',
         productName: row.productName,
         productImage: row.productImage || '',
@@ -1959,8 +2429,10 @@ const mapCustomerOrderToClient = (doc) => {
         items: row.itemsCount,
         total: formatPhp(row.amount),
         time: relativeTimeLabel(row.createdAt),
-        status: row.status,
+        status,
         cancelReason: row.cancelReason || '',
+        bookingPaymentLink,
+        bookingPaymentLinkExpiresAt: paymentLinkToken?.expiresAt || null,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt
     }
@@ -1983,7 +2455,10 @@ export const resolveTouristCustomerMenuOrderPayload = async ({ businessId, lines
     if (!business || business.verificationStatus !== 'VERIFIED') {
         throw new Error('BUSINESS_NOT_FOUND')
     }
-    if (!supportsPublicMenuCatalog(business)) {
+    if (!isBusinessSubscriptionInActivePaidWindow(business)) {
+        throw new Error('BUSINESS_NOT_FOUND')
+    }
+    if (!supportsPublicListingCatalog(business)) {
         throw new Error('MENU_CATALOG_NOT_SUPPORTED')
     }
 
@@ -2046,6 +2521,70 @@ const buildProductDetailsBlock = ({ billingType, customerPhone, notes, productLi
         .filter(Boolean)
         .join('\n')
 
+const buildTouristBookingApprovedEmailHtml = ({
+    touristName,
+    businessName,
+    orderCode,
+    orderTotal,
+    payUrl
+}) =>
+    templateReader('tourist-booking-approved', {
+        touristName: touristName || 'Tourist',
+        businessName: businessName || 'Resort',
+        orderCode: orderCode || '--',
+        orderTotal: orderTotal || 'PHP 0.00',
+        payUrl: payUrl || '',
+        hasPayUrl: Boolean(payUrl)
+    })
+
+const BOOKING_PAYMENT_LINK_TTL_MS = 24 * 60 * 60 * 1000
+
+const buildTouristBookingPaymentUrlFromToken = ({ paymentToken }) => {
+    const clientUrl = normalizePublicBaseUrl(readFirstEnv(['CLIENT_URL', 'CLIENT_LOCAL', 'CLIENT_PRODUCTION']))
+    if (!clientUrl || !paymentToken) return ''
+    return `${clientUrl}/tourist/booking-payment?t=${encodeURIComponent(String(paymentToken))}`
+}
+
+const createTouristBookingPaymentLinkToken = ({ touristUserId, customerOrderId }) => {
+    const exp = Date.now() + BOOKING_PAYMENT_LINK_TTL_MS
+    const token = sealBookingPaymentPayload({
+        v: 1,
+        touristUserId: String(touristUserId || ''),
+        customerOrderId: String(customerOrderId || ''),
+        exp
+    })
+    return { token, expiresAt: new Date(exp).toISOString() }
+}
+
+const openTouristBookingPaymentLinkToken = ({ touristUserId, paymentToken }) => {
+    let payload
+    try {
+        payload = openBookingPaymentPayload(paymentToken)
+    } catch {
+        throw new Error('INVALID_BOOKING_PAYMENT_TOKEN')
+    }
+    if (
+        payload?.v !== 1 ||
+        !payload?.touristUserId ||
+        !payload?.customerOrderId ||
+        !mongoose.Types.ObjectId.isValid(String(payload.customerOrderId)) ||
+        !payload?.exp
+    ) {
+        throw new Error('INVALID_BOOKING_PAYMENT_TOKEN')
+    }
+    if (Number(payload.exp) < Date.now()) {
+        throw new Error('BOOKING_PAYMENT_TOKEN_EXPIRED')
+    }
+    if (touristUserId != null && String(payload.touristUserId) !== String(touristUserId || '')) {
+        throw new Error('BOOKING_PAYMENT_TOKEN_MISMATCH')
+    }
+    return {
+        tokenTouristUserId: String(payload.touristUserId),
+        customerOrderId: String(payload.customerOrderId),
+        expiresAt: new Date(Number(payload.exp)).toISOString()
+    }
+}
+
 const insertTouristCustomerOrderDocument = async ({
     business,
     resolved,
@@ -2056,6 +2595,7 @@ const insertTouristCustomerOrderDocument = async ({
     customerName,
     customerPhone,
     billingType,
+    orderType = 'MENU_ORDER',
     notes,
     status = 'PLACED',
     placedByUserId
@@ -2080,6 +2620,7 @@ const insertTouristCustomerOrderDocument = async ({
         customerName: String(customerName).trim(),
         customerPhone: String(customerPhone || '').trim().slice(0, 40),
         billingType,
+        orderType,
         notes: String(notes || '').trim().slice(0, 2000),
         productName,
         productImage: resolved[0]?.image || '',
@@ -2102,6 +2643,7 @@ export const createTouristCustomerOrder = async ({
     customerName,
     customerPhone = '',
     billingType = 'PAY_AT_PICKUP',
+    orderType = 'MENU_ORDER',
     notes = '',
     lines,
     placedByUserId
@@ -2126,6 +2668,7 @@ export const createTouristCustomerOrder = async ({
         customerName,
         customerPhone,
         billingType,
+        orderType,
         notes,
         placedByUserId
     })
@@ -2136,6 +2679,21 @@ const buildTouristMenuOrderReferenceNumber = ({ pendingId, businessId }) => {
     const p = String(pendingId || '').replace(/[^a-zA-Z0-9]/g, '').slice(-10).toUpperCase()
     const b = String(businessId || '').replace(/[^a-fA-F0-9]/g, '').slice(-6).toUpperCase()
     return `TBTOC${b}${p}${Date.now().toString().slice(-6)}`.slice(0, 36)
+}
+
+const pickXenditDirectEwalletCheckoutUrl = (invoiceResponse, wantedMethod) => {
+    const target = String(wantedMethod || '').trim().toUpperCase()
+    if (!target) return ''
+    const list = Array.isArray(invoiceResponse?.available_ewallets) ? invoiceResponse.available_ewallets : []
+    for (const row of list) {
+        const kind = String(row?.ewallet_type || row?.channel_code || row?.type || '')
+            .trim()
+            .toUpperCase()
+        if (kind !== target) continue
+        const direct = String(row?.checkout_url || row?.checkoutUrl || row?.deeplink || '').trim()
+        if (direct) return direct
+    }
+    return ''
 }
 
 const extractCheckoutSessionMetadata = (payload = {}) => {
@@ -2155,6 +2713,8 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
     const requestReferenceNumber = resolveWebhookReferenceNumber(payload)
     const checkoutSessionId = resolveWebhookPaymentId(payload)
     const pendingId = String(meta.tbPendingCheckoutId || '').trim()
+    const metaKind = String(meta.tbPendingCheckoutKind || '').trim()
+    const isTouristCheckoutKind = metaKind === 'tourist_menu_order' || metaKind === 'tourist_booking_request'
     let pending = null
     let usesFallbackMatch = false
 
@@ -2164,6 +2724,9 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
 
     if (!pending) {
         const byRef = String(requestReferenceNumber || payload?.external_id || '').trim()
+        if (!isTouristCheckoutKind && !isTouristCheckoutReferenceNumber(byRef)) {
+            return { handled: false, touristCheckoutSynced: false }
+        }
         const or = []
         if (byRef) {
             or.push({ requestReferenceNumber: byRef })
@@ -2178,11 +2741,10 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
         usesFallbackMatch = true
     }
 
-    const metaKind = String(meta.tbPendingCheckoutKind || '').trim()
     if (!pending) {
         return { handled: usesFallbackMatch, touristCheckoutSynced: true, applied: false, reason: 'PENDING_CHECKOUT_NOT_FOUND' }
     }
-    if (!usesFallbackMatch && metaKind && metaKind !== 'tourist_menu_order') {
+    if (!usesFallbackMatch && metaKind && metaKind !== 'tourist_menu_order' && metaKind !== 'tourist_booking_request') {
         return { handled: false, touristCheckoutSynced: false }
     }
 
@@ -2235,19 +2797,36 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
         totalAmount: snap.totalAmount
     })
 
-    const order = await insertTouristCustomerOrderDocument({
-        business,
-        resolved,
-        totalAmount: snap.totalAmount,
-        totalCount: snap.itemsCount,
-        productName: snap.productName || productLines[0] || 'Menu order',
-        productDetails,
-        customerName: pending.customerName,
-        customerPhone: pending.customerPhone,
-        billingType: pending.billingType || 'PREPAID_ONLINE',
-        notes: pending.notes,
-        placedByUserId: pending.userId
-    })
+    let order = null
+    /** Keep linkage stable: if pending already points to a booking order, always finish that order,
+     *  even when webhook metadata kind is missing/inconsistent. */
+    if (pending.customerOrderId) {
+        order = await CustomerOrder.findById(pending.customerOrderId)
+        if (!order) {
+            return { handled: true, touristCheckoutSynced: true, applied: false, reason: 'ORDER_MISSING_FOR_BOOKING_PAYMENT' }
+        }
+        order.status = 'FINISHED'
+        order.billingType = pending.billingType || order.billingType || 'PREPAID_ONLINE'
+        order.orderType = order.orderType || 'BOOKING_REQUEST'
+        order.notes = pending.notes || order.notes || ''
+        order.updatedAt = new Date()
+        await order.save()
+    } else {
+        order = await insertTouristCustomerOrderDocument({
+            business,
+            resolved,
+            totalAmount: snap.totalAmount,
+            totalCount: snap.itemsCount,
+            productName: snap.productName || productLines[0] || 'Menu order',
+            productDetails,
+            customerName: pending.customerName,
+            customerPhone: pending.customerPhone,
+            billingType: pending.billingType || 'PREPAID_ONLINE',
+            orderType: pending.customerOrderId ? 'BOOKING_REQUEST' : 'MENU_ORDER',
+            notes: pending.notes,
+            placedByUserId: pending.userId
+        })
+    }
 
     await TouristMenuOrderCheckout.updateOne(
         { _id: pending._id },
@@ -2260,7 +2839,53 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
         console.error('Failed to clear tourist cart after paid menu checkout', err)
     }
 
-    return { handled: true, touristCheckoutSynced: true, applied: true, reason: 'TOURIST_ORDER_CREATED' }
+    return { handled: true, touristCheckoutSynced: true, applied: true, reason: 'TOURIST_ORDER_PAID' }
+}
+
+const tryFulfillBusinessPaymentMethodVerificationFromWebhook = async (payload = {}, headers = {}) => {
+    const meta = extractCheckoutSessionMetadata(payload)
+    const kind = String(meta.tbPendingCheckoutKind || '').trim()
+    if (kind !== 'business_payment_method_verification') {
+        return { handled: false, businessPaymentMethodSetupSynced: false }
+    }
+    const businessId = String(meta.businessId || '').trim()
+    const methodCode = String(meta.methodCode || '').trim().toUpperCase()
+    if (!mongoose.Types.ObjectId.isValid(businessId) || !TOURIST_CHECKOUT_METHOD_CODES.includes(methodCode)) {
+        return { handled: true, businessPaymentMethodSetupSynced: true, applied: false, reason: 'INVALID_SETUP_METADATA' }
+    }
+
+    const eventName = resolveWebhookEventName(payload, headers)
+    const payStatus = resolveWebhookStatus(payload)
+    const mapped = mapWebhookToSetupStatus({ eventName, status: payStatus })
+    if (mapped !== 'SUCCESS') {
+        return { handled: true, businessPaymentMethodSetupSynced: true, applied: false, reason: 'SETUP_NOT_SUCCESS' }
+    }
+
+    const business = await Business.findById(businessId)
+    if (!business) {
+        return { handled: true, businessPaymentMethodSetupSynced: true, applied: false, reason: 'BUSINESS_NOT_FOUND_FOR_SETUP' }
+    }
+    const settings = normalizeBusinessSettings({
+        ...DEFAULT_BUSINESS_SETTINGS,
+        ...(business.settings || {})
+    })
+    const now = new Date()
+    settings.paymentMethods[methodCode] = {
+        ...settings.paymentMethods[methodCode],
+        enabled: false,
+        isVerified: true,
+        verifiedAt: now
+    }
+    await Business.updateOne(
+        { _id: business._id },
+        {
+            $set: {
+                settings,
+                updatedAt: now
+            }
+        }
+    )
+    return { handled: true, businessPaymentMethodSetupSynced: true, applied: true, reason: 'BUSINESS_PAYMENT_METHOD_VERIFIED' }
 }
 
 export const getTouristMenuOrderCheckoutStatusForUser = async (userId, pendingCheckoutId) => {
@@ -2320,6 +2945,13 @@ export const createTouristMenuOrderXenditCheckout = async ({
 }) => {
     const { business, resolved, totalAmount, totalCount, productName, productLines } =
         await resolveTouristCustomerMenuOrderPayload({ businessId, lines })
+    const enabledBusinessPaymentMethods = getEnabledBusinessTouristPaymentMethods(business)
+    if (!enabledBusinessPaymentMethods.length) {
+        throw new Error('PAYMENT_METHOD_NOT_AVAILABLE_FOR_BUSINESS')
+    }
+    if (!enabledBusinessPaymentMethods.includes(String(billingType || '').toUpperCase())) {
+        throw new Error('PAYMENT_METHOD_NOT_AVAILABLE_FOR_BUSINESS')
+    }
     await assertBusinessMonthlyOrderCapacity({ business, incomingOrders: 1 })
     if (totalAmount <= 0) {
         throw new Error('INVALID_ORDER_AMOUNT')
@@ -2381,14 +3013,8 @@ export const createTouristMenuOrderXenditCheckout = async ({
     }
 
     const referenceNumber = buildTouristMenuOrderReferenceNumber({ pendingId: pending._id, businessId: business._id })
-    const successUrl = buildSignedTouristCheckoutReturnUrl(clientBaseUrl, {
-        payment: 'success',
-        pendingCheckoutId: String(pending._id)
-    })
-    const cancelUrl = buildSignedTouristCheckoutReturnUrl(clientBaseUrl, {
-        payment: 'cancelled',
-        pendingCheckoutId: String(pending._id)
-    })
+    const successUrl = buildSignedTouristExploreReturnUrl(clientBaseUrl, { payment: 'success' })
+    const cancelUrl = buildSignedTouristExploreReturnUrl(clientBaseUrl, { payment: 'cancelled' })
     if (!successUrl || !cancelUrl) {
         await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
         throw new Error('CHECKOUT_RETURN_URLS_INVALID')
@@ -2444,7 +3070,10 @@ export const createTouristMenuOrderXenditCheckout = async ({
         }
     })()
 
-    const checkoutUrl = jsonResponse?.invoice_url
+    const hostedCheckoutUrl = String(jsonResponse?.invoice_url || '').trim()
+    const wantsGcash = paymentMethodTypes.includes('GCASH')
+    const directGcashUrl = wantsGcash ? pickXenditDirectEwalletCheckoutUrl(jsonResponse, 'GCASH') : ''
+    const checkoutUrl = directGcashUrl || hostedCheckoutUrl
     const checkoutId = jsonResponse?.id || ''
     if (!response.ok || !checkoutUrl) {
         await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
@@ -2454,6 +3083,20 @@ export const createTouristMenuOrderXenditCheckout = async ({
             responseText ||
             'Unknown Xendit upstream error'
         throw new Error(`Xendit invoice create failed (${response.status}): ${upstreamMessage}`)
+    }
+
+    if (wantsGcash) {
+        console.info('[TouristMenuOrderCheckout] gcash redirect resolution', {
+            pendingCheckoutId: String(pending._id),
+            checkoutId: String(checkoutId || ''),
+            usedDirectGcash: Boolean(directGcashUrl),
+            hasAvailableEwallets: Array.isArray(jsonResponse?.available_ewallets),
+            availableEwalletTypes: Array.isArray(jsonResponse?.available_ewallets)
+                ? jsonResponse.available_ewallets
+                    .map((row) => String(row?.ewallet_type || row?.channel_code || row?.type || '').trim())
+                    .filter(Boolean)
+                : []
+        })
     }
 
     await TouristMenuOrderCheckout.updateOne(
@@ -2475,11 +3118,327 @@ export const createTouristMenuOrderXenditCheckout = async ({
     }
 }
 
+export const createTouristBookingRequestPaymentCheckout = async ({
+    userId,
+    customerOrderId,
+    returnBaseUrl,
+    paymentMethod = 'GCASH'
+}) => {
+    const oid = String(customerOrderId || '').trim()
+    if (!mongoose.Types.ObjectId.isValid(oid)) {
+        throw new Error('ORDER_NOT_FOUND')
+    }
+    const order = await CustomerOrder.findById(oid)
+    if (!order || String(order.placedByUserId || '') !== String(userId || '')) {
+        throw new Error('ORDER_NOT_FOUND')
+    }
+    if (String(order.orderType || '').toUpperCase() !== 'BOOKING_REQUEST') {
+        throw new Error('BOOKING_PAYMENT_NOT_ALLOWED')
+    }
+    const paidCheckoutExists = await TouristMenuOrderCheckout.exists({
+        customerOrderId: order._id,
+        status: 'PAID'
+    })
+    if (paidCheckoutExists) {
+        throw new Error('BOOKING_ALREADY_PAID')
+    }
+    const orderStatus = String(order.status || '').toUpperCase()
+    if (orderStatus === 'FINISHED') {
+        throw new Error('BOOKING_ALREADY_PAID')
+    }
+    if (orderStatus !== 'PROCESSING') {
+        throw new Error('BOOKING_NOT_APPROVED')
+    }
+
+    const business = await Business.findById(order.businessId).populate('category')
+    if (!business || business.verificationStatus !== 'VERIFIED' || !supportsPublicListingCatalog(business)) {
+        throw new Error('BUSINESS_NOT_FOUND')
+    }
+    if (!isBusinessSubscriptionInActivePaidWindow(business)) {
+        throw new Error('BUSINESS_NOT_FOUND')
+    }
+    const enabledBusinessPaymentMethods = getEnabledBusinessTouristPaymentMethods(business)
+    if (!enabledBusinessPaymentMethods.length) {
+        throw new Error('PAYMENT_METHOD_NOT_AVAILABLE_FOR_BUSINESS')
+    }
+    if (!enabledBusinessPaymentMethods.includes(String(paymentMethod || '').toUpperCase())) {
+        throw new Error('PAYMENT_METHOD_NOT_AVAILABLE_FOR_BUSINESS')
+    }
+
+    const lineItems = Array.isArray(order.lineItems) ? order.lineItems : []
+    const resolved = lineItems.map((r) => ({
+        menuItemId: String(r.menuItemId || ''),
+        name: String(r.name || ''),
+        qty: Math.min(99, Math.max(1, Number(r.qty) || 1)),
+        unit: Number.isFinite(Number(r.unit)) ? Number(r.unit) : 0,
+        image: String(r.image || ''),
+        lineNotes: String(r.lineNotes || '')
+    }))
+    const totalAmount = Number(order.amount || 0)
+    const totalCount = Number(order.itemsCount || resolved.reduce((n, r) => n + r.qty, 0))
+    if (!resolved.length || totalAmount <= 0) {
+        throw new Error('INVALID_ORDER_AMOUNT')
+    }
+
+    const productLines = resolved.map((r) => {
+        const base = `${r.qty}× ${r.name} @ ${r.unit.toFixed(2)} = ${(r.unit * r.qty).toFixed(2)}`
+        return r.lineNotes ? `${base} — Item note: ${r.lineNotes}` : base
+    })
+    const productDetailsPreview = buildProductDetailsBlock({
+        billingType: 'PREPAID_ONLINE',
+        customerPhone: order.customerPhone || '',
+        notes: order.notes || '',
+        productLines,
+        totalAmount
+    })
+
+    const pending = await TouristMenuOrderCheckout.create({
+        businessId: business._id,
+        userId,
+        status: 'AWAITING_PAYMENT',
+        customerName: String(order.customerName || '').trim(),
+        customerPhone: String(order.customerPhone || '').trim().slice(0, 40),
+        billingType: 'PREPAID_ONLINE',
+        notes: String(order.notes || '').trim().slice(0, 2000),
+        resolvedSnapshot: {
+            lines: resolved.map((r) => ({
+                menuItemId: r.menuItemId,
+                name: r.name,
+                unit: r.unit,
+                qty: r.qty,
+                lineNotes: r.lineNotes || '',
+                image: r.image || ''
+            })),
+            totalAmount: Math.round(totalAmount * 100) / 100,
+            itemsCount: totalCount,
+            productName: String(order.productName || '').slice(0, 255),
+            productDetails: productDetailsPreview.slice(0, 4000)
+        },
+        customerOrderId: order._id
+    })
+
+    const xenditSecretKey = getXenditSecretKey()
+    if (!xenditSecretKey) {
+        await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
+        throw new Error('XENDIT_SECRET_KEY_NOT_CONFIGURED')
+    }
+    if (!xenditSecretKey.startsWith('xnd_')) {
+        await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
+        throw new Error('XENDIT_SECRET_KEY_INVALID')
+    }
+    const checkoutEndpoint = getXenditInvoiceBaseUrl()
+    if (!checkoutEndpoint) {
+        await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
+        throw new Error('XENDIT_INVOICE_URL_NOT_CONFIGURED')
+    }
+    const clientBaseUrl = normalizePublicBaseUrl(returnBaseUrl || readFirstEnv(['CLIENT_URL']))
+    if (!clientBaseUrl) {
+        await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
+        throw new Error('CHECKOUT_RETURN_BASE_URL_INVALID')
+    }
+
+    const referenceNumber = buildTouristMenuOrderReferenceNumber({ pendingId: pending._id, businessId: business._id })
+    const successUrl = buildSignedTouristCheckoutReturnUrl(clientBaseUrl, {
+        payment: 'success',
+        pendingCheckoutId: String(pending._id)
+    })
+    const cancelUrl = buildSignedTouristCheckoutReturnUrl(clientBaseUrl, {
+        payment: 'cancelled',
+        pendingCheckoutId: String(pending._id)
+    })
+    if (!successUrl || !cancelUrl) {
+        await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
+        throw new Error('CHECKOUT_RETURN_URLS_INVALID')
+    }
+
+    const fromChoice = mapTouristCheckoutBillingToXenditMethods(paymentMethod)
+    const enabledFromEnv = readFirstEnv(['XENDIT_PAYMENT_METHODS'])
+        .split(',')
+        .map((value) => normalizeXenditInvoiceMethod(value))
+        .filter(Boolean)
+    const paymentMethodTypes = enabledFromEnv.length
+        ? fromChoice.filter((t) => enabledFromEnv.includes(t))
+        : fromChoice
+    if (!paymentMethodTypes.length) {
+        await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
+        throw new Error('PAYMENT_METHOD_NOT_ENABLED_FOR_CHECKOUT')
+    }
+
+    const payload = {
+        external_id: referenceNumber,
+        amount: Math.round(Number(totalAmount) * 100) / 100,
+        currency: 'PHP',
+        description: `Booking payment - ${business.name || 'Resort'}`,
+        success_redirect_url: successUrl,
+        failure_redirect_url: cancelUrl,
+        payment_methods: paymentMethodTypes,
+        metadata: {
+            tbPendingCheckoutKind: 'tourist_booking_request',
+            tbPendingCheckoutId: String(pending._id),
+            requestReferenceNumber: String(referenceNumber),
+            businessId: String(business._id),
+            touristUserId: String(userId),
+            customerOrderId: String(order._id),
+            productName: String(order.productName || '').slice(0, 255)
+        }
+    }
+
+    const response = await fetch(checkoutEndpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: buildXenditBasicAuthHeader(xenditSecretKey)
+        },
+        body: JSON.stringify(payload)
+    })
+    const responseText = await response.text()
+    const jsonResponse = (() => {
+        try {
+            return JSON.parse(responseText)
+        } catch (_error) {
+            return {}
+        }
+    })()
+    const checkoutUrl = jsonResponse?.invoice_url
+    const checkoutId = jsonResponse?.id || ''
+    if (!response.ok || !checkoutUrl) {
+        await TouristMenuOrderCheckout.deleteOne({ _id: pending._id })
+        const upstreamMessage = jsonResponse?.message || jsonResponse?.error_code || responseText || 'Unknown Xendit upstream error'
+        throw new Error(`Xendit invoice create failed (${response.status}): ${upstreamMessage}`)
+    }
+    await TouristMenuOrderCheckout.updateOne(
+        { _id: pending._id },
+        {
+            $set: {
+                checkoutSessionId: checkoutId,
+                requestReferenceNumber: referenceNumber
+            }
+        }
+    )
+    return {
+        checkoutUrl,
+        checkoutId,
+        pendingCheckoutId: String(pending._id),
+        amount: Math.round(totalAmount * 100) / 100,
+        businessName: business.name || '',
+        customerOrderId: String(order._id)
+    }
+}
+
+export const resolveTouristBookingPaymentLinkByToken = async ({ userId, paymentToken }) => {
+    const { tokenTouristUserId, customerOrderId, expiresAt } = openTouristBookingPaymentLinkToken({
+        touristUserId: userId,
+        paymentToken
+    })
+    const order = await CustomerOrder.findById(customerOrderId).populate('businessId', 'name settings.paymentMethods')
+    if (!order || String(order.placedByUserId || '') !== String(tokenTouristUserId || '')) {
+        throw new Error('ORDER_NOT_FOUND')
+    }
+    if (String(order.orderType || '').toUpperCase() !== 'BOOKING_REQUEST') {
+        throw new Error('BOOKING_PAYMENT_NOT_ALLOWED')
+    }
+    const paidCheckoutExists = await TouristMenuOrderCheckout.exists({
+        customerOrderId: order._id,
+        status: 'PAID'
+    })
+    if (paidCheckoutExists) {
+        throw new Error('BOOKING_ALREADY_PAID')
+    }
+    if (String(order.status || '').toUpperCase() === 'FINISHED') {
+        throw new Error('BOOKING_ALREADY_PAID')
+    }
+    const businessName =
+        order.businessId && typeof order.businessId === 'object'
+            ? String(order.businessId.name || '').trim()
+            : ''
+    const enabledPaymentMethods =
+        order.businessId && typeof order.businessId === 'object'
+            ? getEnabledBusinessTouristPaymentMethods(order.businessId)
+            : TOURIST_CHECKOUT_METHOD_CODES
+    return {
+        orderId: String(order._id),
+        orderCode: String(order.orderCode || ''),
+        orderStatus: String(order.status || ''),
+        amount: Math.round((Number(order.amount) || 0) * 100) / 100,
+        currency: String(order.currency || 'PHP'),
+        productName: String(order.productName || 'Booking request'),
+        businessName,
+        availablePaymentMethods: enabledPaymentMethods,
+        expiresAt
+    }
+}
+
+export const createTouristBookingRequestPaymentCheckoutByToken = async ({
+    userId,
+    paymentToken,
+    returnBaseUrl,
+    paymentMethod = 'GCASH'
+}) => {
+    const { tokenTouristUserId, customerOrderId } = openTouristBookingPaymentLinkToken({
+        touristUserId: userId,
+        paymentToken
+    })
+    return createTouristBookingRequestPaymentCheckout({
+        userId: userId || tokenTouristUserId,
+        customerOrderId,
+        returnBaseUrl,
+        paymentMethod
+    })
+}
+
+export const resolveTouristBookingPaymentLinkByPublicToken = async ({ paymentToken }) => {
+    const { tokenTouristUserId, customerOrderId, expiresAt } = openTouristBookingPaymentLinkToken({
+        paymentToken
+    })
+    const order = await CustomerOrder.findById(customerOrderId).populate('businessId', 'name settings.paymentMethods')
+    if (!order || String(order.placedByUserId || '') !== String(tokenTouristUserId || '')) {
+        throw new Error('ORDER_NOT_FOUND')
+    }
+    if (String(order.orderType || '').toUpperCase() !== 'BOOKING_REQUEST') {
+        throw new Error('BOOKING_PAYMENT_NOT_ALLOWED')
+    }
+    const paidCheckoutExists = await TouristMenuOrderCheckout.exists({
+        customerOrderId: order._id,
+        status: 'PAID'
+    })
+    if (paidCheckoutExists) {
+        throw new Error('BOOKING_ALREADY_PAID')
+    }
+    if (String(order.status || '').toUpperCase() === 'FINISHED') {
+        throw new Error('BOOKING_ALREADY_PAID')
+    }
+    const businessName =
+        order.businessId && typeof order.businessId === 'object'
+            ? String(order.businessId.name || '').trim()
+            : ''
+    const enabledPaymentMethods =
+        order.businessId && typeof order.businessId === 'object'
+            ? getEnabledBusinessTouristPaymentMethods(order.businessId)
+            : TOURIST_CHECKOUT_METHOD_CODES
+    return {
+        orderId: String(order._id),
+        orderCode: String(order.orderCode || ''),
+        orderStatus: String(order.status || ''),
+        amount: Math.round((Number(order.amount) || 0) * 100) / 100,
+        currency: String(order.currency || 'PHP'),
+        productName: String(order.productName || 'Booking request'),
+        businessName,
+        availablePaymentMethods: enabledPaymentMethods,
+        expiresAt
+    }
+}
+
 export const listMyCustomerOrdersByUserId = async (userId) => {
     const business = await findBusinessByUserId(userId)
     if (!supportsPublicMenuCatalog(business)) {
         throw new Error('MENU_ORDERS_NOT_AVAILABLE')
     }
+    const orders = await CustomerOrder.find({ businessId: business._id }).sort({ createdAt: -1 }).lean()
+    return orders.map((o) => mapCustomerOrderToClient({ ...o, _id: o._id }))
+}
+
+export const listMyResortBookingRecordsByUserId = async (userId) => {
+    const business = await findBusinessByUserId(userId)
     const orders = await CustomerOrder.find({ businessId: business._id }).sort({ createdAt: -1 }).lean()
     return orders.map((o) => mapCustomerOrderToClient({ ...o, _id: o._id }))
 }
@@ -2498,9 +3457,16 @@ export const listTouristCustomerOrdersByUserId = async (userId) => {
     return orders.map((o) => mapCustomerOrderToClient({ ...o, _id: o._id }))
 }
 
-export const advanceMyCustomerOrderStatusByUserId = async (userId, orderId) => {
+const extractEmailFromText = (text) => {
+    const raw = String(text || '')
+    const match = raw.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)
+    return match?.[0] ? String(match[0]).trim() : ''
+}
+
+export const advanceMyCustomerOrderStatusByUserId = async (userId, orderId, options = {}) => {
+    const forceBookingApprovalEmail = Boolean(options?.forceBookingApprovalEmail)
     const business = await findBusinessByUserId(userId)
-    if (!supportsPublicMenuCatalog(business)) {
+    if (!supportsPublicListingCatalog(business)) {
         throw new Error('MENU_ORDERS_NOT_AVAILABLE')
     }
     const order = await CustomerOrder.findOne({ _id: orderId, businessId: business._id })
@@ -2510,11 +3476,64 @@ export const advanceMyCustomerOrderStatusByUserId = async (userId, orderId) => {
     if (order.status === 'PLACED') {
         order.status = 'PROCESSING'
     } else if (order.status === 'PROCESSING') {
+    if (String(order.orderType || '').toUpperCase() === 'BOOKING_REQUEST') {
+            throw new Error('INVALID_STATUS_TRANSITION')
+        }
         order.status = 'FINISHED'
     } else {
         throw new Error('INVALID_STATUS_TRANSITION')
     }
     await order.save()
+    const normalizedBusinessCategory = String(business?.category?.name || '')
+        .trim()
+        .toUpperCase()
+    const isStayBusiness = normalizedBusinessCategory === 'RESORT' || normalizedBusinessCategory === 'HOTEL'
+    const isBookingRequestOrder =
+        forceBookingApprovalEmail ||
+        String(order.orderType || '').toUpperCase() === 'BOOKING_REQUEST' ||
+        (isStayBusiness && order.status === 'PROCESSING')
+
+    if (order.status === 'PROCESSING' && isBookingRequestOrder) {
+        const tourist = order.placedByUserId ? await User.findById(order.placedByUserId).select('name email') : null
+        const fallbackEmail = extractEmailFromText(order.notes) || extractEmailFromText(order.productDetails)
+        const recipientEmail = String(tourist?.email || fallbackEmail || '').trim()
+        const clientUrl = normalizePublicBaseUrl(readFirstEnv(['CLIENT_URL', 'CLIENT_LOCAL', 'CLIENT_PRODUCTION']))
+        const bookingPayToken = tourist?._id
+            ? createTouristBookingPaymentLinkToken({
+                touristUserId: tourist._id,
+                customerOrderId: order._id
+            })
+            : null
+        const payUrl =
+            clientUrl && bookingPayToken?.token
+                ? `${clientUrl}/tourist/booking-payment?t=${encodeURIComponent(String(bookingPayToken.token))}`
+                : ''
+        if (recipientEmail) {
+            const html = buildTouristBookingApprovedEmailHtml({
+                touristName: tourist?.name || '',
+                businessName: business?.name || 'Resort',
+                orderCode: order.orderCode,
+                orderTotal: formatPhp(order.amount),
+                payUrl
+            })
+            await sendMailer(recipientEmail, '[TaraBisita] Booking approved - complete payment', html)
+            console.info('[BookingApprovalEmail] sent', {
+                orderId: String(order._id),
+                orderCode: order.orderCode,
+                touristEmail: recipientEmail,
+                recipientSource: tourist?.email ? 'tourist-account' : 'booking-notes-fallback',
+                hasPayUrl: Boolean(payUrl),
+                paymentLinkExpiresAt: bookingPayToken?.expiresAt || null
+            })
+        } else {
+            console.warn('[BookingApprovalEmail] skipped: no recipient email', {
+                orderId: String(order._id),
+                orderCode: order.orderCode,
+                hasPlacedByUserId: Boolean(order.placedByUserId),
+                hasNotesEmailCandidate: Boolean(fallbackEmail)
+            })
+        }
+    }
     if (order.status === 'FINISHED') {
         scheduleTouristOrderCompletionEmailForOrder(order._id).catch((err) =>
             console.error('Failed to schedule tourist order completion email', err?.message || err)
@@ -2523,9 +3542,13 @@ export const advanceMyCustomerOrderStatusByUserId = async (userId, orderId) => {
     return mapCustomerOrderToClient(order)
 }
 
+/** Dedicated resort/hotel booking approval path (separate from generic customer-order advance). */
+export const advanceMyResortBookingRecordStatusByUserId = async (userId, orderId) =>
+    advanceMyCustomerOrderStatusByUserId(userId, orderId, { forceBookingApprovalEmail: true })
+
 export const cancelMyCustomerOrderByUserId = async (userId, orderId, cancelReason) => {
     const business = await findBusinessByUserId(userId)
-    if (!supportsPublicMenuCatalog(business)) {
+    if (!supportsPublicListingCatalog(business)) {
         throw new Error('MENU_ORDERS_NOT_AVAILABLE')
     }
     const order = await CustomerOrder.findOne({ _id: orderId, businessId: business._id })
@@ -2539,4 +3562,61 @@ export const cancelMyCustomerOrderByUserId = async (userId, orderId, cancelReaso
     order.cancelReason = String(cancelReason || '').trim() || 'Canceled by business'
     await order.save()
     return mapCustomerOrderToClient(order)
+}
+
+export const autoCancelExpiredBookingPaymentOrders = async ({ now = new Date() } = {}) => {
+    const nowDate = now instanceof Date ? now : new Date(now)
+    if (Number.isNaN(nowDate.getTime())) {
+        return { checkedCount: 0, canceledCount: 0 }
+    }
+
+    const threshold = new Date(nowDate.getTime() - BOOKING_PAYMENT_LINK_TTL_MS)
+    const pendingRows = await CustomerOrder.find(
+        {
+            orderType: 'BOOKING_REQUEST',
+            status: 'PROCESSING',
+            updatedAt: { $lte: threshold }
+        },
+        { _id: 1 }
+    ).lean()
+
+    if (!pendingRows.length) {
+        return { checkedCount: 0, canceledCount: 0 }
+    }
+
+    const candidateOrderIds = pendingRows.map((row) => row._id)
+    const paidCheckoutRows = await TouristMenuOrderCheckout.find(
+        {
+            customerOrderId: { $in: candidateOrderIds },
+            status: 'PAID'
+        },
+        { customerOrderId: 1 }
+    ).lean()
+
+    const paidOrderIdSet = new Set(paidCheckoutRows.map((row) => String(row.customerOrderId || '')))
+    const cancellableOrderIds = candidateOrderIds.filter((id) => !paidOrderIdSet.has(String(id)))
+
+    if (!cancellableOrderIds.length) {
+        return { checkedCount: candidateOrderIds.length, canceledCount: 0 }
+    }
+
+    const result = await CustomerOrder.updateMany(
+        {
+            _id: { $in: cancellableOrderIds },
+            orderType: 'BOOKING_REQUEST',
+            status: 'PROCESSING',
+            updatedAt: { $lte: threshold }
+        },
+        {
+            $set: {
+                status: 'CANCELED',
+                cancelReason: 'Booking auto-canceled due to unpaid payment link expiration (24 hours).'
+            }
+        }
+    )
+
+    return {
+        checkedCount: candidateOrderIds.length,
+        canceledCount: result?.modifiedCount || 0
+    }
 }

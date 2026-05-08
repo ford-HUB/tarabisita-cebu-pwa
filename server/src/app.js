@@ -8,6 +8,7 @@ import paymentsWebhookRoutes from "./modules/payments/payments-webhook.routes.js
 import businessRoutes from "./modules/business/business.routes.js"
 import touristRoutes from "./modules/tourist/tourist.routes.js"
 import adminRoutes from "./modules/admin/admin.routes.js"
+import { recordHttpTiming, writeMorganLineToTelemetry } from './shared/utils/systemPerformanceTelemetry.utils.js'
 
 const app = express()
 
@@ -16,7 +17,30 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 app.use(cookieParser())
 
-app.use(morgan('dev'))
+app.use(
+    morgan('dev', {
+        stream: {
+            write: (line) => {
+                writeMorganLineToTelemetry(line)
+                process.stdout.write(line)
+            }
+        }
+    })
+)
+
+app.use((req, res, next) => {
+    const start = process.hrtime.bigint()
+    res.on('finish', () => {
+        const elapsedMs = Number(process.hrtime.bigint() - start) / 1_000_000
+        recordHttpTiming({
+            method: req.method,
+            path: req.originalUrl || req.url || '',
+            statusCode: res.statusCode,
+            durationMs: elapsedMs
+        })
+    })
+    next()
+})
 
 const allowedOrigins = [
     process.env.CLIENT_LOCAL,

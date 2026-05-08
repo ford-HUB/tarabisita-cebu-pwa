@@ -7,12 +7,19 @@ const DEFAULT_RECENT_ORDERS_LIMIT = 8
 const DEFAULT_TOP_PRODUCTS_LIMIT = 5
 const DEFAULT_MONTHLY_TARGET_GOAL = 50000
 
-const supportsPublicMenuCatalog = (business) => {
+const resolveBusinessCategory = (business) => {
   const category =
     typeof business?.category === 'object' && business?.category?.name != null
       ? String(business.category.name).trim().toUpperCase()
       : String(business?.category || '').trim().toUpperCase()
-  return category === 'RESTAURANT'
+  return category
+}
+
+const resolveDashboardOrderType = (business) => {
+  const category = resolveBusinessCategory(business)
+  if (category === 'RESTAURANT') return 'MENU_ORDER'
+  if (category === 'RESORT' || category === 'HOTEL') return 'BOOKING_REQUEST'
+  return ''
 }
 
 const resolveManilaToday = () => {
@@ -230,27 +237,32 @@ const buildCustomersTotal = (orders) => {
   return placedByUserSet.size + fallbackKeys.size
 }
 
+const countOrdersByStatus = (orders, status) =>
+  orders.reduce((count, order) => {
+    return String(order?.status || '').toUpperCase() === String(status || '').toUpperCase() ? count + 1 : count
+  }, 0)
+
 const buildOrdersBuckets = (orders) => {
-  let delivered = 0
-  let pending = 0
-  let canceled = 0
+  const delivered = countOrdersByStatus(orders, 'FINISHED')
+  const canceled = countOrdersByStatus(orders, 'CANCELED')
+  const waitingForApproval = countOrdersByStatus(orders, 'PLACED')
+  const waitingForPayment = countOrdersByStatus(orders, 'PROCESSING')
+  const pending = waitingForApproval + waitingForPayment
   let revenue = 0
 
   for (const order of orders) {
-    if (order.status === 'FINISHED') {
-      delivered += 1
+    if (String(order?.status || '').toUpperCase() === 'FINISHED') {
       revenue += safeNumber(order.amount)
-    } else if (order.status === 'CANCELED') {
-      canceled += 1
-    } else {
-      pending += 1
     }
   }
+
   return {
     total: orders.length,
     delivered,
     pending,
     canceled,
+    waitingForApproval,
+    waitingForPayment,
     revenue: round2(revenue)
   }
 }
@@ -258,7 +270,8 @@ const buildOrdersBuckets = (orders) => {
 export const getMyBusinessDashboardByUserId = async (userId, { year, month } = {}) => {
   const business = await Business.findOne({ userId }).populate('category', 'name').lean()
   if (!business) throw new Error('BUSINESS_NOT_FOUND')
-  if (!supportsPublicMenuCatalog(business)) throw new Error('MENU_DASHBOARD_NOT_AVAILABLE')
+  const dashboardOrderType = resolveDashboardOrderType(business)
+  if (!dashboardOrderType) throw new Error('MENU_DASHBOARD_NOT_AVAILABLE')
 
   const resolvedYear = resolveManilaYearFromInput(year)
   const resolvedMonth = resolveManilaMonthFromInput(month)
@@ -269,21 +282,26 @@ export const getMyBusinessDashboardByUserId = async (userId, { year, month } = {
   const previousMonthRange = buildManilaMonthRange(previousYearMonth(resolvedMonth))
   const todayRange = buildManilaDayRange(today)
 
+  const orderTypeFilter = { orderType: dashboardOrderType }
   const [yearOrders, currentMonthOrders, previousMonthOrders, todayOrders] = await Promise.all([
     CustomerOrder.find({
       businessId: business._id,
+      ...orderTypeFilter,
       createdAt: { $gte: yearRange.startAt, $lte: yearRange.endAt }
     }).lean(),
     CustomerOrder.find({
       businessId: business._id,
+      ...orderTypeFilter,
       createdAt: { $gte: monthRange.startAt, $lt: monthRange.endAt }
     }).lean(),
     CustomerOrder.find({
       businessId: business._id,
+      ...orderTypeFilter,
       createdAt: { $gte: previousMonthRange.startAt, $lt: previousMonthRange.endAt }
     }).lean(),
     CustomerOrder.find({
       businessId: business._id,
+      ...orderTypeFilter,
       createdAt: { $gte: todayRange.startAt, $lte: todayRange.endAt }
     }).lean()
   ])
@@ -297,6 +315,10 @@ export const getMyBusinessDashboardByUserId = async (userId, { year, month } = {
   const customersThisMonth = buildCustomersTotal(currentMonthOrders)
   const customersPreviousMonth = buildCustomersTotal(previousMonthOrders)
   const customersTotal = buildCustomersTotal(yearOrders)
+  const isBookingDashboard = dashboardOrderType === 'BOOKING_REQUEST'
+  const confirmedYearCount = countOrdersByStatus(yearOrders, 'FINISHED')
+  const confirmedMonthCount = countOrdersByStatus(currentMonthOrders, 'FINISHED')
+  const confirmedPreviousMonthCount = countOrdersByStatus(previousMonthOrders, 'FINISHED')
 
   const { monthlySales, statisticsByMonth } = aggregateMonthlySalesAndStatistics(yearOrders)
   const topProducts = aggregateTopProducts(yearOrders, DEFAULT_TOP_PRODUCTS_LIMIT)
@@ -311,22 +333,25 @@ export const getMyBusinessDashboardByUserId = async (userId, { year, month } = {
       id: String(business._id),
       name: business.name || 'Business'
     },
+    scope: dashboardOrderType,
     year: resolvedYear,
     month: resolvedMonth,
     today,
     totals: {
       customers: customersTotal,
-      orders: yearBuckets.total,
+      orders: isBookingDashboard ? confirmedYearCount : yearBuckets.total,
       delivered: yearBuckets.delivered,
-      pending: yearBuckets.pending,
+      pending: isBookingDashboard ? yearBuckets.waitingForApproval : yearBuckets.pending,
+      waitingForPayment: isBookingDashboard ? yearBuckets.waitingForPayment : 0,
       canceled: yearBuckets.canceled,
       revenue: yearBuckets.revenue
     },
     monthTotals: {
       customers: customersThisMonth,
-      orders: monthBuckets.total,
+      orders: isBookingDashboard ? confirmedMonthCount : monthBuckets.total,
       delivered: monthBuckets.delivered,
-      pending: monthBuckets.pending,
+      pending: isBookingDashboard ? monthBuckets.waitingForApproval : monthBuckets.pending,
+      waitingForPayment: isBookingDashboard ? monthBuckets.waitingForPayment : 0,
       canceled: monthBuckets.canceled,
       revenue: monthBuckets.revenue
     },
@@ -339,7 +364,10 @@ export const getMyBusinessDashboardByUserId = async (userId, { year, month } = {
     },
     trends: {
       customersDeltaPct: computeDeltaPct(customersThisMonth, customersPreviousMonth),
-      ordersDeltaPct: computeDeltaPct(monthBuckets.total, previousMonthBuckets.total),
+      ordersDeltaPct: computeDeltaPct(
+        isBookingDashboard ? confirmedMonthCount : monthBuckets.total,
+        isBookingDashboard ? confirmedPreviousMonthCount : previousMonthBuckets.total
+      ),
       revenueDeltaPct: computeDeltaPct(monthBuckets.revenue, previousMonthBuckets.revenue)
     },
     monthlySales,

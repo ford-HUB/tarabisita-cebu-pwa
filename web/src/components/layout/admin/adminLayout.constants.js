@@ -1,4 +1,4 @@
-import { FiBriefcase, FiCreditCard, FiDollarSign, FiGrid, FiUsers } from 'react-icons/fi'
+import { FiActivity, FiBriefcase, FiCreditCard, FiDollarSign, FiGrid, FiUsers } from 'react-icons/fi'
 import { toEncryptedRoute } from '../../../shared/utils/direct.utils'
 
 export const adminSidebarLinks = [
@@ -17,6 +17,11 @@ export const adminSidebarLinks = [
     label: 'Manage users',
     icon: FiUsers,
     path: `/${toEncryptedRoute('admin/users')}`
+  },
+  {
+    label: 'System Performance',
+    icon: FiActivity,
+    path: `/${toEncryptedRoute('admin/system-performance')}`
   },
   { type: 'section', label: 'Billing' },
   {
