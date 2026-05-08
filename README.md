@@ -174,4 +174,3 @@ Common types:
 - `docs` - documentation-only changes
 - `chore` - maintenance or tooling changes
 - `test` - test additions/updates
-
