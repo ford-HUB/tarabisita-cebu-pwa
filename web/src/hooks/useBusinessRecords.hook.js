@@ -14,6 +14,22 @@ const toDateLabel = (value) => {
   return parsedDate.toISOString().slice(0, 10)
 }
 
+/** Up to 3 unique image URLs for the Product column (summary image + line items). */
+const collectOrderRecordImages = (order) => {
+  const urls = []
+  const push = (raw) => {
+    const s = String(raw || '').trim()
+    if (!s || urls.includes(s)) return
+    urls.push(s)
+  }
+  push(order.productImage)
+  for (const li of order.lineItems || []) {
+    push(li?.image)
+    if (urls.length >= 3) break
+  }
+  return urls
+}
+
 export const useBusinessRecords = () => {
   const { resolvedOrders } = useCustomerOrders()
   const [currentPage, setCurrentPage] = useState(1)
@@ -43,6 +59,7 @@ export const useBusinessRecords = () => {
         id: order.orderCode || order.id,
         customer: order.customer || 'Unknown customer',
         product: order.productName || 'Unspecified order',
+        productImages: collectOrderRecordImages(order),
         total: order.total || 'PHP 0.00',
         items: Number.isFinite(Number(order.items)) ? Number(order.items) : 0,
         status: order.status === 'CANCELED' ? 'FAILED' : 'SUCCESS',

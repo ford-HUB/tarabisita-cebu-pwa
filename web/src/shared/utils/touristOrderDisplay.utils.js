@@ -1,17 +1,23 @@
 /** Matches server `CustomerOrder.status` (PLACED → PROCESSING → FINISHED / CANCELED). */
-export const touristCustomerOrderStatusLabel = (status) => {
-  switch (String(status || '').toUpperCase()) {
-    case 'PLACED':
-      return 'Waiting for approval'
-    case 'PROCESSING':
-      return 'Approved - waiting for payment'
-    case 'FINISHED':
-      return 'Completed'
-    case 'CANCELED':
-      return 'Canceled'
-    default:
-      return status ? String(status) : ''
+export const touristCustomerOrderStatusLabel = (status, orderType) => {
+  const s = String(status || '').toUpperCase()
+  const t = String(orderType || '').toUpperCase()
+
+  // Restaurant menu orders: show kitchen workflow (not resort payment workflow).
+  if (t === 'MENU_ORDER') {
+    if (s === 'PLACED') return 'Waiting to process'
+    if (s === 'PROCESSING') return 'Processing'
+    if (s === 'FINISHED') return 'Finished'
+    if (s === 'CANCELED') return 'Canceled'
+    return status ? String(status) : ''
   }
+
+  // Booking requests (resort/hotel) and legacy rows: keep existing wording.
+  if (s === 'PLACED') return 'Waiting for approval'
+  if (s === 'PROCESSING') return 'Approved - waiting for payment'
+  if (s === 'FINISHED') return 'Completed'
+  if (s === 'CANCELED') return 'Canceled'
+  return status ? String(status) : ''
 }
 
 export const touristCustomerOrderStatusBadgeClass = (status) => {

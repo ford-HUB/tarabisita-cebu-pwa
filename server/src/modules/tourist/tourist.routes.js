@@ -3,9 +3,11 @@ import touristCartItemRouter from './tourist-cart-item/tourist-cart-item.routes.
 import menuOrderCheckoutRoutes from './menu-order-checkout/menu-order-checkout.routes.js'
 import touristCustomerOrdersRoutes from './tourist-customer-orders/tourist-customer-orders.routes.js'
 import storeMessagingRoutes from './store-messaging/store-messaging.routes.js'
+import touristAccountRoutes from './tourist-account/tourist-account.routes.js'
 
 const touristRoutes = express.Router()
 
+touristRoutes.use('/account', touristAccountRoutes)
 touristRoutes.use('/', touristCartItemRouter)
 touristRoutes.use('/', menuOrderCheckoutRoutes)
 touristRoutes.use('/', touristCustomerOrdersRoutes)

@@ -11,8 +11,8 @@ import {
   FiPlus,
   FiSearch,
   FiShoppingBag,
+  FiShoppingCart,
   FiStar,
-  FiUser
 } from 'react-icons/fi'
 import { toast } from 'sonner'
 import {
@@ -692,7 +692,7 @@ const BusinessDetail = () => {
                     {cartCount ? 'Review payment and address' : 'Add items to continue'}
                   </button>
                   <p className="mt-2 inline-flex items-center gap-1 text-xs text-[#666]">
-                    <FiUser className="h-3.5 w-3.5" aria-hidden />
+                    <FiShoppingCart className="h-3.5 w-3.5" aria-hidden />
                     {cartCount} item{cartCount === 1 ? '' : 's'} in cart
                   </p>
                 </div>

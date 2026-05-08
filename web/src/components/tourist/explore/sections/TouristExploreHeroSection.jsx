@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import { categoryDisplayLabel } from '../../../../shared/utils/touristExplore.utils.js'
+import { categoryDisplayLabel, categoryMatchesLabel } from '../../../../shared/utils/touristExplore.utils.js'
 
 const cardImage = (business) => business?.banner || business?.coverImage || business?.logo || null
 
@@ -12,6 +12,7 @@ const HERO_CAROUSEL_NAV_BTN_CLASS =
 const HeroSlide = ({ business, userName, onOpen, padForDots }) => {
   const img = cardImage(business)
   const label = categoryDisplayLabel(business.category)
+  const isRestaurant = categoryMatchesLabel(business?.category, 'Restaurant')
 
   return (
     <div className="relative min-w-full shrink-0">
@@ -43,7 +44,7 @@ const HeroSlide = ({ business, userName, onOpen, padForDots }) => {
             onClick={() => onOpen(business)}
             className="rounded-full bg-[#ff7a1a] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#eb6c12]"
           >
-            View & book
+            {isRestaurant ? 'Visit & Order' : 'View & Book'}
           </button>
         </div>
       </div>

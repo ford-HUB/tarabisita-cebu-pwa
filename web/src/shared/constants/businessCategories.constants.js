@@ -1,7 +1,6 @@
 export const BUSINESS_CATEGORIES = [
   { value: 'RESTAURANT', label: 'Restaurant' },
-  { value: 'RESORT', label: 'Resort' },
-  { value: 'HOTEL', label: 'Hotel' }
+  { value: 'RESORT', label: 'Resort' }
 ]
 
 export const BUSINESS_CATEGORY_LABEL_BY_VALUE = BUSINESS_CATEGORIES.reduce((acc, item) => {

@@ -209,12 +209,9 @@ const getEnabledBusinessTouristPaymentMethods = (business) => {
 const ensureEnabledBusinessMethodsAreVerified = (paymentMethods = {}) => {
     for (const code of TOURIST_CHECKOUT_METHOD_CODES) {
         const row = paymentMethods?.[code] || {}
-        if (row.enabled !== false) {
-            const hasRequiredDetails = String(row.accountName || '').trim() && String(row.accountNumber || '').trim()
-            if (!hasRequiredDetails || !row.isVerified) {
-                throw new Error('PAYMENT_METHOD_REQUIRES_VERIFICATION')
-            }
-        }
+        // Tourist checkout uses Xendit invoice methods (no manual account credentials required).
+        // Only require verification when the business explicitly enables the method.
+        if (row.enabled === true && !row.isVerified) throw new Error('PAYMENT_METHOD_REQUIRES_VERIFICATION')
     }
 }
 
@@ -1589,7 +1586,6 @@ export const verifyBusinessPaymentMethodByUserId = async (userId, { methodCode, 
     })
     normalized.paymentMethods[code] = {
         ...normalized.paymentMethods[code],
-        enabled: false,
         accountName: String(accountName || '').trim().slice(0, 120),
         accountNumber: String(accountNumber || '').trim().slice(0, 120),
         isVerified: true,
@@ -2127,6 +2123,97 @@ const supportsPublicListingCatalog = (business) => {
     return normalized === 'restaurant' || normalized === 'resort' || normalized === 'hotel'
 }
 
+const STAY_CHECK_IN_NOTE_RE = /Check-in:\s*(\d{4}-\d{2}-\d{2})/i
+const STAY_CHECK_OUT_NOTE_RE = /Check-out:\s*(\d{4}-\d{2}-\d{2})/i
+
+const isIsoYmd = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())
+
+const addOneCalendarDayYmd = (ymd) => {
+    const [y, m, d] = String(ymd)
+        .split('-')
+        .map((x) => Number(x))
+    const dt = new Date(y, m - 1, d)
+    if (Number.isNaN(dt.getTime())) return ''
+    dt.setDate(dt.getDate() + 1)
+    const yy = dt.getFullYear()
+    const mm = String(dt.getMonth() + 1).padStart(2, '0')
+    const dd = String(dt.getDate()).padStart(2, '0')
+    return `${yy}-${mm}-${dd}`
+}
+
+/** Nights [check-in, check-out) parsed from tourist stay booking notes. */
+export const expandStayOccupiedNightsFromNotes = (notes) => {
+    const text = String(notes || '')
+    const checkIn = text.match(STAY_CHECK_IN_NOTE_RE)?.[1]?.trim() || ''
+    const checkOut = text.match(STAY_CHECK_OUT_NOTE_RE)?.[1]?.trim() || ''
+    if (!isIsoYmd(checkIn) || !isIsoYmd(checkOut) || checkOut <= checkIn) return []
+    const nights = []
+    let d = checkIn
+    while (d < checkOut) {
+        nights.push(d)
+        d = addOneCalendarDayYmd(d)
+        if (!d || nights.length > 400) break
+    }
+    return nights
+}
+
+const stayOccupancyKey = (businessId, menuItemId) => `${String(businessId)}:${String(menuItemId)}`
+
+const accumulateStayOrderIntoOccupancyMap = (map, order) => {
+    const businessId = order?.businessId != null ? String(order.businessId) : ''
+    const line = Array.isArray(order?.lineItems) ? order.lineItems[0] : null
+    const menuItemId = line?.menuItemId != null ? String(line.menuItemId) : ''
+    if (!businessId || !menuItemId) return
+    const nights = expandStayOccupiedNightsFromNotes(order.notes)
+    if (!nights.length) return
+    const key = stayOccupancyKey(businessId, menuItemId)
+    if (!map.has(key)) map.set(key, new Set())
+    const set = map.get(key)
+    for (const night of nights) set.add(night)
+}
+
+export const buildStayOccupancyMapFromOrders = (orders) => {
+    const map = new Map()
+    for (const order of orders || []) {
+        accumulateStayOrderIntoOccupancyMap(map, order)
+    }
+    return map
+}
+
+const fetchActiveStayBookingOrdersForBusinesses = async (businessIds) => {
+    const ids = (businessIds || [])
+        .map((id) => (id?.toString?.() ? id.toString() : String(id)))
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    if (!ids.length) return []
+    const objectIds = ids.map((id) => new mongoose.Types.ObjectId(id))
+    return CustomerOrder.find({
+        businessId: { $in: objectIds },
+        orderType: 'BOOKING_REQUEST',
+        // Only treat confirmed rows as occupied.
+        // `PLACED` = waiting for approval; `PROCESSING` = approved but pending payment.
+        // Both should remain bookable until the stay is confirmed (`FINISHED`).
+        status: 'FINISHED'
+    })
+        .select({ businessId: 1, notes: 1, lineItems: 1 })
+        .lean()
+}
+
+/** Attach per-menu-item occupied night list for resort/hotel public catalog (from non-canceled booking requests). */
+export const attachStayOccupancyToPublicMenuItems = async (business, menuItems) => {
+    if (!business || !Array.isArray(menuItems) || !menuItems.length) return menuItems
+    const cat = String(business?.category?.name || '').trim().toLowerCase()
+    if (cat !== 'resort' && cat !== 'hotel') return menuItems
+    const orders = await fetchActiveStayBookingOrdersForBusinesses([business._id])
+    const occMap = buildStayOccupancyMapFromOrders(orders)
+    const bid = String(business._id)
+    return menuItems.map((item) => {
+        const key = stayOccupancyKey(bid, item.id)
+        const set = occMap.get(key)
+        const occupiedDates = set ? [...set].sort() : []
+        return { ...item, occupiedDates }
+    })
+}
+
 /**
  * Public menu feed for verified businesses that support the public menu catalog. Only items that are not deleted,
  * `isAvailable` is true, and `stockStatus` is not OUT_OF_STOCK.
@@ -2167,13 +2254,33 @@ export const listPublicMenuFeedItems = async ({ menuCategory = 'ALL' } = {}) => 
         return normMenuCategory(label) === filterNorm
     })
 
+    const resortBusinessIds = [
+        ...new Set(
+            filtered
+                .filter(({ business }) => {
+                    const n = String(business?.category?.name || '').trim().toLowerCase()
+                    return n === 'resort' || n === 'hotel'
+                })
+                .map(({ business }) => business._id)
+        )
+    ]
+    const stayOrders = await fetchActiveStayBookingOrdersForBusinesses(resortBusinessIds)
+    const stayOccMap = buildStayOccupancyMapFromOrders(stayOrders)
+
     const items = filtered
-        .map(({ business, raw }) => ({
-            ...extractMenuItem(raw),
-            businessId: String(business._id),
-            businessName: business.name || 'Business',
-            businessLogo: business.logo || null
-        }))
+        .map(({ business, raw }) => {
+            const base = {
+                ...extractMenuItem(raw),
+                businessId: String(business._id),
+                businessName: business.name || 'Business',
+                businessLogo: business.logo || null
+            }
+            const n = String(business?.category?.name || '').trim().toLowerCase()
+            if (n !== 'resort' && n !== 'hotel') return base
+            const key = stayOccupancyKey(String(business._id), String(raw._id))
+            const set = stayOccMap.get(key)
+            return { ...base, occupiedDates: set ? [...set].sort() : [] }
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
     const categories = Array.from(categoryLabels).sort((a, b) =>
@@ -2566,6 +2673,19 @@ const buildTouristBookingApprovedEmailHtml = ({
         hasPayUrl: Boolean(payUrl)
     })
 
+const buildTouristBookingAutoCanceledEmailHtml = ({
+    touristName,
+    businessName,
+    packageName,
+    checkInLabel
+}) =>
+    templateReader('tourist-booking-auto-canceled', {
+        touristName: touristName || 'Tourist',
+        businessName: businessName || 'Resort',
+        packageName: packageName || 'Stay package',
+        checkInLabel: checkInLabel || ''
+    })
+
 const BOOKING_PAYMENT_LINK_TTL_MS = 24 * 60 * 60 * 1000
 
 const buildTouristBookingPaymentUrlFromToken = ({ paymentToken }) => {
@@ -2932,7 +3052,6 @@ const tryFulfillBusinessPaymentMethodVerificationFromWebhook = async (payload = 
     const now = new Date()
     settings.paymentMethods[methodCode] = {
         ...settings.paymentMethods[methodCode],
-        enabled: false,
         isVerified: true,
         verifiedAt: now
     }
@@ -3540,6 +3659,101 @@ const extractEmailFromText = (text) => {
     return match?.[0] ? String(match[0]).trim() : ''
 }
 
+const STAY_CHECK_IN_LABEL_RE = /Check-in:\s*([^\n]+)/i
+
+const extractStayCheckInLabelFromNotes = (notes) => {
+    const text = String(notes || '')
+    const match = text.match(STAY_CHECK_IN_LABEL_RE)?.[1]
+    return match ? String(match).trim() : ''
+}
+
+const resolveBookingPackageName = (order) => {
+    const line = Array.isArray(order?.lineItems) ? order.lineItems[0] : null
+    const fromLine = String(line?.name || '').trim()
+    if (fromLine) return fromLine
+    const fromProductName = String(order?.productName || '').trim()
+    if (fromProductName) return fromProductName
+    return 'Stay package'
+}
+
+const cancelConflictingPendingStayBookingRequests = async ({ approvedOrder, business }) => {
+    const order = approvedOrder
+    if (!order || !business) return { canceledCount: 0 }
+    const normalizedBusinessCategory = String(business?.category?.name || '')
+        .trim()
+        .toUpperCase()
+    const isStayBusiness = normalizedBusinessCategory === 'RESORT' || normalizedBusinessCategory === 'HOTEL'
+    if (!isStayBusiness) return { canceledCount: 0 }
+    if (String(order?.orderType || '').toUpperCase() !== 'BOOKING_REQUEST') return { canceledCount: 0 }
+    if (String(order?.status || '').toUpperCase() !== 'PROCESSING') return { canceledCount: 0 }
+
+    const approvedLine = Array.isArray(order?.lineItems) ? order.lineItems[0] : null
+    const approvedMenuItemId = String(approvedLine?.menuItemId || '').trim()
+    if (!approvedMenuItemId) return { canceledCount: 0 }
+
+    const approvedNights = expandStayOccupiedNightsFromNotes(order.notes)
+    if (!approvedNights.length) return { canceledCount: 0 }
+    const approvedNightSet = new Set(approvedNights)
+
+    const candidates = await CustomerOrder.find({
+        businessId: business._id,
+        orderType: 'BOOKING_REQUEST',
+        status: 'PLACED',
+        _id: { $ne: order._id },
+        'lineItems.0.menuItemId': approvedMenuItemId
+    })
+        .select({ _id: 1, placedByUserId: 1, notes: 1, productName: 1, productDetails: 1, lineItems: 1, orderCode: 1 })
+        .lean()
+
+    if (!candidates.length) return { canceledCount: 0 }
+
+    const cancellable = []
+    for (const row of candidates) {
+        const nights = expandStayOccupiedNightsFromNotes(row.notes)
+        if (!nights.length) continue
+        if (nights.some((d) => approvedNightSet.has(d))) {
+            cancellable.push(row)
+        }
+    }
+    if (!cancellable.length) return { canceledCount: 0 }
+
+    let canceledCount = 0
+    const cancelReason = 'Auto-canceled: requested stay schedule is already occupied by another booking.'
+    const packageName = resolveBookingPackageName(order)
+
+    for (const row of cancellable) {
+        const updated = await CustomerOrder.updateOne(
+            { _id: row._id, status: 'PLACED' },
+            { $set: { status: 'CANCELED', cancelReason } }
+        )
+        if ((updated?.modifiedCount || 0) < 1) continue
+        canceledCount += 1
+
+        try {
+            const tourist = row.placedByUserId ? await User.findById(row.placedByUserId).select('name email') : null
+            const fallbackEmail = extractEmailFromText(row.notes) || extractEmailFromText(row.productDetails)
+            const recipientEmail = String(tourist?.email || fallbackEmail || '').trim()
+            if (!recipientEmail) continue
+            const checkInLabel = extractStayCheckInLabelFromNotes(row.notes)
+            const html = buildTouristBookingAutoCanceledEmailHtml({
+                touristName: tourist?.name || '',
+                businessName: business?.name || 'Resort',
+                packageName,
+                checkInLabel
+            })
+            await sendMailer(recipientEmail, '[TaraBisita] Booking request cancelled - schedule occupied', html)
+        } catch (err) {
+            console.warn('[BookingAutoCancelEmail] failed', {
+                orderId: String(row?._id || ''),
+                orderCode: String(row?.orderCode || ''),
+                message: err?.message || String(err || '')
+            })
+        }
+    }
+
+    return { canceledCount }
+}
+
 export const advanceMyCustomerOrderStatusByUserId = async (userId, orderId, options = {}) => {
     const forceBookingApprovalEmail = Boolean(options?.forceBookingApprovalEmail)
     const business = await findBusinessByUserId(userId)
@@ -3569,6 +3783,12 @@ export const advanceMyCustomerOrderStatusByUserId = async (userId, orderId, opti
         forceBookingApprovalEmail ||
         String(order.orderType || '').toUpperCase() === 'BOOKING_REQUEST' ||
         (isStayBusiness && order.status === 'PROCESSING')
+
+    if (order.status === 'PROCESSING' && isBookingRequestOrder) {
+        await cancelConflictingPendingStayBookingRequests({ approvedOrder: order, business }).catch((err) =>
+            console.warn('[BookingAutoCancel] failed', { orderId: String(order?._id || ''), message: err?.message || String(err || '') })
+        )
+    }
 
     if (order.status === 'PROCESSING' && isBookingRequestOrder) {
         const tourist = order.placedByUserId ? await User.findById(order.placedByUserId).select('name email') : null

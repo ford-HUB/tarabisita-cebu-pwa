@@ -1,7 +1,5 @@
-import { Link } from 'react-router-dom'
 import { useTouristRestaurantCheckout } from '../../../hooks/useTouristRestaurantCheckout.hook.js'
 import TouristCheckoutCartSection from '../../../components/tourist/checkout/sections/TouristCheckoutCartSection.jsx'
-import { touristCheckoutHref } from '../../../components/layout/tourist/touristLayout.constants.js'
 
 const RestaurantCart = () => {
   const {
@@ -13,7 +11,9 @@ const RestaurantCart = () => {
     removeItem,
     isItemSelected,
     toggleItemSelected,
-    goExplore
+    goExplore,
+    proceedFromCart,
+    isProceedingFromCart
   } = useTouristRestaurantCheckout()
 
   if (!items.length) {
@@ -60,12 +60,14 @@ const RestaurantCart = () => {
           Continue shopping
         </button>
         {selectedCount > 0 ? (
-          <Link
-            to={touristCheckoutHref}
-            className="inline-flex items-center justify-center rounded-full bg-[#1f1f1f] px-6 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-black"
+          <button
+            type="button"
+            onClick={() => void proceedFromCart()}
+            disabled={isProceedingFromCart}
+            className="inline-flex items-center justify-center rounded-full bg-[#1f1f1f] px-6 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-70"
           >
-            Proceed to checkout
-          </Link>
+            {isProceedingFromCart ? 'Loading…' : 'Proceed to checkout'}
+          </button>
         ) : (
           <span className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-[#ece3d9] px-6 py-2.5 text-center text-sm font-semibold text-[#6b6b6b]">
             Select at least one item

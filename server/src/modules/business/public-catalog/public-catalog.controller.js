@@ -1,5 +1,6 @@
 import Business from '../models/business.model.js'
 import {
+    attachStayOccupancyToPublicMenuItems,
     incrementPublicBusinessProfileViewCount,
     listPublicMenuItemsFromBusinessDoc,
     listPublicMenuFeedItems,
@@ -30,12 +31,14 @@ const TOURIST_CHECKOUT_METHOD_CODES = ['GCASH', 'MAYA', 'GRAB_PAY', 'CARD']
 const resolveAvailableTouristPaymentMethods = (business) => {
     const paymentMethods = business?.settings?.paymentMethods || {}
     return TOURIST_CHECKOUT_METHOD_CODES.filter(
-        (code) => paymentMethods?.[code]?.enabled !== false && Boolean(paymentMethods?.[code]?.isVerified)
+        (code) => paymentMethods?.[code]?.enabled === true && Boolean(paymentMethods?.[code]?.isVerified)
     )
 }
 
 export const getPublicMenuFeed = async (req, res) => {
     try {
+        // Public catalog items include computed occupancy; prevent stale client/browser caches.
+        res.set('Cache-Control', 'no-store')
         const menuCategory =
             req.query.menuCategory != null && String(req.query.menuCategory).trim() !== ''
                 ? String(req.query.menuCategory).trim()
@@ -180,6 +183,8 @@ export const recordPublicBusinessView = async (req, res) => {
 
 export const getBusinessById = async (req, res) => {
     try {
+        // Public business payload includes computed stay occupancy; prevent stale client/browser caches.
+        res.set('Cache-Control', 'no-store')
         const { businessId } = req.params
         const business = await Business.findById(businessId).populate('category')
 
@@ -194,7 +199,10 @@ export const getBusinessById = async (req, res) => {
             return res.status(403).json({ message: 'Business is not yet publicly available' })
         }
 
-        const menuItems = listPublicMenuItemsFromBusinessDoc(business)
+        const menuItems = await attachStayOccupancyToPublicMenuItems(
+            business,
+            listPublicMenuItemsFromBusinessDoc(business)
+        )
 
         return res.status(200).json({
             data: {

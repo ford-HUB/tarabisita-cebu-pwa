@@ -1,3 +1,36 @@
+const ProductCell = ({ images, label }) => {
+  const hasImages = Array.isArray(images) && images.length > 0
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {hasImages ? (
+        <div className="flex shrink-0 items-center">
+          {images.map((src, index) => (
+            <img
+              key={`${src}-${index}`}
+              src={src}
+              alt={index === 0 ? label : ''}
+              className={`relative h-8 w-8 rounded-md border-2 border-white object-cover shadow-sm ${
+                index > 0 ? '-ml-2' : ''
+              }`}
+              style={{ zIndex: images.length - index }}
+              onError={(e) => {
+                e.currentTarget.remove()
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          className="h-8 w-8 shrink-0 rounded-md bg-[#f0e8de]"
+          aria-hidden
+        />
+      )}
+      <p className="min-w-0 font-medium leading-snug text-[#2f2f2f]">{label}</p>
+    </div>
+  )
+}
+
 const RecordsTableSection = ({ orders }) => {
   return (
     <div className="mt-3 overflow-x-auto">
@@ -23,7 +56,7 @@ const RecordsTableSection = ({ orders }) => {
               >
                 <p className="font-semibold text-[#7d5b3b]">{order.id}</p>
                 <p className="font-medium text-[#2f2f2f]">{order.customer}</p>
-                <p className="font-medium text-[#2f2f2f]">{order.product}</p>
+                <ProductCell images={order.productImages} label={order.product} />
                 <p className="font-semibold text-[#9b5a2c]">{order.total}</p>
                 <p>{order.items}</p>
                 <span
