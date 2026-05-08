@@ -416,17 +416,6 @@ const Reservations = () => {
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  void openBookingConversation(reviewingBooking)
-                }}
-                disabled={messagingBookingId === String(reviewingBooking.id || '')}
-                className="inline-flex items-center gap-1.5 rounded-full border border-[#d4c4b6] bg-white px-4 py-2 text-xs font-semibold text-[#8a4a33] transition hover:border-[#c3b1a1] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <FiMessageCircle size={14} />
-                {messagingBookingId === String(reviewingBooking.id || '') ? 'Opening...' : 'Message Tourist'}
-              </button>
-              <button
-                type="button"
                 onClick={() => setReviewingBookingId('')}
                 className="rounded-full border border-[#e7dfd5] bg-white px-4 py-2 text-xs font-semibold text-[#8a4a33] transition hover:border-[#d4c4b6]"
               >
