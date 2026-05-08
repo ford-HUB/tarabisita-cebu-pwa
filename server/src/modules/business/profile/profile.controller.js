@@ -19,6 +19,13 @@ import { appendActivityLog } from '../../../shared/utils/business-controller.hel
 export const getMyBusinessSettings = async (req, res) => {
     try {
         const settings = await getBusinessSettingsByUserId(req.user._id)
+        // Settings drives payment-method verification gating; never serve cached/stale responses.
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+            'Surrogate-Control': 'no-store'
+        })
         return res.status(200).json({ data: settings })
     } catch (error) {
         if (error.message === 'BUSINESS_NOT_FOUND') {
