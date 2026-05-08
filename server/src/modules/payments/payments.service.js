@@ -6,6 +6,7 @@ import BusinessSubscription from '../business/billing/models/business-subscripti
 import User from '../auth/models/user.model.js'
 import ActivityLog from '../auth/models/activity-log.model.js'
 import XenditWebhookEvent from './models/xendit-webhook-event.model.js'
+import BusinessPaymentMethodSetup from './models/business-payment-method-setup.model.js'
 import cloudinary from '../../configs/cloudinary.js'
 import bcrypt from 'bcrypt'
 import { sendMailer } from '../auth/auth.service.js'
@@ -736,7 +737,13 @@ const resolveWebhookEventName = (payload = {}, headers = {}) =>
     ).toUpperCase()
 
 const resolveWebhookStatus = (payload = {}) => {
-    const xenditStatus = String(payload?.status || payload?.invoice_status || '').toUpperCase()
+    const xenditStatus = String(
+        payload?.status ||
+            payload?.invoice_status ||
+            payload?.data?.status ||
+            payload?.data?.invoice_status ||
+            ''
+    ).toUpperCase()
     if (xenditStatus) {
         return xenditStatus
     }
@@ -1669,6 +1676,28 @@ export const createBusinessPaymentMethodSetupCheckoutByUserId = async (
     if (!response.ok || !checkoutUrl) {
         const upstreamMessage = jsonResponse?.message || jsonResponse?.error_code || responseText || 'Unknown Xendit upstream error'
         throw new Error(`Xendit invoice create failed (${response.status}): ${upstreamMessage}`)
+    }
+
+    // Persist mapping so we can verify from webhook even when Xendit doesn't send invoice metadata.
+    try {
+        await BusinessPaymentMethodSetup.create({
+            businessId: business._id,
+            methodCode: code,
+            externalId: payload.external_id,
+            checkoutId,
+            status: 'PENDING'
+        })
+    } catch (err) {
+        // If externalId already exists, keep the latest checkoutId for the mapping.
+        try {
+            await BusinessPaymentMethodSetup.updateOne(
+                { externalId: payload.external_id },
+                { $set: { businessId: business._id, methodCode: code, checkoutId } },
+                { upsert: true }
+            )
+        } catch (e2) {
+            console.error('Failed to persist payment method setup mapping', e2?.message || e2)
+        }
     }
 
     return {
@@ -2697,8 +2726,16 @@ const pickXenditDirectEwalletCheckoutUrl = (invoiceResponse, wantedMethod) => {
 }
 
 const extractCheckoutSessionMetadata = (payload = {}) => {
+    // Xendit invoice webhooks: metadata is commonly on `payload.data.metadata` (or sometimes root).
+    if (payload?.data?.metadata && typeof payload.data.metadata === 'object') {
+        return payload.data.metadata
+    }
     if (payload?.metadata && typeof payload.metadata === 'object') {
         return payload.metadata
+    }
+    const xenditDataAttrs = payload?.data?.attributes
+    if (xenditDataAttrs?.metadata && typeof xenditDataAttrs.metadata === 'object') {
+        return xenditDataAttrs.metadata
     }
     const inner = payload?.data?.attributes?.data?.attributes
     const meta = inner?.metadata
@@ -2845,20 +2882,43 @@ export const tryFulfillTouristMenuOrderCheckoutFromWebhook = async (payload = {}
 const tryFulfillBusinessPaymentMethodVerificationFromWebhook = async (payload = {}, headers = {}) => {
     const meta = extractCheckoutSessionMetadata(payload)
     const kind = String(meta.tbPendingCheckoutKind || '').trim()
-    if (kind !== 'business_payment_method_verification') {
-        return { handled: false, businessPaymentMethodSetupSynced: false }
-    }
-    const businessId = String(meta.businessId || '').trim()
-    const methodCode = String(meta.methodCode || '').trim().toUpperCase()
-    if (!mongoose.Types.ObjectId.isValid(businessId) || !TOURIST_CHECKOUT_METHOD_CODES.includes(methodCode)) {
-        return { handled: true, businessPaymentMethodSetupSynced: true, applied: false, reason: 'INVALID_SETUP_METADATA' }
-    }
-
     const eventName = resolveWebhookEventName(payload, headers)
     const payStatus = resolveWebhookStatus(payload)
     const mapped = mapWebhookToSetupStatus({ eventName, status: payStatus })
     if (mapped !== 'SUCCESS') {
+        // Not our concern unless it was intended for setup verification.
+        if (kind !== 'business_payment_method_verification') {
+            return { handled: false, businessPaymentMethodSetupSynced: false }
+        }
         return { handled: true, businessPaymentMethodSetupSynced: true, applied: false, reason: 'SETUP_NOT_SUCCESS' }
+    }
+
+    // Preferred path: webhook includes our metadata.
+    let businessId = String(meta.businessId || '').trim()
+    let methodCode = String(meta.methodCode || '').trim().toUpperCase()
+
+    // Fallback: some Xendit webhook payloads omit metadata entirely.
+    if (kind !== 'business_payment_method_verification' || !mongoose.Types.ObjectId.isValid(businessId)) {
+        const reference = String(payload?.external_id || resolveWebhookReferenceNumber(payload) || '').trim()
+        const paymentId = String(payload?.id || resolveWebhookPaymentId(payload) || '').trim()
+        if (!reference.startsWith('TBPMV') && !paymentId) {
+            return { handled: false, businessPaymentMethodSetupSynced: false }
+        }
+        const setup = await BusinessPaymentMethodSetup.findOne({
+            $or: [
+                ...(reference ? [{ externalId: reference }] : []),
+                ...(paymentId ? [{ checkoutId: paymentId }] : [])
+            ]
+        }).sort({ createdAt: -1 })
+        if (!setup) {
+            return { handled: true, businessPaymentMethodSetupSynced: true, applied: false, reason: 'SETUP_SESSION_NOT_FOUND' }
+        }
+        businessId = String(setup.businessId || '').trim()
+        methodCode = String(setup.methodCode || '').trim().toUpperCase()
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(businessId) || !TOURIST_CHECKOUT_METHOD_CODES.includes(methodCode)) {
+        return { handled: true, businessPaymentMethodSetupSynced: true, applied: false, reason: 'INVALID_SETUP_METADATA' }
     }
 
     const business = await Business.findById(businessId)
@@ -2885,6 +2945,23 @@ const tryFulfillBusinessPaymentMethodVerificationFromWebhook = async (payload = 
             }
         }
     )
+
+    // Best-effort: mark setup row as applied.
+    try {
+        const reference = String(payload?.external_id || resolveWebhookReferenceNumber(payload) || '').trim()
+        const paymentId = String(payload?.id || resolveWebhookPaymentId(payload) || '').trim()
+        const query = reference ? { externalId: reference } : paymentId ? { checkoutId: paymentId } : null
+        if (query) {
+            await BusinessPaymentMethodSetup.updateOne(query, {
+                $set: {
+                    status: 'PAID',
+                    verifiedAppliedAt: now
+                }
+            })
+        }
+    } catch {
+        // ignore
+    }
     return { handled: true, businessPaymentMethodSetupSynced: true, applied: true, reason: 'BUSINESS_PAYMENT_METHOD_VERIFIED' }
 }
 
