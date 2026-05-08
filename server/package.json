@@ -9,6 +9,7 @@
     "build": "node src/server.js",
     "seed:admin": "node src/migrations/seed-admin.js",
     "seed:restaurant-menu": "node src/migrations/seed-restaurant-menu.js",
+    "seed:resort-business": "node src/migrations/seed-resort-business.js",
     "migrate:customer-orders-collection": "node src/migrations/rename-customer-orders-collection.js",
     "migrate:tourist-cart-collection": "node src/migrations/rename-tourist-cart-collection.js",
     "migrate:remove-business-theme-color": "node src/migrations/remove-business-theme-color.js"

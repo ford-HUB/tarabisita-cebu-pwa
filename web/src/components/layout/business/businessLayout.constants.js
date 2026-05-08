@@ -6,6 +6,7 @@ import {
   FiDatabase,
   FiGrid,
   FiMessageSquare,
+  FiSettings,
   FiShield,
   FiUser
 } from 'react-icons/fi'
@@ -19,6 +20,7 @@ export const buildBusinessStoreMessagingThreadHref = (conversationId) => {
 }
 
 export const businessOrdersHref = `/${toEncryptedRoute('business/dashboard/orders')}`
+export const businessBookingRequestsHref = `/${toEncryptedRoute('business/dashboard/booking-requests')}`
 
 /** Deep link to Orders with optional `o` = customer order id (opens details when the board loads). */
 export const buildBusinessOrderDeepLinkHref = (orderId) => {
@@ -29,6 +31,10 @@ export const buildBusinessOrderDeepLinkHref = (orderId) => {
 export const businessChatHubHref = `/${toEncryptedRoute('business/dashboard/chat')}`
 
 export const businessNotificationsHref = `/${toEncryptedRoute('business/dashboard/notifications')}`
+export const businessSettingsHref = `/${toEncryptedRoute('business/dashboard/settings')}`
+export const businessPaymentMethodsHref = `/${toEncryptedRoute('business/dashboard/payment-methods')}`
+export const businessRecordsHref = `/${toEncryptedRoute('business/dashboard/records')}`
+export const businessBookingsRecordsHref = `/${toEncryptedRoute('business/dashboard/bookings-records')}`
 
 export const businessDashboardHref = `/${toEncryptedRoute('business/dashboard')}`
 
@@ -36,9 +42,11 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
   const categoryLabel = getBusinessCategoryLabel(businessCategory)
   const baseBusinessPath = `/${toEncryptedRoute('business/dashboard')}`
   const normalizedCategory = String(businessCategory || '').trim().toUpperCase()
-  const addItemLabel = normalizedCategory === 'RESTAURANT' ? 'Menus' : 'Products'
+  const isAccommodationBusiness = normalizedCategory === 'RESORT' || normalizedCategory === 'HOTEL'
+  const addItemLabel = normalizedCategory === 'RESTAURANT' ? 'Menus' : isAccommodationBusiness ? 'Manage' : 'Products'
   const addItemPath = `/${toEncryptedRoute('business/dashboard/menu')}`
   const ordersPath = `/${toEncryptedRoute('business/dashboard/orders')}`
+  const reservationsPath = `/${toEncryptedRoute('business/dashboard/reservations')}`
   const todaysRecordPath = `/${toEncryptedRoute('business/dashboard/todays-record')}`
   const yourBusinessChildren =
     normalizedCategory === 'RESTAURANT'
@@ -51,7 +59,10 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
       : [
           { label: 'Interface', path: `/${toEncryptedRoute('business/dashboard/interface')}` },
           { label: addItemLabel, path: addItemPath },
-          'Product List'
+          {
+            label: 'Booking Requests',
+            path: `/${toEncryptedRoute('business/dashboard/booking-requests')}`
+          }
         ]
   const profilePath = `/${toEncryptedRoute('business/dashboard/profile')}`
 
@@ -68,9 +79,9 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
       ? []
       : [
           {
-            label: 'Bookings',
+            label: 'Reservations',
             icon: FiClipboard,
-            path: ordersPath
+            path: reservationsPath
           }
         ]),
     { type: 'section', label: 'Support' },
@@ -85,9 +96,19 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
       path: `/${toEncryptedRoute('business/dashboard/billing')}`
     },
     {
-      label: 'Order Records',
+      label: normalizedCategory === 'RESTAURANT' ? 'Order Records' : 'Bookings Record',
       icon: FiDatabase,
-      path: `/${toEncryptedRoute('business/dashboard/records')}`
+      path: normalizedCategory === 'RESTAURANT' ? businessRecordsHref : businessBookingsRecordsHref
+    },
+    {
+      label: 'Payment Methods',
+      icon: FiCreditCard,
+      path: businessPaymentMethodsHref
+    },
+    {
+      label: 'Settings',
+      icon: FiSettings,
+      path: businessSettingsHref
     },
     { type: 'section', label: 'Other' },
     {

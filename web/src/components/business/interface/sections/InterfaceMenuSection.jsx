@@ -18,10 +18,21 @@ const InterfaceMenuSection = ({
   getCardClassName,
   menuItems,
   isLoadingMenuItems,
-  menuCategories
+  menuCategories,
+  bannerUrl,
+  businessNameInput,
+  businessDescriptionInput,
+  logoUrl,
+  isResort = false,
+  resortSpotlightImage,
+  resortGalleryImages = [],
+  handleResortSpotlightChange,
+  handleResortGalleryAdd,
+  handleResortGalleryReplace
 }) => {
   const [menuSearch, setMenuSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('ALL')
+  const [isShowingAllPackages, setIsShowingAllPackages] = useState(false)
   const isRestaurant = categoryLabel === 'Restaurant'
 
   const filteredItems = useMemo(() => {
@@ -48,6 +59,13 @@ const InterfaceMenuSection = ({
     })
     return Array.from(buckets.entries()).sort(([a], [b]) => a.localeCompare(b))
   }, [filteredItems])
+
+  const featuredResortImage =
+    bannerUrl ||
+    resortSpotlightImage ||
+    resortGalleryImages[0] ||
+    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&q=80&auto=format&fit=crop'
+  const visiblePackageItems = isShowingAllPackages ? menuItems : menuItems.slice(0, 3)
 
   return (
     <section className="rounded-2xl border border-[#e7ddd2] bg-[#faf7f2] p-6 shadow-sm">
@@ -159,6 +177,117 @@ const InterfaceMenuSection = ({
               ))
             )}
           </div>
+        </div>
+      ) : isResort ? (
+        <div className="space-y-5">
+          <article className="overflow-hidden rounded-2xl border border-[#ecdfd1] bg-white">
+            <div className="relative h-56 md:h-72">
+              <img src={featuredResortImage} alt="Resort hero" className="h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-linear-to-t from-black/45 via-black/10 to-transparent" />
+              <div className="absolute right-3 top-3">
+                <label className="inline-flex cursor-pointer items-center rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-[#2f2f2f] shadow-sm">
+                  Replace hero image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleResortSpotlightChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              <div className="absolute bottom-4 left-4 right-4 text-white">
+                <h3 className="text-3xl font-semibold leading-none md:text-4xl">
+                  {String(businessNameInput || 'Peaceful Paradise').toUpperCase()}
+                </h3>
+                <p className="mt-2 text-xs md:text-sm">{businessDescriptionInput || 'Discover your resort highlights and amenities.'}</p>
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-[#ecdfd1] bg-white p-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-base font-semibold text-[#2f2f2f]">Our Packages</h4>
+              <button
+                type="button"
+                onClick={() => setIsShowingAllPackages((value) => !value)}
+                className="text-xs font-medium text-[#6f665d] hover:underline"
+              >
+                {isShowingAllPackages ? 'View less' : 'View all'}
+              </button>
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              {menuItems.length === 0 ? (
+                <div className="md:col-span-3 rounded-xl border border-dashed border-[#e9dfd2] bg-[#fffaf4] p-5 text-center text-sm text-[#8b7f73]">
+                  No packages yet. Add listings in Manage to display them here.
+                </div>
+              ) : (
+                visiblePackageItems.map((item) => (
+                  <article
+                    key={item.id || item._id || item.name}
+                    className="overflow-hidden rounded-xl border border-[#efe5d9] bg-[#fcf8f2]"
+                  >
+                    {item.images?.[0] ? (
+                      <img
+                        src={item.images[0]}
+                        alt={item.name || 'Package'}
+                        className="h-28 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-28 w-full bg-linear-to-r from-[#d5e5f8] via-[#e7d9c8] to-[#c6dcc6]" />
+                    )}
+                    <div className="p-3">
+                      <p className="text-sm font-medium text-[#2f2f2f]">{item.name || 'Untitled package'}</p>
+                      <p className="mt-1 line-clamp-2 text-xs text-[#7c736a]">
+                        {item.description || 'No package description yet.'}
+                      </p>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+
+            <div className="mt-5 border-t border-[#efe5d9] pt-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h5 className="text-sm font-semibold text-[#2f2f2f]">Gallery Photos</h5>
+                <label className="inline-flex cursor-pointer items-center rounded-full border border-[#e7dacd] bg-[#fff7ef] px-3 py-1.5 text-xs font-medium text-[#7d5b3b]">
+                  Add photos
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleResortGalleryAdd}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              {resortGalleryImages.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-[#e9dfd2] bg-[#fffaf4] p-5 text-center text-sm text-[#8b7f73]">
+                  Upload resort photos to show in your interface gallery.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  {resortGalleryImages.map((image, index) => (
+                    <div key={`resort-gallery-${index}`} className="group relative overflow-hidden rounded-lg">
+                      <img
+                        src={image}
+                        alt={`Resort gallery ${index + 1}`}
+                        className="h-28 w-full object-cover md:h-32"
+                      />
+                      <label className="absolute bottom-2 right-2 hidden cursor-pointer rounded-full bg-white/90 px-2 py-1 text-[10px] font-medium text-[#2f2f2f] shadow-sm group-hover:inline-flex">
+                        Replace
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) => handleResortGalleryReplace(event, index)}
+                        />
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </article>
         </div>
       ) : (
         <div className={cardListClassName}>

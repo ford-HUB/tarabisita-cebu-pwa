@@ -28,6 +28,8 @@ export const buildTouristExploreReorderHref = (businessId, menuItemId) => {
 }
 export const touristCartHref = `/${toEncryptedRoute('tourist/explore/cart')}`
 export const touristCheckoutHref = `/${toEncryptedRoute('tourist/explore/checkout')}`
+export const touristStayBookingHref = `/${toEncryptedRoute('tourist/explore/stay-booking')}`
+export const touristBookingPaymentHref = `/${toEncryptedRoute('tourist/booking-payment')}`
 export const touristOrdersHref = `/${toEncryptedRoute('tourist/orders')}`
 export const touristHistoryHref = `/${toEncryptedRoute('tourist/history')}`
 export const touristMessagesHref = `/${toEncryptedRoute('tourist/messages')}`

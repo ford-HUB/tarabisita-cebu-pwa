@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fi'
 import {
   touristExploreHref,
+  buildTouristExploreBusinessDetailHref,
   buildTouristExploreReorderHref,
   buildTouristStoreMessagingHref
 } from '../../../layout/tourist/touristLayout.constants'
@@ -20,6 +21,21 @@ const formatLineUnitPhp = (n) => {
   const num = Number(n)
   if (!Number.isFinite(num) || num <= 0) return null
   return `₱${num.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+const readBookingDateWindow = (order) => {
+  const text = `${String(order?.detailPreview || '')}\n${String(order?.title || '')}`
+  const checkIn = text.match(/Check-in:\s*([^\n]+)/i)?.[1]?.trim() || ''
+  const checkOut = text.match(/Check-out:\s*([^\n]+)/i)?.[1]?.trim() || ''
+  if (!checkIn && !checkOut) return ''
+  return `${checkIn || '--'} to ${checkOut || '--'}`
+}
+
+const isResortBookingOrder = (order) => {
+  const orderType = String(order?.orderType || '').toUpperCase()
+  if (orderType === 'BOOKING_REQUEST') return true
+  const text = `${String(order?.detailPreview || '')}\n${String(order?.title || '')}\n${String(order?.billingType || '')}`
+  return /(check-in\s*:|check-out\s*:|guests?\s*:|room)/i.test(text)
 }
 
 const StoreAvatar = ({ src }) => {
@@ -65,11 +81,15 @@ const TouristOrdersListSection = ({
 
   const goReorderMenuItem = useCallback(
     (order, line) => {
-      if (!order?.businessId || !line?.menuItemId) {
+      if (!order?.businessId) {
         toast.error('Missing details to re-order this item.')
         return
       }
-      navigate(buildTouristExploreReorderHref(order.businessId, line.menuItemId))
+      if (line?.menuItemId) {
+        navigate(buildTouristExploreReorderHref(order.businessId, line.menuItemId))
+        return
+      }
+      navigate(buildTouristExploreBusinessDetailHref(order.businessId))
     },
     [navigate]
   )
@@ -207,17 +227,37 @@ const TouristOrdersListSection = ({
                   ) : null}
                 </div>
                 {order.lineItems?.length ? (
-                  <div className="mt-4 rounded-xl border border-[#efe6dc] bg-[#fffcf8] p-3 md:p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a79a8b]">Ordered items</p>
-                    <ul className="mt-2.5 space-y-2.5">
-                      {order.lineItems.map((line) => {
-                        const unitLabel = formatLineUnitPhp(line.unit)
-                        return (
-                          <li
-                            key={`${order.id}-${line.menuItemId}`}
-                            className="flex flex-col gap-2 rounded-lg border border-[#ece3d9] bg-white p-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
-                          >
-                            <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                  <ul className="mt-4 space-y-2">
+                    {(order.lineItems?.length
+                      ? order.lineItems
+                      : isResortBookingOrder(order)
+                        ? []
+                        : [
+                            {
+                              menuItemId: '',
+                              name: String(order.title || 'Item'),
+                              qty: Number(order.itemsCount) > 0 ? Number(order.itemsCount) : 1,
+                              unit: 0,
+                              lineNotes: '',
+                              image: String(order.productImage || '')
+                            }
+                          ]
+                    ).map((line) => {
+                      const unitLabel = formatLineUnitPhp(line.unit)
+                      const isBookingRequest = isResortBookingOrder(order)
+                      const isCanceled = String(order.statusKey || '').toUpperCase() === 'CANCELED'
+                      const canReorder = !isBookingRequest && !isCanceled
+                      return (
+                        <li
+                          key={`${order.id}-${line.menuItemId}`}
+                          className={
+                            isBookingRequest
+                              ? 'flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-[#3f3a35]'
+                              : 'flex flex-col gap-2 rounded-lg border border-[#ece3d9] bg-white p-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3'
+                          }
+                        >
+                          <div className={isBookingRequest ? 'min-w-0' : 'flex min-w-0 flex-1 items-start gap-2.5'}>
+                            {!isBookingRequest ? (
                               <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[#ece3d9] bg-[#faf8f5]">
                                 {line.image ? (
                                   <img src={line.image} alt="" className="h-full w-full object-cover" />
@@ -227,30 +267,91 @@ const TouristOrdersListSection = ({
                                   </div>
                                 )}
                               </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-[#1f1f1f]">{line.name || 'Item'}</p>
-                                <p className="mt-0.5 text-xs text-[#6b655d]">
-                                  <span className="font-medium text-[#5b4f45]">{line.qty}×</span>
-                                  {unitLabel ? <span className="text-[#7a726a]"> · {unitLabel} each</span> : null}
-                                </p>
-                                {line.lineNotes ? (
-                                  <p className="mt-1 text-xs italic text-[#8a7a6e]">Note: {line.lineNotes}</p>
-                                ) : null}
-                              </div>
+                            ) : null}
+                            <div className="min-w-0 flex-1">
+                              {isBookingRequest ? (
+                                <>
+                                  <span className="text-xs text-[#6b655d]">
+                                    {line.qty}×{unitLabel ? ` · ${unitLabel} each` : ''}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-sm font-medium text-[#1f1f1f]">{line.name || 'Item'}</p>
+                                  <p className="mt-0.5 text-xs text-[#6b655d]">
+                                    <span className="font-medium text-[#5b4f45]">{line.qty}×</span>
+                                    {unitLabel ? <span className="text-[#7a726a]"> · {unitLabel} each</span> : null}
+                                  </p>
+                                </>
+                              )}
+                              {line.lineNotes ? (
+                                <p className="mt-1 text-xs italic text-[#8a7a6e]">Note: {line.lineNotes}</p>
+                              ) : null}
                             </div>
+                          </div>
+                          {canReorder ? (
                             <button
                               type="button"
                               onClick={() => goReorderMenuItem(order, line)}
-                              className="inline-flex shrink-0 items-center justify-center gap-1.5 self-stretch rounded-full border border-[#e7dfd5] bg-[#fffaf6] px-3 py-2 text-xs font-semibold text-[#9b5a2c] transition hover:border-[#ff7a1a] hover:text-[#ff7a1a] sm:self-center"
+                              className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-[#e7dfd5] bg-[#fffaf6] text-xs font-semibold text-[#9b5a2c] transition hover:border-[#ff7a1a] hover:text-[#ff7a1a] ${isBookingRequest ? 'px-3 py-1.5' : 'self-stretch px-3 py-2 sm:self-center'}`}
                             >
                               <FiRefreshCw className="h-3.5 w-3.5" aria-hidden />
                               Re-order
                             </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
+                          ) : null}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                ) : !isResortBookingOrder(order) ? (
+                  <ul className="mt-4 space-y-2">
+                    {[
+                      {
+                        menuItemId: '',
+                        name: String(order.title || 'Item'),
+                        qty: Number(order.itemsCount) > 0 ? Number(order.itemsCount) : 1,
+                        unit: 0,
+                        lineNotes: '',
+                        image: String(order.productImage || '')
+                      }
+                    ].map((line) => (
+                      <li
+                        key={`${order.id}-fallback-line`}
+                        className="flex flex-col gap-2 rounded-lg border border-[#ece3d9] bg-white p-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                      >
+                        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[#ece3d9] bg-[#faf8f5]">
+                            {line.image ? (
+                              <img src={line.image} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[#c4b5a8]">
+                                <FiPackage className="h-5 w-5" aria-hidden />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-[#1f1f1f]">{line.name}</p>
+                            <p className="mt-0.5 text-xs text-[#6b655d]">
+                              <span className="font-medium text-[#5b4f45]">{line.qty}×</span>
+                            </p>
+                          </div>
+                        </div>
+                        {String(order.statusKey || '').toUpperCase() !== 'CANCELED' ? (
+                          <button
+                            type="button"
+                            onClick={() => goReorderMenuItem(order, line)}
+                            className="inline-flex shrink-0 items-center justify-center gap-1.5 self-stretch rounded-full border border-[#e7dfd5] bg-[#fffaf6] px-3 py-2 text-xs font-semibold text-[#9b5a2c] transition hover:border-[#ff7a1a] hover:text-[#ff7a1a] sm:self-center"
+                          >
+                            <FiRefreshCw className="h-3.5 w-3.5" aria-hidden />
+                            Re-order
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {isResortBookingOrder(order) && order.detailPreview ? (
+                  <p className="mt-3 text-xs leading-relaxed text-[#6b655d]">{order.detailPreview}</p>
                 ) : null}
                 {order.statusKey === 'CANCELED' && order.cancelReason ? (
                   <p className="mt-2 text-xs text-[#8a6a5a]">Reason: {order.cancelReason}</p>
@@ -406,6 +507,9 @@ const TouristOrdersListSection = ({
                                 <span className="font-medium text-[#1f1f1f]">{order.total}</span>
                               ) : null}
                               {order.time ? <span>{order.time}</span> : null}
+                              {readBookingDateWindow(order) ? (
+                                <span className="font-medium text-[#5d4b3f]">Booking: {readBookingDateWindow(order)}</span>
+                              ) : null}
                             </div>
                           </div>
                         </div>

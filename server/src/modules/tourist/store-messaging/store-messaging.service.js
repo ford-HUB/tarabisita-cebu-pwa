@@ -14,6 +14,17 @@ const formatPhp = (amount) => {
     return `₱${n.toFixed(2)}`
 }
 
+const resolveBusinessCategorySlug = (business) => {
+    const categoryName =
+        business?.category && typeof business.category === 'object'
+            ? String(business.category.name || '')
+            : String(business?.category || '')
+    const normalized = categoryName.trim().toLowerCase()
+    if (normalized === 'resort' || normalized === 'hotel') return 'resort'
+    if (normalized === 'restaurant') return 'restaurant'
+    return normalized
+}
+
 const extractBusinessCard = (businessDoc) => {
     if (!businessDoc || typeof businessDoc !== 'object') {
         return { businessName: '', businessStoreImage: '' }
@@ -453,7 +464,7 @@ const getMessagingNotificationItemsForBusinessId = async (businessObjectId) => {
     return { unreadCount, items }
 }
 
-const listOrderNotificationItemsForBusiness = async (bizLean) => {
+const listOrderNotificationItemsForBusiness = async (bizLean, { orderKind = 'ORDER' } = {}) => {
     const threshold = bizLean.ordersNotificationReadAt ? new Date(bizLean.ordersNotificationReadAt) : new Date(0)
     const [unreadOrderCount, rows] = await Promise.all([
         CustomerOrder.countDocuments({
@@ -469,15 +480,18 @@ const listOrderNotificationItemsForBusiness = async (bizLean) => {
     const items = rows.map((o) => {
         const code = o.orderCode != null ? String(o.orderCode).trim() : ''
         const amt = formatPhp(o.amount)
-        const preview = code ? `New order #${code} · ${amt}` : `New order · ${amt}`
+        const isBooking = orderKind === 'BOOKING'
+        const preview = code
+            ? `New ${isBooking ? 'booking' : 'order'} #${code} · ${amt}`
+            : `New ${isBooking ? 'booking' : 'order'} · ${amt}`
         const createdAt = o.createdAt ? new Date(o.createdAt) : null
         const isUnread = createdAt && createdAt > threshold
         return {
-            kind: 'ORDER',
+            kind: orderKind,
             orderId: String(o._id),
             orderCode: code,
             customerName: o.customerName != null ? String(o.customerName).trim() : 'Customer',
-            productName: o.productName != null ? String(o.productName).trim() : 'Order',
+            productName: o.productName != null ? String(o.productName).trim() : isBooking ? 'Booking' : 'Order',
             productImage: o.productImage != null ? String(o.productImage).trim() : '',
             amount: Number(o.amount) || 0,
             currency: o.currency != null ? String(o.currency) : 'PHP',
@@ -492,13 +506,19 @@ const listOrderNotificationItemsForBusiness = async (bizLean) => {
 }
 
 export const getBusinessStoreMessagingNotificationSummary = async (businessUserId) => {
-    const biz = await Business.findOne({ userId: businessUserId }).select('_id ordersNotificationReadAt').lean()
+    const biz = await Business.findOne({ userId: businessUserId })
+        .select('_id ordersNotificationReadAt category')
+        .populate('category', 'name')
+        .lean()
     if (!biz) {
         return { unreadCount: 0, items: [] }
     }
+    const categorySlug = resolveBusinessCategorySlug(biz)
     const [msg, ord] = await Promise.all([
         getMessagingNotificationItemsForBusinessId(biz._id),
-        listOrderNotificationItemsForBusiness(biz)
+        listOrderNotificationItemsForBusiness(biz, {
+            orderKind: categorySlug === 'resort' ? 'BOOKING' : 'ORDER'
+        })
     ])
     const items = [...msg.items, ...ord.items].sort((a, b) => {
         const ta = new Date(a.previewAt || 0).getTime()

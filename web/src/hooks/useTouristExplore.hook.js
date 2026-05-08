@@ -17,6 +17,7 @@ export const useTouristExplore = () => {
   const [selectedBusiness, setSelectedBusiness] = useState(null)
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [foodMenuCategory, setFoodMenuCategory] = useState('ALL')
+  const [stayTypeFilter, setStayTypeFilter] = useState('ALL')
 
   const {
     businesses,
@@ -55,14 +56,23 @@ export const useTouristExplore = () => {
   }, [categoryFilter])
 
   useEffect(() => {
+    if (categoryFilter !== 'INTENT_STAY') {
+      setStayTypeFilter('ALL')
+    }
+  }, [categoryFilter])
+
+  useEffect(() => {
     if (categoryFilter !== 'INTENT_FOOD') return
     void loadMenuFeed(foodMenuCategory)
   }, [categoryFilter, foodMenuCategory, loadMenuFeed])
 
-  const filteredBusinesses = useMemo(
-    () => filterBusinessesByExploreFilter(businesses, categoryFilter),
-    [businesses, categoryFilter]
-  )
+  const filteredBusinesses = useMemo(() => {
+    const baseRows = filterBusinessesByExploreFilter(businesses, categoryFilter)
+    if (categoryFilter !== 'INTENT_STAY' || stayTypeFilter === 'ALL') {
+      return baseRows
+    }
+    return baseRows.filter((business) => categoryMatchesLabel(business?.category, stayTypeFilter))
+  }, [businesses, categoryFilter, stayTypeFilter])
 
   const heroSpotlightBusinesses = useMemo(
     () => pickSpotlightHeroBusinesses(filteredBusinesses, { max: 8 }),
@@ -134,6 +144,8 @@ export const useTouristExplore = () => {
     showPartnerTypeChips,
     categoryFilter,
     setCategoryFilter,
+    stayTypeFilter,
+    setStayTypeFilter,
     foodMenuCategory,
     setFoodMenuCategory,
     menuFeedItems,

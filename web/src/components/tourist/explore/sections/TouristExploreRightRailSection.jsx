@@ -45,15 +45,21 @@ const TouristExploreRightRailSection = ({
   showPartnerTypeChips,
   isCollapsed,
   onToggleCollapsed,
+  stayTypeFilter,
+  onStayTypeFilterChange,
   foodMenuCategory,
   onFoodMenuCategoryChange,
   foodMenuCategories,
   foodMenuCategoriesLoading
 }) => {
   const [foodTypesOpen, setFoodTypesOpen] = useState(false)
+  const [stayTypesOpen, setStayTypesOpen] = useState(false)
 
   useEffect(() => {
     if (categoryFilter !== 'INTENT_FOOD') setFoodTypesOpen(false)
+  }, [categoryFilter])
+  useEffect(() => {
+    if (categoryFilter !== 'INTENT_STAY') setStayTypesOpen(false)
   }, [categoryFilter])
 
   if (isCollapsed) {
@@ -208,6 +214,97 @@ const TouristExploreRightRailSection = ({
                             </button>
                           </li>
                         ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              )
+            }
+
+            if (intent.id === 'INTENT_STAY') {
+              const listId = 'tourist-rail-stay-types'
+              return (
+                <div
+                  key={intent.id}
+                  className={`overflow-hidden rounded-xl border transition ${
+                    isActive
+                      ? 'border-[#ff7a1a] bg-[#fff8f2] text-[#9b5a2c]'
+                      : 'border-transparent bg-[#f8f5f0] text-[#1f1f1f] hover:border-[#e7dfd5]'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={isActive && stayTypesOpen}
+                    aria-controls={listId}
+                    onClick={() => {
+                      if (!isActive) {
+                        onSelectIntent(intent.id)
+                        setStayTypesOpen(true)
+                      } else {
+                        setStayTypesOpen((o) => !o)
+                      }
+                    }}
+                    className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-sm font-medium outline-none transition focus-visible:ring-2 focus-visible:ring-[#ff7a1a]/30"
+                  >
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                        isActive ? 'bg-[#ff7a1a] text-white' : 'bg-[#f0e8de] text-[#9b5a2c]'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate leading-tight">{intent.label}</span>
+                      <span className="text-[10px] font-normal leading-tight text-[#5b5b5b]">
+                        {intent.count} partner{intent.count === 1 ? '' : 's'}
+                        {isActive && stayTypeFilter !== 'ALL' ? (
+                          <span className="text-[#9b5a2c]"> · {stayTypeFilter}</span>
+                        ) : null}
+                      </span>
+                    </span>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/60 text-[#9b5a2c] ring-1 ring-[#e7dfd5]/80">
+                      {isActive && stayTypesOpen ? (
+                        <FiChevronUp className="h-4 w-4" aria-hidden />
+                      ) : (
+                        <FiChevronDown className="h-4 w-4" aria-hidden />
+                      )}
+                    </span>
+                  </button>
+                  {isActive && stayTypesOpen ? (
+                    <div className="border-t border-[#ffd4bc]/50 bg-[#fffdfb] px-1.5 pb-2 pt-1">
+                      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[#a79a8b]">
+                        Stay type
+                      </p>
+                      <ul
+                        id={listId}
+                        role="listbox"
+                        aria-label="Stay type"
+                        className="space-y-0.5"
+                      >
+                        {['ALL', 'Resort', 'Hotel'].map((type) => {
+                          const isSelected = stayTypeFilter === type
+                          const label = type === 'ALL' ? 'All stay types' : type
+                          return (
+                            <li key={type}>
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  onStayTypeFilterChange?.(type)
+                                  setStayTypesOpen(false)
+                                }}
+                                className={`flex w-full rounded-lg px-2.5 py-2 text-left text-sm transition ${
+                                  isSelected
+                                    ? 'bg-[#fff8f2] font-semibold text-[#9b5a2c] ring-1 ring-inset ring-[#ff7a1a]/35'
+                                    : 'text-[#1f1f1f] hover:bg-[#faf8f5]'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            </li>
+                          )
+                        })}
                       </ul>
                     </div>
                   ) : null}

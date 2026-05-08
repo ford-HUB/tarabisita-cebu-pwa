@@ -1,12 +1,14 @@
 import Business from '../models/business.model.js'
 import CustomerOrder from '../customer-orders/models/customer-order.model.js'
 
-const supportsPublicMenuCatalog = (business) => {
+const resolveBusinessCategorySlug = (business) => {
   const category =
     typeof business?.category === 'object' && business?.category?.name != null
       ? String(business.category.name).trim().toUpperCase()
       : String(business?.category || '').trim().toUpperCase()
-  return category === 'RESTAURANT'
+  if (category === 'RESTAURANT') return 'restaurant'
+  if (category === 'RESORT' || category === 'HOTEL') return 'resort'
+  return 'other'
 }
 
 const resolveManilaDateLabel = (dateInput) => {
@@ -47,7 +49,8 @@ const mapOrdersByHour = (orders = []) => {
 export const getMyTrafficInsightsByUserId = async (userId, dateInput) => {
   const business = await Business.findOne({ userId }).populate('category', 'name').lean()
   if (!business) throw new Error('BUSINESS_NOT_FOUND')
-  if (!supportsPublicMenuCatalog(business)) throw new Error('MENU_ORDERS_NOT_AVAILABLE')
+  const categorySlug = resolveBusinessCategorySlug(business)
+  if (categorySlug !== 'restaurant' && categorySlug !== 'resort') throw new Error('MENU_ORDERS_NOT_AVAILABLE')
 
   const { day, startAt, endAt } = resolveManilaRange(dateInput)
   const dailyOrders = await CustomerOrder.find({
@@ -65,13 +68,17 @@ export const getMyTrafficInsightsByUserId = async (userId, dateInput) => {
   const completionRate = totalOrdersToday > 0 ? (completedToday / totalOrdersToday) * 100 : 0
 
   return {
-    business: { id: String(business._id), name: business.name || 'Business' },
+    business: { id: String(business._id), name: business.name || 'Business', category: categorySlug },
     date: day,
+    reportBasis: categorySlug === 'resort' ? 'bookings' : 'orders',
     summary: {
       publicProfileViews: totalViews,
       totalOrdersToday,
       completedOrdersToday: completedToday,
       canceledOrdersToday: canceledToday,
+      totalBookingsToday: totalOrdersToday,
+      completedBookingsToday: completedToday,
+      canceledBookingsToday: canceledToday,
       conversionRatePct: Number(clampPercent(conversionRate).toFixed(2)),
       completionRatePct: Number(clampPercent(completionRate).toFixed(2))
     },

@@ -9,8 +9,7 @@ const ACTION_MENU_GAP = 8
 const VIEWPORT_PADDING = 8
 
 const stockStatusLabelMap = {
-  AVAILABLE_TO_ORDER: 'Available to Order',
-  OUT_OF_STOCK: 'Out of Stock'
+  OUT_OF_STOCK: 'Unavailable'
 }
 
 const formatPrice = (price) =>
@@ -24,6 +23,7 @@ const ItemListSection = ({
   menuItems,
   isLoadingMenuItems,
   addLabel,
+  isAccommodationBusiness = false,
   activeDeleteId,
   activeStockId,
   handleDeleteMenuItem,
@@ -41,8 +41,13 @@ const ItemListSection = ({
   closeEditModal,
   handleEditMenuItem
 }) => {
-  const itemTerm = categoryLabel === 'Restaurant' ? 'menu' : 'product'
-  const titleLabel = categoryLabel === 'Restaurant' ? 'Published Menus' : 'Published Products'
+  const itemTerm = categoryLabel === 'Restaurant' ? 'menu' : isAccommodationBusiness ? 'listing' : 'product'
+  const titleLabel = categoryLabel === 'Restaurant'
+    ? 'Published Menus'
+    : isAccommodationBusiness
+      ? 'Published Listings'
+      : 'Published Products'
+  const availableStatusLabel = isAccommodationBusiness ? 'Available to Book' : 'Available to Order'
   const [searchQuery, setSearchQuery] = useState('')
   const [stockFilter, setStockFilter] = useState('ALL')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
@@ -149,7 +154,7 @@ const ItemListSection = ({
             type="text"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder={`Search ${itemTerm} name, flavor, category`}
+            placeholder={`Search ${itemTerm} name, details, category`}
             className="w-full rounded-xl border border-[#eadfce] bg-white py-2 pr-3 pl-9 text-sm text-[#3f3f3f] outline-none transition focus:border-[#ff7a1a]"
           />
         </label>
@@ -159,8 +164,10 @@ const ItemListSection = ({
           className="rounded-xl border border-[#eadfce] bg-white px-3 py-2 text-sm text-[#3f3f3f] outline-none transition focus:border-[#ff7a1a]"
         >
           <option value="ALL">All Availability</option>
-          <option value="AVAILABLE_TO_ORDER">Available to Order</option>
-          <option value="OUT_OF_STOCK">Out of Stock</option>
+          <option value="AVAILABLE_TO_ORDER">
+            {isAccommodationBusiness ? 'Available to Book' : 'Available to Order'}
+          </option>
+          <option value="OUT_OF_STOCK">Unavailable</option>
         </select>
         <select
           value={categoryFilter}
@@ -178,7 +185,7 @@ const ItemListSection = ({
 
       {isLoadingMenuItems ? (
         <div className="rounded-xl border border-dashed border-[#e8ddd0] bg-[#fffaf5] p-8 text-center text-sm text-[#8f8377]">
-          Loading menu items...
+          {isAccommodationBusiness ? 'Loading listings...' : 'Loading menu items...'}
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[#e8ddd0] bg-[#fffaf5] p-8 text-center text-sm text-[#8f8377]">
@@ -196,7 +203,7 @@ const ItemListSection = ({
                 <div className="flex min-w-[220px] flex-1 items-center gap-3">
                   <img src={item.images?.[0]} alt={item.name} className="h-12 w-12 rounded-lg object-cover" />
                   <div>
-                    <p className="text-sm font-semibold text-[#2f2f2f]">{item.name}</p>
+                  <p className="text-sm font-semibold text-[#2f2f2f]">{item.name}</p>
                     <p className="text-xs text-[#8a7f74]">{item.category || 'Uncategorized'}</p>
                   </div>
                 </div>
@@ -206,7 +213,7 @@ const ItemListSection = ({
                     currentStock === 'OUT_OF_STOCK' ? 'bg-[#fbecec] text-[#9c4040]' : 'bg-[#e8f8ec] text-[#2a7b45]'
                   }`}
                 >
-                  {stockStatusLabelMap[currentStock] || 'Available to Order'}
+                  {stockStatusLabelMap[currentStock] || availableStatusLabel}
                 </span>
                 <div className="relative">
                   <button
@@ -242,15 +249,28 @@ const ItemListSection = ({
                     {item.category ? (
                       <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">{item.category}</span>
                     ) : null}
-                    <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">Flavor: {item.flavor}</span>
+                    <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">
+                      {isAccommodationBusiness ? 'Accommodation' : 'Flavor'}: {item.flavor}
+                    </span>
                     {item.preparationTime ? (
-                      <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">Prep: {item.preparationTime}</span>
+                      <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">
+                        {isAccommodationBusiness ? 'Availability' : 'Prep'}: {item.preparationTime}
+                      </span>
                     ) : null}
                     {item.servingSize ? (
-                      <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">{item.servingSize}</span>
+                      <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">
+                        {isAccommodationBusiness ? `Capacity: ${item.servingSize}` : item.servingSize}
+                      </span>
                     ) : null}
                     {item.spiceLevel ? (
-                      <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">Spice: {item.spiceLevel}</span>
+                      <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">
+                        {isAccommodationBusiness ? 'Level' : 'Spice'}: {item.spiceLevel}
+                      </span>
+                    ) : null}
+                    {isAccommodationBusiness && item.allergens ? (
+                      <span className="rounded-full bg-[#f6efe7] px-2 py-1 text-[#6f665d]">
+                        Amenities: {item.allergens}
+                      </span>
                     ) : null}
                   </div>
 
@@ -266,7 +286,7 @@ const ItemListSection = ({
                           : 'bg-[#e8f8ec] text-[#2a7b45]'
                       }`}
                     >
-                      {stockStatusLabelMap[currentStock] || 'Available to Order'}
+                      {stockStatusLabelMap[currentStock] || availableStatusLabel}
                     </span>
                     <div className="flex items-center gap-1.5">
                       <div className="relative">
@@ -372,8 +392,10 @@ const ItemListSection = ({
                     {activeStockId === item.id
                       ? 'Updating...'
                       : currentStock === 'OUT_OF_STOCK'
-                      ? 'Available to Order'
-                      : 'Out of Stock'}
+                      ? isAccommodationBusiness
+                        ? 'Available to Book'
+                        : 'Available to Order'
+                      : 'Unavailable'}
                   </button>
                   <button
                     type="button"
@@ -398,6 +420,7 @@ const ItemListSection = ({
         key={`${selectedEditItem?.id || 'edit-item-modal'}-${isEditModalOpen ? 'open' : 'closed'}`}
         isOpen={isEditModalOpen}
         item={selectedEditItem}
+        isAccommodationBusiness={isAccommodationBusiness}
         isSaving={activeEditId === selectedEditItem?.id}
         onClose={closeEditModal}
         onSave={handleEditMenuItem}

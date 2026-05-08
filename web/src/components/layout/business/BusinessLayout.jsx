@@ -66,12 +66,14 @@ const BusinessLayout = () => {
   const isOnBaseProfilePage =
     location.pathname === '/business/dashboard/profile' &&
     new URLSearchParams(location.search).get('view') !== 'activity'
+  const isOnSettingsPage = location.pathname === '/business/dashboard/settings'
+  const isAllowedRestrictedPage = isOnBaseProfilePage || isOnSettingsPage
 
   useEffect(() => {
-    if (isOperationsLocked && !isOnBaseProfilePage) {
+    if (isOperationsLocked && !isAllowedRestrictedPage) {
       navigate(profilePath, { replace: true })
     }
-  }, [isOperationsLocked, isOnBaseProfilePage, navigate, profilePath])
+  }, [isOperationsLocked, isAllowedRestrictedPage, navigate, profilePath])
 
   useEffect(() => {
     // Re-open every refresh until verification is approved.
@@ -109,7 +111,7 @@ const BusinessLayout = () => {
         />
 
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-6">
-          {!isOperationsLocked || isOnBaseProfilePage ? (
+          {!isOperationsLocked || isAllowedRestrictedPage ? (
             <Outlet />
           ) : null}
         </main>

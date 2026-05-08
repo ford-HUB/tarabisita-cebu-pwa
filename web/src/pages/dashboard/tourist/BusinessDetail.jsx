@@ -5,6 +5,7 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiInfo,
+  FiImage,
   FiMessageCircle,
   FiMinus,
   FiPlus,
@@ -17,7 +18,8 @@ import { toast } from 'sonner'
 import {
   buildTouristStoreMessagingHref,
   touristCheckoutHref,
-  touristExploreHref
+  touristExploreHref,
+  touristStayBookingHref
 } from '../../../components/layout/tourist/touristLayout.constants.js'
 import {
   fetchPublicBusinessById,
@@ -26,10 +28,11 @@ import {
 import { postStoreMessagingLinkToken } from '../../../services/tourist/store-messaging.service.js'
 import { useTouristCartItemStore } from '../../../store/tourist/tourist-cart-item.store.js'
 import TouristDestinationMapPanel from '../../../components/tourist/explore/modals/TouristDestinationMapPanel.jsx'
+import TouristStayPackageDetailModal from '../../../components/tourist/explore/modals/TouristStayPackageDetailModal.jsx'
 import { pickCartItemDetailsFromMenuItem } from '../../../shared/utils/tourist-cart-item-details.utils.js'
 import { hasValidMapCoordinates } from '../../../shared/utils/mapboxStaticMap.utils.js'
 import { googleDirectionsUrl, googleSearchAddressUrl } from '../../../shared/utils/touristMapLinks.utils.js'
-import { categoryDisplayLabel } from '../../../shared/utils/touristExplore.utils.js'
+import { categoryDisplayLabel, categoryMatchesLabel } from '../../../shared/utils/touristExplore.utils.js'
 
 const heroImg = (business) => business?.banner || business?.coverImage || business?.logo
 
@@ -183,10 +186,14 @@ const BusinessDetail = () => {
   const [errorMessage, setErrorMessage] = useState('')
   const [stickyTopOffset, setStickyTopOffset] = useState(0)
   const [isMapModalOpen, setIsMapModalOpen] = useState(false)
+  const [selectedPackageId, setSelectedPackageId] = useState('')
+  const [isPackageModalOpen, setIsPackageModalOpen] = useState(false)
 
   useEffect(() => {
     setSelectedCategory('All')
     setMenuSearchTerm('')
+    setSelectedPackageId('')
+    setIsPackageModalOpen(false)
   }, [businessId])
 
   useEffect(() => {
@@ -230,6 +237,19 @@ const BusinessDetail = () => {
   }, [businessId])
 
   const menuItems = useMemo(() => (Array.isArray(business?.menuItems) ? business.menuItems : []), [business?.menuItems])
+  const availableStayPackages = useMemo(
+    () =>
+      menuItems.filter((item) => {
+        if (item?.isDeleted) return false
+        if (!item?.isAvailable) return false
+        return String(item?.stockStatus || '').trim().toUpperCase() !== 'OUT_OF_STOCK'
+      }),
+    [menuItems]
+  )
+  const isStayBusiness = useMemo(
+    () => categoryMatchesLabel(business?.category, 'Resort') || categoryMatchesLabel(business?.category, 'Hotel'),
+    [business?.category]
+  )
   const categories = useMemo(() => {
     const dynamic = getMenuCategories(menuItems)
     const total = dynamic.reduce((sum, entry) => sum + entry.count, 0)
@@ -254,6 +274,12 @@ const BusinessDetail = () => {
     () => (selectedCategory === 'All' ? groupedMenuItems : groupedMenuItems.filter((g) => g.name === selectedCategory)),
     [groupedMenuItems, selectedCategory]
   )
+  const selectedPackage = useMemo(() => {
+    if (!isStayBusiness || !availableStayPackages.length) return null
+    const firstPackage = availableStayPackages[0] || null
+    if (!selectedPackageId) return firstPackage
+    return availableStayPackages.find((item) => String(item?.id || '') === selectedPackageId) || firstPackage
+  }, [isStayBusiness, availableStayPackages, selectedPackageId])
 
   const businessCartItems = useMemo(
     () => cartItems.filter((it) => String(it.businessId) === String(business?._id || '')),
@@ -268,6 +294,7 @@ const BusinessDetail = () => {
   const img = heroImg(business)
   const logo = business?.logo || img
   const categoryLabel = categoryDisplayLabel(business?.category)
+  const listingLabel = isStayBusiness ? 'Stay List' : 'Restaurant List'
   const businessName = business?.name || 'Restaurant'
   const rating = formatRating(business?.averageRating || business?.rating)
   const ratingCount = Number(business?.ratingCount || business?.reviewsCount || business?.reviewCount || 1000)
@@ -328,6 +355,48 @@ const BusinessDetail = () => {
     )
   }
 
+  const selectedPackageWithBusiness = selectedPackage
+    ? {
+        ...selectedPackage,
+        businessId: String(business._id),
+        businessName: business.name
+      }
+    : null
+
+  const handleBookSelectedPackage = () => {
+    if (!selectedPackageWithBusiness) return
+    setIsPackageModalOpen(false)
+    navigate(touristStayBookingHref, {
+      state: {
+        stayPackage: selectedPackageWithBusiness,
+        stayBusiness: {
+          _id: String(business._id),
+          name: business.name,
+          addOns: business?.addOns
+        }
+      }
+    })
+  }
+
+  const handleAddSelectedPackageToCart = () => {
+    if (!selectedPackageWithBusiness) return
+    const image = Array.isArray(selectedPackageWithBusiness.images) && selectedPackageWithBusiness.images.length
+      ? selectedPackageWithBusiness.images[0]
+      : ''
+    addItem({
+      businessId: selectedPackageWithBusiness.businessId,
+      businessName: selectedPackageWithBusiness.businessName,
+      catalogItemId: String(selectedPackageWithBusiness.id || ''),
+      name: selectedPackageWithBusiness.name || 'Stay package',
+      unitPrice: Number(selectedPackageWithBusiness.price) || 0,
+      image,
+      qty: 1,
+      listingType: 'STAY',
+      ...pickCartItemDetailsFromMenuItem(selectedPackageWithBusiness)
+    })
+    setIsPackageModalOpen(false)
+  }
+
   return (
     <div className="mx-auto max-w-[1320px] pb-8">
       <div className="mb-3 flex items-center gap-2 text-xs text-[#666]">
@@ -339,7 +408,7 @@ const BusinessDetail = () => {
           <FiArrowLeft className="h-3.5 w-3.5" aria-hidden />
           Back
         </button>
-        <span>Restaurant List</span>
+        <span>{listingLabel}</span>
         <span>›</span>
         <span className="font-medium text-[#2b2b2b]">{businessName}</span>
       </div>
@@ -401,163 +470,236 @@ const BusinessDetail = () => {
           </div>
         </div>
 
-        <MenuTabs
-          selected={selectedCategory}
-          onSelect={setSelectedCategory}
-          categories={categories}
-          stickyTopOffset={stickyTopOffset}
-          searchTerm={menuSearchTerm}
-          onSearchTermChange={setMenuSearchTerm}
-        />
-
-        <div className="grid gap-0 lg:h-[calc(100vh-220px)] lg:grid-cols-[minmax(0,1fr)_340px] lg:overflow-hidden">
-          <div className="min-w-0 bg-white px-4 py-4 md:px-5 lg:h-full lg:overflow-y-auto lg:pr-4">
-            {!displayGroups.length ? (
-              <div className="rounded-lg border border-dashed border-[#dedede] bg-[#fafafa] p-8 text-center text-sm text-[#5c5c5c]">
-                No menu items found for this filter.
+        {isStayBusiness ? (
+          <div className="border-b border-[#efefef] px-4 py-4 md:px-5">
+            <div className="relative h-52 overflow-hidden rounded-xl border border-[#e7dfd5] bg-[#f1f1f1] sm:h-64">
+              {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
+              <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/30 to-transparent" />
+              <div className="absolute bottom-4 left-4 right-4 text-white">
+                <p className="text-xs font-semibold uppercase tracking-wide text-white/80">{categoryLabel}</p>
+                <h2 className="mt-1 text-3xl leading-tight font-semibold sm:text-5xl">{String(businessName || '').toUpperCase()}</h2>
+                <p className="mt-1 line-clamp-2 text-sm text-white/90">
+                  {business?.description || 'Curated stay experiences with relaxing views and resort comfort.'}
+                </p>
               </div>
-            ) : null}
+            </div>
+          </div>
+        ) : null}
 
-            {displayGroups.map((group) => (
-              <section key={group.name} className="mb-7">
-                <h2 className="mb-1 text-[32px] font-semibold leading-tight text-[#232323]">{group.name}</h2>
+        {isStayBusiness ? null : (
+          <MenuTabs
+            selected={selectedCategory}
+            onSelect={setSelectedCategory}
+            categories={categories}
+            stickyTopOffset={stickyTopOffset}
+            searchTerm={menuSearchTerm}
+            onSearchTermChange={setMenuSearchTerm}
+          />
+        )}
+
+        {isStayBusiness ? (
+          <div className="grid gap-4 bg-white px-4 py-4 md:px-5">
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold text-[#242424]">Stay Packages</h2>
+                <p className="text-xs text-[#666]">Select a card to open package details</p>
+              </div>
+              {!availableStayPackages.length ? (
+                <div className="rounded-lg border border-dashed border-[#dedede] bg-[#fafafa] p-8 text-center text-sm text-[#5c5c5c]">
+                  No available stay packages for booking yet.
+                </div>
+              ) : (
                 <div className="grid gap-3 md:grid-cols-2">
-                  {group.rows.map((item) => {
+                  {availableStayPackages.map((item) => {
+                    const id = String(item?.id || '')
                     const image = Array.isArray(item.images) && item.images.length ? item.images[0] : ''
+                    const isSelected = String(selectedPackage?.id || '') === id
                     return (
                       <article
-                        key={item.id}
-                        className="relative overflow-hidden rounded-xl border border-[#e9e9e9] bg-white p-3 pr-11 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                        key={id}
+                        className={`overflow-hidden rounded-xl border bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition ${
+                          isSelected ? 'border-[#222] ring-1 ring-[#222]/10' : 'border-[#e9e9e9]'
+                        }`}
                       >
-                        <div className="flex gap-3">
-                          <div className="min-w-0 flex-1">
-                            <h3 className="line-clamp-1 text-base font-semibold text-[#222]">{item.name}</h3>
-                            <p className="mt-0.5 text-sm text-[#444]">from {formatPrice(item.price)}</p>
-                            {item.description ? (
-                              <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[#666]">{item.description}</p>
-                            ) : null}
-                          </div>
-                          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-[#f1f1f1]">
-                            {image ? <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
-                          </div>
-                        </div>
                         <button
                           type="button"
-                          onClick={() =>
-                            addItem({
-                              businessId: String(business._id),
-                              businessName: business.name,
-                              catalogItemId: String(item.id),
-                              name: item.name,
-                              unitPrice: Number(item.price) || 0,
-                              image,
-                              qty: 1,
-                              ...pickCartItemDetailsFromMenuItem(item)
-                            })
-                          }
-                          className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfdfdf] bg-white text-[#232323] shadow-sm transition hover:bg-[#f6f6f6]"
-                          aria-label={`Add ${item.name} to cart`}
+                          onClick={() => {
+                            setSelectedPackageId(id)
+                            setIsPackageModalOpen(true)
+                          }}
+                          className="w-full text-left"
                         >
-                          <FiPlus className="h-4 w-4" aria-hidden />
+                          <div className="mb-2 h-32 w-full overflow-hidden rounded-md bg-[#f1f1f1]">
+                            {image ? <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
+                          </div>
+                          <h3 className="line-clamp-1 text-base font-semibold text-[#222]">{item.name}</h3>
+                          <p className="mt-0.5 text-sm text-[#444]">from {formatPrice(item.price)}</p>
+                          {item.description ? (
+                            <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[#666]">{item.description}</p>
+                          ) : null}
+                          <div className="mt-2">
+                            <span className="inline-flex rounded-full bg-[#1f1f1f] px-3 py-1 text-xs font-semibold text-white">
+                              Book
+                            </span>
+                          </div>
                         </button>
                       </article>
                     )
                   })}
                 </div>
-              </section>
-            ))}
+              )}
+            </section>
           </div>
-
-          <aside
-            className="border-l border-[#efefef] bg-white p-3 md:p-4 lg:sticky lg:h-full lg:self-start"
-            style={{ top: `${sidebarStickyTop}px` }}
-          >
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="mb-3 overflow-hidden rounded-lg border border-[#ececec]">
-                <div className="text-sm">
-                  <button type="button" className="w-full bg-gray-50 px-3 py-2.5 font-medium text-[#242424]">
-                    Chart
-                  </button>
+        ) : (
+          <div className="grid gap-0 lg:h-[calc(100vh-220px)] lg:grid-cols-[minmax(0,1fr)_340px] lg:overflow-hidden">
+            <div className="min-w-0 bg-white px-4 py-4 md:px-5 lg:h-full lg:overflow-y-auto lg:pr-4">
+              {!displayGroups.length ? (
+                <div className="rounded-lg border border-dashed border-[#dedede] bg-[#fafafa] p-8 text-center text-sm text-[#5c5c5c]">
+                  No menu items found for this filter.
                 </div>
-              </div>
+              ) : null}
 
-              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                {!businessCartItems.length ? (
-                  <div className="rounded-lg border border-[#efefef] bg-[#fafafa] px-4 py-8 text-center">
-                    <div className="mx-auto mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#f0f0f0] text-[#9b9b9b]">
-                      <FiShoppingBag className="h-6 w-6" aria-hidden />
-                    </div>
-                    <p className="text-xl font-semibold text-[#242424]">your carts</p>
-                    <p className="mt-1 text-sm text-[#666]">You haven&apos;t added anything to your cart!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {businessCartItems.map((it) => (
-                      <div key={it.key} className="rounded-lg border border-[#ececec] p-2.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="line-clamp-2 text-sm font-medium text-[#222]">{it.name}</p>
+              {displayGroups.map((group) => (
+                <section key={group.name} className="mb-7">
+                  <h2 className="mb-1 text-[32px] font-semibold leading-tight text-[#232323]">{group.name}</h2>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {group.rows.map((item) => {
+                      const image = Array.isArray(item.images) && item.images.length ? item.images[0] : ''
+                      return (
+                        <article
+                          key={item.id}
+                          className="relative overflow-hidden rounded-xl border border-[#e9e9e9] bg-white p-3 pr-11 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                        >
+                          <div className="flex gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="line-clamp-1 text-base font-semibold text-[#222]">{item.name}</h3>
+                              <p className="mt-0.5 text-sm text-[#444]">from {formatPrice(item.price)}</p>
+                              {item.description ? (
+                                <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[#666]">{item.description}</p>
+                              ) : null}
+                            </div>
+                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-[#f1f1f1]">
+                              {image ? <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
+                            </div>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => removeItem(it.key)}
-                            className="text-xs text-[#b74747] hover:underline"
+                            onClick={() =>
+                              addItem({
+                                businessId: String(business._id),
+                                businessName: business.name,
+                                catalogItemId: String(item.id),
+                                name: item.name,
+                                unitPrice: Number(item.price) || 0,
+                                image,
+                                qty: 1,
+                                ...pickCartItemDetailsFromMenuItem(item)
+                              })
+                            }
+                            className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfdfdf] bg-white text-[#232323] shadow-sm transition hover:bg-[#f6f6f6]"
+                            aria-label={`Add ${item.name} to cart`}
                           >
-                            Remove
+                            <FiPlus className="h-4 w-4" aria-hidden />
                           </button>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between">
-                          <div className="inline-flex items-center rounded-md border border-[#e6e6e6]">
+                        </article>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+
+            <aside
+              className="border-l border-[#efefef] bg-white p-3 md:p-4 lg:sticky lg:h-full lg:self-start"
+              style={{ top: `${sidebarStickyTop}px` }}
+            >
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="mb-3 overflow-hidden rounded-lg border border-[#ececec]">
+                  <div className="text-sm">
+                    <button type="button" className="w-full bg-gray-50 px-3 py-2.5 font-medium text-[#242424]">
+                      Chart
+                    </button>
+                  </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                  {!businessCartItems.length ? (
+                    <div className="rounded-lg border border-[#efefef] bg-[#fafafa] px-4 py-8 text-center">
+                      <div className="mx-auto mb-3 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#f0f0f0] text-[#9b9b9b]">
+                        <FiShoppingBag className="h-6 w-6" aria-hidden />
+                      </div>
+                      <p className="text-xl font-semibold text-[#242424]">your carts</p>
+                      <p className="mt-1 text-sm text-[#666]">You haven&apos;t added anything to your cart!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {businessCartItems.map((it) => (
+                        <div key={it.key} className="rounded-lg border border-[#ececec] p-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="line-clamp-2 text-sm font-medium text-[#222]">{it.name}</p>
                             <button
                               type="button"
-                              onClick={() => {
-                                const nextQty = Number(it.qty || 1) - 1
-                                if (nextQty <= 0) {
-                                  removeItem(it.key)
-                                  return
-                                }
-                                setItemQty(it.key, nextQty)
-                              }}
-                              className="px-2 py-1 text-[#555]"
+                              onClick={() => removeItem(it.key)}
+                              className="text-xs text-[#b74747] hover:underline"
                             >
-                              <FiMinus className="h-3.5 w-3.5" aria-hidden />
-                            </button>
-                            <span className="px-2 text-sm font-medium text-[#242424]">{it.qty}</span>
-                            <button
-                              type="button"
-                              onClick={() => setItemQty(it.key, Math.min(99, Number(it.qty || 1) + 1))}
-                              className="px-2 py-1 text-[#555]"
-                            >
-                              <FiPlus className="h-3.5 w-3.5" aria-hidden />
+                              Remove
                             </button>
                           </div>
-                          <p className="text-sm font-semibold text-[#1f1f1f]">{formatPrice((Number(it.unitPrice) || 0) * (Number(it.qty) || 0))}</p>
+                          <div className="mt-2 flex items-center justify-between">
+                            <div className="inline-flex items-center rounded-md border border-[#e6e6e6]">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextQty = Number(it.qty || 1) - 1
+                                  if (nextQty <= 0) {
+                                    removeItem(it.key)
+                                    return
+                                  }
+                                  setItemQty(it.key, nextQty)
+                                }}
+                                className="px-2 py-1 text-[#555]"
+                              >
+                                <FiMinus className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                              <span className="px-2 text-sm font-medium text-[#242424]">{it.qty}</span>
+                              <button
+                                type="button"
+                                onClick={() => setItemQty(it.key, Math.min(99, Number(it.qty || 1) + 1))}
+                                className="px-2 py-1 text-[#555]"
+                              >
+                                <FiPlus className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                            </div>
+                            <p className="text-sm font-semibold text-[#1f1f1f]">{formatPrice((Number(it.unitPrice) || 0) * (Number(it.qty) || 0))}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 border-t border-[#efefef] pt-3">
-                <div className="flex items-center justify-between text-sm text-[#595959]">
-                  <span>Total (incl. fees and tax)</span>
-                  <span className="text-lg font-semibold text-[#1f1f1f]">{formatPrice(cartSubtotal)}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => navigate(touristCheckoutHref)}
-                  disabled={!cartCount}
-                  className="mt-3 w-full rounded-md bg-[#e0e0e0] px-4 py-2.5 text-sm font-semibold text-[#4a4a4a] transition enabled:bg-[#222] enabled:text-white enabled:hover:bg-black disabled:cursor-not-allowed"
-                >
-                  {cartCount ? 'Review payment and address' : 'Add items to continue'}
-                </button>
-                <p className="mt-2 inline-flex items-center gap-1 text-xs text-[#666]">
-                  <FiUser className="h-3.5 w-3.5" aria-hidden />
-                  {cartCount} item{cartCount === 1 ? '' : 's'} in cart
-                </p>
+
+                <div className="mt-4 border-t border-[#efefef] pt-3">
+                  <div className="flex items-center justify-between text-sm text-[#595959]">
+                    <span>Total (incl. fees and tax)</span>
+                    <span className="text-lg font-semibold text-[#1f1f1f]">{formatPrice(cartSubtotal)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(touristCheckoutHref)}
+                    disabled={!cartCount}
+                    className="mt-3 w-full rounded-md bg-[#e0e0e0] px-4 py-2.5 text-sm font-semibold text-[#4a4a4a] transition enabled:bg-[#222] enabled:text-white enabled:hover:bg-black disabled:cursor-not-allowed"
+                  >
+                    {cartCount ? 'Review payment and address' : 'Add items to continue'}
+                  </button>
+                  <p className="mt-2 inline-flex items-center gap-1 text-xs text-[#666]">
+                    <FiUser className="h-3.5 w-3.5" aria-hidden />
+                    {cartCount} item{cartCount === 1 ? '' : 's'} in cart
+                  </p>
+                </div>
               </div>
-            </div>
-          </aside>
-        </div>
+            </aside>
+          </div>
+        )}
       </div>
       <StoreLocationModal
         isOpen={isMapModalOpen}
@@ -565,6 +707,13 @@ const BusinessDetail = () => {
         businessName={businessName}
         address={business?.address}
         destination={destination}
+      />
+      <TouristStayPackageDetailModal
+        open={isStayBusiness && isPackageModalOpen}
+        item={selectedPackageWithBusiness}
+        onClose={() => setIsPackageModalOpen(false)}
+        onAddToCart={handleAddSelectedPackageToCart}
+        onBookNow={handleBookSelectedPackage}
       />
     </div>
   )

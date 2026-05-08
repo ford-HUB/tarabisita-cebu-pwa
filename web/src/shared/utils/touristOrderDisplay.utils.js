@@ -2,9 +2,9 @@
 export const touristCustomerOrderStatusLabel = (status) => {
   switch (String(status || '').toUpperCase()) {
     case 'PLACED':
-      return 'Waiting to be processed'
+      return 'Waiting for approval'
     case 'PROCESSING':
-      return 'Processing'
+      return 'Approved - waiting for payment'
     case 'FINISHED':
       return 'Completed'
     case 'CANCELED':

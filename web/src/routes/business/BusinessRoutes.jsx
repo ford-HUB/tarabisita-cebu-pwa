@@ -1,5 +1,7 @@
 import BusinessLayout from "../../components/layout/business/BusinessLayout";
 import Billing from "../../pages/dashboard/business/Billing";
+import BookingRequests from "../../pages/dashboard/business/BookingRequests";
+import BookingsRecord from "../../pages/dashboard/business/BookingsRecord";
 import Chat from "../../pages/dashboard/business/Chat";
 import DailySales from "../../pages/dashboard/business/DailySales";
 import Home from "../../pages/dashboard/business/Home";
@@ -8,6 +10,9 @@ import Menu from "../../pages/dashboard/business/Menu";
 import Notifications from "../../pages/dashboard/business/Notifications";
 import Orders from "../../pages/dashboard/business/Orders";
 import Profile from "../../pages/dashboard/business/Profile";
+import Reservations from "../../pages/dashboard/business/Reservations";
+import Settings from "../../pages/dashboard/business/Settings";
+import PaymentMethods from "../../pages/dashboard/business/PaymentMethods";
 import TodaysRecord from "../../pages/dashboard/business/TodaysRecord";
 import Records from "../../pages/dashboard/business/Records";
 import TrafficInsights from "../../pages/dashboard/business/TrafficInsights";
@@ -32,6 +37,14 @@ export const BusinessRoutes = [
                 element: <Profile />
             },
             {
+                path: 'settings',
+                element: <Settings />
+            },
+            {
+                path: 'payment-methods',
+                element: <PaymentMethods />
+            },
+            {
                 path: 'interface',
                 element: <Interface />
             },
@@ -42,6 +55,14 @@ export const BusinessRoutes = [
             {
                 path: 'orders',
                 element: <Orders />
+            },
+            {
+                path: 'booking-requests',
+                element: <BookingRequests />
+            },
+            {
+                path: 'reservations',
+                element: <Reservations />
             },
             {
                 path: 'notifications',
@@ -62,6 +83,10 @@ export const BusinessRoutes = [
             {
                 path: 'records',
                 element: <Records />
+            },
+            {
+                path: 'bookings-records',
+                element: <BookingsRecord />
             },
             {
                 path: 'reports/daily-sales',

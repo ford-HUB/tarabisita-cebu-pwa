@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useBusinessDashboardStore } from '../store/business/dashboard.store'
 
 const ORDER_STATUS_FILTERS = ['All', 'Delivered', 'Pending', 'Canceled']
+const RESORT_BOOKING_STATUS_FILTERS = ['All', 'Confirmed', 'Waiting for approval', 'Waiting for payment', 'Cancelled']
 const OVERVIEW_TABS = ['Overview', 'Sales', 'Revenue']
 
 const resolveCurrentManilaYear = () => {
@@ -17,7 +18,13 @@ const toCurrencyPhp = (value) =>
     maximumFractionDigits: 0
   }).format(Number(value) || 0)
 
-const mapStatusToLabel = (status) => {
+const mapStatusToLabel = (status, isResortDashboard) => {
+  if (isResortDashboard) {
+    if (status === 'FINISHED') return 'Confirmed'
+    if (status === 'PROCESSING') return 'Waiting for payment'
+    if (status === 'CANCELED') return 'Cancelled'
+    return 'Waiting for approval'
+  }
   if (status === 'FINISHED') return 'Delivered'
   if (status === 'CANCELED') return 'Canceled'
   return 'Pending'
@@ -55,7 +62,7 @@ const STATISTICS_KEY_BY_TAB = {
   Revenue: 'revenue'
 }
 
-export const useBusinessDashboard = () => {
+export const useBusinessDashboard = ({ isResortDashboard = false } = {}) => {
   const { data, isLoading, errorMessage, selectedYear, loadDashboard, setSelectedYear } = useBusinessDashboardStore(
     useShallow((state) => ({
       data: state.data,
@@ -69,12 +76,19 @@ export const useBusinessDashboard = () => {
 
   const [activeOverviewTab, setActiveOverviewTab] = useState('Overview')
   const [activeOrderFilter, setActiveOrderFilter] = useState('All')
+  const orderStatusFilters = isResortDashboard ? RESORT_BOOKING_STATUS_FILTERS : ORDER_STATUS_FILTERS
 
   const activeYear = selectedYear || resolveCurrentManilaYear()
 
   useEffect(() => {
     void loadDashboard({ year: activeYear })
   }, [activeYear, loadDashboard])
+
+  useEffect(() => {
+    if (!orderStatusFilters.includes(activeOrderFilter)) {
+      setActiveOrderFilter('All')
+    }
+  }, [activeOrderFilter, orderStatusFilters])
 
   const handleSelectYear = useCallback(
     (year) => {
@@ -122,17 +136,17 @@ export const useBusinessDashboard = () => {
 
   const filteredRecentOrders = useMemo(() => {
     if (activeOrderFilter === 'All') return recentOrders
-    return recentOrders.filter((order) => mapStatusToLabel(order.status) === activeOrderFilter)
-  }, [activeOrderFilter, recentOrders])
+    return recentOrders.filter((order) => mapStatusToLabel(order.status, isResortDashboard) === activeOrderFilter)
+  }, [activeOrderFilter, isResortDashboard, recentOrders])
 
   const recentOrdersForView = useMemo(
     () =>
       filteredRecentOrders.map((order) => ({
         ...order,
-        statusLabel: mapStatusToLabel(order.status),
+        statusLabel: mapStatusToLabel(order.status, isResortDashboard),
         dateLabel: formatRecentOrderDateLabel(order.createdAt)
       })),
-    [filteredRecentOrders]
+    [filteredRecentOrders, isResortDashboard]
   )
 
   const totalsForView = useMemo(() => {
@@ -146,6 +160,7 @@ export const useBusinessDashboard = () => {
       ordersDeltaPct: Number(trends.ordersDeltaPct) || 0,
       delivered: Number(totals.delivered) || 0,
       pending: Number(totals.pending) || 0,
+      waitingForPayment: Number(totals.waitingForPayment) || 0,
       canceled: Number(totals.canceled) || 0,
       revenue: Number(totals.revenue) || 0,
       currentMonthOrders: Number(monthTotals.orders) || 0
@@ -208,7 +223,7 @@ export const useBusinessDashboard = () => {
     handleSelectYear,
     refresh,
     overviewTabs: OVERVIEW_TABS,
-    orderStatusFilters: ORDER_STATUS_FILTERS,
+    orderStatusFilters,
     activeOverviewTab,
     setActiveOverviewTab,
     activeOrderFilter,

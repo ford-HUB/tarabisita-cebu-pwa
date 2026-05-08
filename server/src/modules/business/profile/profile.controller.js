@@ -1,7 +1,13 @@
 import {
+    getBusinessSettingsByUserId,
+    updateBusinessSettingsByUserId,
+    verifyBusinessPaymentMethodByUserId,
+    createBusinessPaymentMethodSetupCheckoutByUserId,
     changeBusinessPasswordByUserId,
     getBusinessActivityLogsByUserId,
     getBusinessProfileByUserId,
+    getBusinessProfileByUserIdForCategory,
+    updateBusinessMenuItemStockByUserId,
     submitBusinessProofByUserId,
     updateBusinessProfileByUserId,
     uploadBusinessAccountAvatarByUserId,
@@ -9,6 +15,116 @@ import {
     uploadBusinessProfileImageByUserId
 } from './profile.service.js'
 import { appendActivityLog } from '../../../shared/utils/business-controller.helpers.js'
+
+export const getMyBusinessSettings = async (req, res) => {
+    try {
+        const settings = await getBusinessSettingsByUserId(req.user._id)
+        return res.status(200).json({ data: settings })
+    } catch (error) {
+        if (error.message === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const updateMyBusinessSettings = async (req, res) => {
+    try {
+        const settings = await updateBusinessSettingsByUserId(req.user._id, req.validatedData.body)
+        await appendActivityLog(req, {
+            action: 'BUSINESS_SETTINGS_UPDATED',
+            category: 'ACCOUNT_PROFILE',
+            severity: 'LOW',
+            description: 'Business account settings were updated.'
+        })
+
+        return res.status(200).json({
+            message: 'Business settings updated successfully',
+            data: settings
+        })
+    } catch (error) {
+        if (error.message === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        if (error.message === 'PAYMENT_METHOD_REQUIRES_VERIFICATION') {
+            return res.status(409).json({ message: 'Please verify all enabled payment methods before saving.' })
+        }
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const verifyMyBusinessPaymentMethod = async (req, res) => {
+    try {
+        const data = await verifyBusinessPaymentMethodByUserId(req.user._id, req.validatedData.body)
+        await appendActivityLog(req, {
+            action: 'PAYMENT_METHOD_VERIFIED',
+            category: 'ACCOUNT_PROFILE',
+            severity: 'LOW',
+            description: `Business payment method ${data.methodCode} was verified with Xendit.`
+        })
+        return res.status(200).json({
+            message: `${data.methodCode} was verified successfully.`,
+            data
+        })
+    } catch (error) {
+        if (error.message === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        if (error.message === 'XENDIT_SECRET_KEY_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'Xendit secret key is not configured' })
+        }
+        if (error.message === 'XENDIT_SECRET_KEY_INVALID') {
+            return res.status(500).json({ message: 'Xendit secret key must start with xnd_' })
+        }
+        if (error.message === 'XENDIT_INVOICE_URL_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'Xendit invoice URL is not configured' })
+        }
+        if (error.message === 'XENDIT_METHOD_NOT_ENABLED') {
+            return res.status(409).json({ message: 'This payment method is disabled in Xendit environment settings.' })
+        }
+        if (error.message === 'XENDIT_AUTH_FAILED') {
+            return res.status(500).json({ message: 'Could not verify against Xendit. Please check API credentials.' })
+        }
+        if (error.message === 'PAYMENT_METHOD_NOT_SUPPORTED') {
+            return res.status(400).json({ message: 'Unsupported payment method.' })
+        }
+        return res.status(500).json({ message: error.message || 'Could not verify payment method.' })
+    }
+}
+
+export const createMyBusinessPaymentMethodSetupCheckout = async (req, res) => {
+    try {
+        const data = await createBusinessPaymentMethodSetupCheckoutByUserId(req.user._id, req.validatedData.body)
+        return res.status(200).json({
+            message: 'Payment method setup checkout created.',
+            data
+        })
+    } catch (error) {
+        const msg = error?.message || ''
+        if (msg === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        if (msg === 'XENDIT_SECRET_KEY_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'Xendit secret key is not configured' })
+        }
+        if (msg === 'XENDIT_SECRET_KEY_INVALID') {
+            return res.status(500).json({ message: 'Xendit secret key must start with xnd_' })
+        }
+        if (msg === 'XENDIT_INVOICE_URL_NOT_CONFIGURED') {
+            return res.status(500).json({ message: 'Xendit invoice URL is not configured' })
+        }
+        if (msg === 'CHECKOUT_RETURN_BASE_URL_INVALID') {
+            return res.status(400).json({ message: 'Invalid return base URL.' })
+        }
+        if (msg === 'CHECKOUT_RETURN_URLS_INVALID') {
+            return res.status(400).json({ message: 'Could not build return URLs.' })
+        }
+        if (msg === 'PAYMENT_METHOD_NOT_ENABLED_FOR_CHECKOUT') {
+            return res.status(409).json({ message: 'This payment method is disabled in Xendit environment settings.' })
+        }
+        return res.status(500).json({ message: error.message || 'Could not start setup checkout.' })
+    }
+}
 
 export const getMyBusinessProfile = async (req, res) => {
     try {
@@ -23,6 +139,78 @@ export const getMyBusinessProfile = async (req, res) => {
     } catch (error) {
         if (error.message === 'BUSINESS_NOT_FOUND') {
             return res.status(404).json({ message: 'Business profile not found' })
+        }
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const getMyRestaurantBusinessProfile = async (req, res) => {
+    try {
+        const businessProfile = await getBusinessProfileByUserIdForCategory(req.user._id, 'restaurant')
+        await appendActivityLog(req, {
+            action: 'PROFILE_VIEWED',
+            category: 'ACCOUNT_PROFILE',
+            severity: 'INFO',
+            description: 'Business restaurant profile page data was viewed.'
+        })
+        return res.status(200).json({ data: businessProfile })
+    } catch (error) {
+        if (error.message === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        if (error.message === 'BUSINESS_CATEGORY_MISMATCH') {
+            return res.status(403).json({ message: 'This endpoint is only available for restaurant business accounts.' })
+        }
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const getMyResortBusinessProfile = async (req, res) => {
+    try {
+        const businessProfile = await getBusinessProfileByUserIdForCategory(req.user._id, 'resort')
+        await appendActivityLog(req, {
+            action: 'PROFILE_VIEWED',
+            category: 'ACCOUNT_PROFILE',
+            severity: 'INFO',
+            description: 'Business resort profile page data was viewed.'
+        })
+        return res.status(200).json({ data: businessProfile })
+    } catch (error) {
+        if (error.message === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        if (error.message === 'BUSINESS_CATEGORY_MISMATCH') {
+            return res.status(403).json({ message: 'This endpoint is only available for resort and hotel business accounts.' })
+        }
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const updateMyResortListingStock = async (req, res) => {
+    try {
+        const { menuItemId } = req.validatedData.params
+        const { stockStatus } = req.validatedData.body
+        const updatedItem = await updateBusinessMenuItemStockByUserId(req.user._id, menuItemId, stockStatus)
+        await appendActivityLog(req, {
+            action: 'LISTING_AVAILABILITY_UPDATED',
+            category: 'MENU_MANAGEMENT',
+            severity: 'LOW',
+            description: 'Resort listing availability was updated.',
+            details: {
+                menuItemId,
+                stockStatus
+            }
+        })
+        return res.status(200).json({
+            message: 'Listing availability updated successfully',
+            data: updatedItem
+        })
+    } catch (error) {
+        if (error.message === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        if (error.message === 'MENU_ITEM_NOT_FOUND') {
+            return res.status(404).json({ message: 'Listing not found' })
         }
         return res.status(500).json({ message: error.message })
     }

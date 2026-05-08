@@ -1,12 +1,19 @@
-const SaveMenuCategoryPresetModal = ({ isOpen, categoryLabel, onClose, onConfirm }) => {
+const SaveMenuCategoryPresetModal = ({
+  isOpen,
+  categoryLabel,
+  onClose,
+  onConfirm,
+  title = 'Save category',
+  maxLabel = 'categories'
+}) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-        <h4 className="text-lg font-semibold text-[#1f1f1f]">Save category</h4>
+        <h4 className="text-lg font-semibold text-[#1f1f1f]">{title}</h4>
         <p className="mt-2 text-sm text-[#5b5b5b]">
-          Save &quot;{categoryLabel}&quot; for quick selection next time? You can keep up to four categories.
+          Save &quot;{categoryLabel}&quot; for quick selection next time? You can keep up to four {maxLabel}.
         </p>
         <div className="mt-5 flex justify-end gap-2">
           <button

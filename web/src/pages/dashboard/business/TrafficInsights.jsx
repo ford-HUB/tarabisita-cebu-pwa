@@ -6,6 +6,9 @@ const percent = (value) => `${Number(value || 0).toFixed(2)}%`
 const TrafficInsights = () => {
   const { data, summary, ordersByHour, selectedDate, setSelectedDate, isLoading, errorMessage, refreshInsights } =
     useBusinessTrafficInsights()
+  const isBookingReport = data?.reportBasis === 'bookings'
+  const unitLabel = isBookingReport ? 'Booking' : 'Order'
+  const unitLabelPlural = `${unitLabel}s`
 
   const generatedLabel = useMemo(() => {
     if (!data?.generatedAt) return ''
@@ -26,7 +29,7 @@ const TrafficInsights = () => {
       <div>
         <h1 className="text-2xl font-semibold text-[#1f1f1f]">Traffic Insights</h1>
         <p className="mt-1 text-sm text-[#6d645d]">
-          Daily profile traffic and order conversion insights for your restaurant.
+          Daily profile traffic and {isBookingReport ? 'booking' : 'order'} conversion insights.
         </p>
       </div>
 
@@ -70,7 +73,7 @@ const TrafficInsights = () => {
                 <p className="mt-1 text-lg font-semibold text-[#2f2f2f]">{summary.publicProfileViews || 0}</p>
               </article>
               <article className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
-                <p className="text-xs text-[#8a8179]">Completed Orders (Today)</p>
+                <p className="text-xs text-[#8a8179]">Completed {unitLabelPlural} (Today)</p>
                 <p className="mt-1 text-lg font-semibold text-[#2f2f2f]">{summary.completedOrdersToday || 0}</p>
               </article>
               <article className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
@@ -78,11 +81,11 @@ const TrafficInsights = () => {
                 <p className="mt-1 text-lg font-semibold text-[#2f2f2f]">{percent(summary.conversionRatePct)}</p>
               </article>
               <article className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
-                <p className="text-xs text-[#8a8179]">Total Orders (Today)</p>
+                <p className="text-xs text-[#8a8179]">Total {unitLabelPlural} (Today)</p>
                 <p className="mt-1 text-lg font-semibold text-[#2f2f2f]">{summary.totalOrdersToday || 0}</p>
               </article>
               <article className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
-                <p className="text-xs text-[#8a8179]">Canceled Orders (Today)</p>
+                <p className="text-xs text-[#8a8179]">Canceled {unitLabelPlural} (Today)</p>
                 <p className="mt-1 text-lg font-semibold text-[#2f2f2f]">{summary.canceledOrdersToday || 0}</p>
               </article>
               <article className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
@@ -93,9 +96,9 @@ const TrafficInsights = () => {
 
             <section className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[#6b4a2f]">Orders by Hour</h3>
+                <h3 className="text-sm font-semibold text-[#6b4a2f]">{unitLabelPlural} by Hour</h3>
                 <p className="text-xs text-[#8a8179]">
-                  Peak hour: {peakHour ? `${peakHour.hour} (${peakHour.orders} order/s)` : 'No orders'}
+                  Peak hour: {peakHour ? `${peakHour.hour} (${peakHour.orders} ${isBookingReport ? 'booking/s' : 'order/s'})` : `No ${unitLabelPlural.toLowerCase()}`}
                 </p>
               </div>
               <div className="space-y-1">

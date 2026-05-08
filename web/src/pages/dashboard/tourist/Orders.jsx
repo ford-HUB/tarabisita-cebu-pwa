@@ -20,7 +20,7 @@ const Orders = () => {
         groups={storeOrderGroups}
         isLoading={isLoading}
         errorMessage={errorMessage}
-        excludeStatuses={['FINISHED']}
+        excludeStatuses={['FINISHED', 'CANCELED']}
       />
     </div>
   )

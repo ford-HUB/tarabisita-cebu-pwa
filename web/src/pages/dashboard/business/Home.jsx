@@ -12,7 +12,10 @@ import {
 
 const Home = () => {
   const { user } = useAuth()
-  const isRestaurant = String(user?.businessCategory || '').toUpperCase() === 'RESTAURANT'
+  const normalizedCategory = String(user?.businessCategory || '').toUpperCase()
+  const isResort = normalizedCategory === 'RESORT'
+  const canUseAnalyticsDashboard =
+    normalizedCategory === 'RESTAURANT' || normalizedCategory === 'RESORT' || normalizedCategory === 'HOTEL'
 
   const {
     isLoading,
@@ -34,9 +37,9 @@ const Home = () => {
     chartGeometry,
     activeYear,
     formatCurrency
-  } = useBusinessDashboard()
+  } = useBusinessDashboard({ isResortDashboard: isResort })
 
-  if (!isRestaurant) {
+  if (!canUseAnalyticsDashboard) {
     return (
       <div className="space-y-6">
         <section className="rounded-2xl border border-[#e7dfd5] bg-white p-6 shadow-sm">
@@ -73,7 +76,7 @@ const Home = () => {
 
       <section className="grid gap-5 xl:grid-cols-3">
         <div className="space-y-5 xl:col-span-2">
-          <KpiCardsSection totals={totals} />
+          <KpiCardsSection totals={totals} orderCountLabel={isResort ? 'Bookings' : 'Orders'} />
           <MonthlySalesSection monthlySales={monthlySales} maxMonthlySales={maxMonthlySales} />
         </div>
 
@@ -96,11 +99,13 @@ const Home = () => {
           activeOrderFilter={activeOrderFilter}
           setActiveOrderFilter={setActiveOrderFilter}
           formatCurrency={formatCurrency}
+          title={isResort ? 'Recent Bookings' : 'Recent Orders'}
+          subtitle={isResort ? 'Filter rows by latest booking status' : 'Filter rows by latest order status'}
         />
         <TopProductsSection topProducts={topProducts} formatCurrency={formatCurrency} />
       </section>
 
-      <OrderStatusCountsSection totals={totals} />
+      {!isResort ? <OrderStatusCountsSection totals={totals} /> : null}
     </div>
   )
 }
