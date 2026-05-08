@@ -46,13 +46,7 @@ const StoreMessages = () => {
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr] lg:items-start">
-        <OrderSnapshotPanel
-          snapshot={session?.orderSnapshot || null}
-          businessPhone={session?.businessPhone}
-          businessEmail={session?.businessEmail}
-          businessWebsite={session?.businessWebsite}
-          businessWhatsapp={session?.businessWhatsapp}
-        />
+        <OrderSnapshotPanel snapshot={session?.orderSnapshot || null} />
         <MessagingThreadSection
           businessName={session?.businessName || ''}
           businessStoreImage={

@@ -1,4 +1,5 @@
 export {
+    attachStayOccupancyToPublicMenuItems,
     createTouristCustomerOrder,
     createTouristMenuOrderXenditCheckout,
     incrementPublicBusinessProfileViewCount,

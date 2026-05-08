@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import FullCalendar from '@fullcalendar/react'
@@ -13,7 +13,9 @@ import {
 import { useAuth } from '../../../hooks/useAuth.hook.js'
 import { useTouristCartItemStore } from '../../../store/tourist/tourist-cart-item.store.js'
 import { pickCartItemDetailsFromMenuItem } from '../../../shared/utils/tourist-cart-item-details.utils.js'
+import { FiClock } from 'react-icons/fi'
 import { postTouristCustomerOrder } from '../../../services/tourist/touristCustomerOrder.service.js'
+import StayDatePickerField from '../../../components/tourist/stay/StayDatePickerField.jsx'
 
 const formatPrice = (n) => {
   const num = Number(n)
@@ -43,7 +45,68 @@ const toIsoDate = (value) => {
   return d.toISOString().slice(0, 10)
 }
 
+/** FullCalendar day cells — use local calendar date, not UTC (avoids wrong-day highlights). */
+const formatLocalYmd = (value) => {
+  const d = value instanceof Date ? value : new Date(value)
+  if (!Number.isFinite(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const addOneCalendarDayYmd = (ymd) => {
+  const [y, m, d] = String(ymd)
+    .split('-')
+    .map((x) => Number(x))
+  const dt = new Date(y, m - 1, d)
+  if (!Number.isFinite(dt.getTime())) return ''
+  dt.setDate(dt.getDate() + 1)
+  const yy = dt.getFullYear()
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
+
+/** Stay nights [check-in, check-out) — matches server occupancy expansion. */
+const enumerateStayNights = (checkIn, checkOut) => {
+  const a = String(checkIn || '').trim()
+  const b = String(checkOut || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b) || b <= a) return []
+  const nights = []
+  let d = a
+  while (d < b) {
+    nights.push(d)
+    d = addOneCalendarDayYmd(d)
+    if (!d || nights.length > 400) break
+  }
+  return nights
+}
+
+const isNotApplicableStayDate = (dateStr, ctx) => {
+  const s = String(dateStr || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return true
+  if (s < ctx.todayYmd) return true
+  if (ctx.whitelistMode && !ctx.availableSet.has(s)) return true
+  return false
+}
+
+/** Earliest YYYY-MM-DD from start (inclusive) where isDisabled returns false. */
+const findFirstOpenCheckInYmd = (startYmd, isDisabled) => {
+  let d = String(startYmd || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return ''
+  for (let i = 0; i < 400 && d; i++) {
+    if (!isDisabled(d)) return d
+    d = addOneCalendarDayYmd(d)
+  }
+  return ''
+}
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+/** Matches StayDatePickerField calendar icon; native time picker control stays clickable but hidden (WebKit). */
+const stayTimeInputClassName =
+  'relative w-full rounded-lg border border-[#ddd2c6] bg-white py-2.5 pl-3 pr-10 text-sm text-[#1f1f1f] outline-none focus:border-[#c9b6a3] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:bottom-0 [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:z-[1] [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0'
 
 const computeStayDays = (checkInDate, checkOutDate) => {
   const inDate = String(checkInDate || '').trim()
@@ -136,6 +199,7 @@ const StayBooking = () => {
   )
   const checkInDate = useWatch({ control, name: 'checkInDate' })
   const checkOutDate = useWatch({ control, name: 'checkOutDate' })
+  const todayYmd = useMemo(() => formatLocalYmd(new Date()), [])
   const stayDays = useMemo(() => computeStayDays(checkInDate, checkOutDate), [checkInDate, checkOutDate])
   const baseNightCost = useMemo(() => Math.max(0, Number(stayPackage?.price) || 0), [stayPackage?.price])
   const baseCoveredDays = 1
@@ -149,15 +213,32 @@ const StayBooking = () => {
     const fromUnavailable = Array.isArray(stayPackage?.unavailableDates) ? stayPackage.unavailableDates : []
     const merged = [...fromPackage, ...fromUnavailable].map(toIsoDate).filter(Boolean)
     return Array.from(new Set(merged))
-  }, [stayPackage?.occupiedDates, stayPackage?.unavailableDates])
+  }, [stayPackage])
 
   const availableDates = useMemo(() => {
     const raw = Array.isArray(stayPackage?.availableDates) ? stayPackage.availableDates : []
     const normalized = raw.map(toIsoDate).filter(Boolean)
     return Array.from(new Set(normalized))
-  }, [stayPackage?.availableDates])
+  }, [stayPackage])
 
   const occupiedSet = useMemo(() => new Set(occupiedDates), [occupiedDates])
+
+  const notApplicableCtx = useMemo(
+    () => ({
+      todayYmd,
+      whitelistMode: availableDates.length > 0,
+      availableSet: new Set(availableDates)
+    }),
+    [todayYmd, availableDates]
+  )
+
+  const checkOutInputMin = useMemo(() => {
+    const ci = String(checkInDate || '').trim()
+    if (ci && /^\d{4}-\d{2}-\d{2}$/.test(ci)) {
+      return addOneCalendarDayYmd(ci) || todayYmd
+    }
+    return addOneCalendarDayYmd(todayYmd) || todayYmd
+  }, [checkInDate, todayYmd])
 
   const calendarEvents = useMemo(() => {
     const occupiedEvents = occupiedDates.map((date) => ({
@@ -167,7 +248,10 @@ const StayBooking = () => {
       color: '#e11d48'
     }))
     const availableEvents = availableDates
-      .filter((date) => !occupiedSet.has(date))
+      .filter(
+        (date) =>
+          !occupiedSet.has(date) && !isNotApplicableStayDate(date, notApplicableCtx)
+      )
       .map((date) => ({
         id: `avail-${date}`,
         title: 'Available',
@@ -175,7 +259,89 @@ const StayBooking = () => {
         color: '#059669'
       }))
     return [...availableEvents, ...occupiedEvents]
-  }, [availableDates, occupiedDates, occupiedSet])
+  }, [availableDates, occupiedDates, occupiedSet, notApplicableCtx])
+
+  const isCheckInPickerDisabled = useCallback(
+    (ymd) => occupiedSet.has(ymd) || isNotApplicableStayDate(ymd, notApplicableCtx),
+    [occupiedSet, notApplicableCtx]
+  )
+
+  const isCheckOutPickerDisabled = useCallback(
+    (ymd) => {
+      if (ymd < checkOutInputMin) return true
+      const ci = String(checkInDate || '').trim()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ci)) return ymd < checkOutInputMin
+      if (ymd <= ci) return true
+      const span = enumerateStayNights(ci, ymd)
+      if (!span.length) return true
+      for (const d of span) {
+        if (occupiedSet.has(d)) return true
+        if (notApplicableCtx.whitelistMode && !notApplicableCtx.availableSet.has(d)) return true
+        if (isNotApplicableStayDate(d, notApplicableCtx)) return true
+      }
+      return false
+    },
+    [checkInDate, checkOutInputMin, occupiedSet, notApplicableCtx]
+  )
+
+  const checkOutPickerVisual = useCallback(
+    (ymd) => {
+      const ci = String(checkInDate || '').trim()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(ci) || ymd <= ci) return 'blocked'
+      const span = enumerateStayNights(ci, ymd)
+      if (span.some((d) => occupiedSet.has(d))) return 'occupied'
+      return 'blocked'
+    },
+    [checkInDate, occupiedSet]
+  )
+
+  const stayCalendarRef = useRef(null)
+  const didPrimeFirstCheckInRef = useRef(false)
+  const lastStayPackageIdRef = useRef('')
+
+  /** Default check-in to the first bookable day (so the orange “selected” marker matches first availability, not “today”). */
+  useEffect(() => {
+    if (!stayPackage || !stayBusiness) return
+    const sid = String(stayPackage.id || '')
+    if (sid !== lastStayPackageIdRef.current) {
+      lastStayPackageIdRef.current = sid
+      didPrimeFirstCheckInRef.current = false
+    }
+    if (didPrimeFirstCheckInRef.current) return
+
+    const current = String(getValues('checkInDate') || '').trim()
+    const currentOk =
+      current &&
+      /^\d{4}-\d{2}-\d{2}$/.test(current) &&
+      !isCheckInPickerDisabled(current)
+
+    const scrollTo = (ymd) => {
+      requestAnimationFrame(() => {
+        const api = stayCalendarRef.current?.getApi?.()
+        if (api && ymd) api.gotoDate(ymd)
+      })
+    }
+
+    if (currentOk) {
+      didPrimeFirstCheckInRef.current = true
+      scrollTo(current)
+      return
+    }
+
+    const found = findFirstOpenCheckInYmd(todayYmd, isCheckInPickerDisabled)
+    if (found) {
+      setValue('checkInDate', found, { shouldDirty: false })
+      scrollTo(found)
+    }
+    didPrimeFirstCheckInRef.current = true
+  }, [
+    stayPackage,
+    stayBusiness,
+    todayYmd,
+    isCheckInPickerDisabled,
+    getValues,
+    setValue
+  ])
 
   useEffect(() => {
     if (touristName && !String(getValues('fullName') || '').trim()) {
@@ -199,6 +365,31 @@ const StayBooking = () => {
       setValue('guests', String(guestLimit), { shouldDirty: false })
     }
   }, [guestLimit, getValues, setValue])
+
+  /** Keep check-out in sync with check-in: clear when check-in clears; otherwise preserve a still-valid check-out or pick the earliest valid check-out (next open night). */
+  useEffect(() => {
+    const ci = String(checkInDate || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ci)) {
+      setValue('checkOutDate', '', { shouldDirty: true })
+      return
+    }
+
+    const coCurrent = String(getValues('checkOutDate') || '').trim()
+    if (coCurrent && /^\d{4}-\d{2}-\d{2}$/.test(coCurrent) && !isCheckOutPickerDisabled(coCurrent)) {
+      return
+    }
+
+    let candidate = addOneCalendarDayYmd(ci)
+    let found = ''
+    for (let i = 0; i < 400 && candidate; i++) {
+      if (!isCheckOutPickerDisabled(candidate)) {
+        found = candidate
+        break
+      }
+      candidate = addOneCalendarDayYmd(candidate)
+    }
+    setValue('checkOutDate', found, { shouldDirty: true })
+  }, [checkInDate, getValues, isCheckOutPickerDisabled, setValue])
 
   if (!stayPackage || !stayBusiness) {
     return (
@@ -227,6 +418,26 @@ const StayBooking = () => {
     if (parsedCheckOutDate <= parsedCheckInDate) {
       toast.error('Check-out date must be after check-in date.')
       return
+    }
+
+    const stayNights = enumerateStayNights(values.checkInDate, values.checkOutDate)
+    if (!stayNights.length) {
+      toast.error('Please provide a valid stay date range.')
+      return
+    }
+    for (const d of stayNights) {
+      if (occupiedSet.has(d)) {
+        toast.error('Those dates overlap nights that are already booked for this stay. Adjust your schedule.')
+        return
+      }
+      if (notApplicableCtx.whitelistMode && !notApplicableCtx.availableSet.has(d)) {
+        toast.error('Your stay includes dates that are not open for booking for this package.')
+        return
+      }
+      if (isNotApplicableStayDate(d, notApplicableCtx)) {
+        toast.error('Your stay includes dates that are not available to book.')
+        return
+      }
     }
 
     const baseCost = baseNightCost
@@ -346,10 +557,14 @@ const StayBooking = () => {
               <span className="h-2.5 w-2.5 rounded-full bg-[#fb923c]" />
               Selected check-in
             </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#d4d4d8]" />
+              Not applicable
+            </span>
           </div>
         </div>
         <div
-          className="mt-3 rounded-xl border border-[#efe5db] bg-[#fcfaf7] p-3 [&_.fc]:text-[#2f2f2f] [&_.fc-theme-standard_.fc-scrollgrid]:border-[#e7dfd5] [&_.fc-theme-standard_td]:border-[#efe5db] [&_.fc-theme-standard_th]:border-[#efe5db] [&_.fc-col-header-cell]:bg-[#f8f5f0] [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-col-header-cell-cushion]:font-semibold [&_.fc-col-header-cell-cushion]:text-[#6f665d] [&_.fc-daygrid-day-frame]:min-h-14 [&_.fc-daygrid-day-number]:text-xs [&_.fc-daygrid-day-number]:text-[#6f665d] [&_.fc-day-today]:bg-[#fff3e8] [&_.fc-toolbar-title]:text-lg [&_.fc-toolbar-title]:font-semibold [&_.fc-toolbar-title]:text-[#2f2f2f] [&_.fc-toolbar.fc-header-toolbar]:mb-2 [&_.fc_.fc-button]:rounded-md [&_.fc_.fc-button]:px-2 [&_.fc_.fc-button]:py-1 [&_.fc_.fc-button]:text-xs [&_.fc_.fc-button]:font-medium [&_.fc_.fc-button]:shadow-none [&_.fc_.fc-button-primary:focus]:shadow-none [&_.fc-daygrid-event]:rounded-md [&_.fc-daygrid-event]:text-[10px] [&_.fc-daygrid-event]:leading-tight [&_.fc-daygrid-event]:text-white [&_.fc-daygrid-day.tb-day-occupied]:bg-[#ffe4e6] [&_.fc-daygrid-day.tb-day-occupied_.fc-daygrid-day-number]:text-[#9f1239] [&_.fc-daygrid-day.tb-day-selected]:bg-[#ffedd5] [&_.fc-daygrid-day.tb-day-selected_.fc-daygrid-day-number]:text-[#9a3412]"
+          className="mt-3 rounded-xl border border-[#efe5db] bg-[#fcfaf7] p-3 [&_.fc]:text-[#2f2f2f] [&_.fc-theme-standard_.fc-scrollgrid]:border-[#e7dfd5] [&_.fc-theme-standard_td]:border-[#efe5db] [&_.fc-theme-standard_th]:border-[#efe5db] [&_.fc-col-header-cell]:bg-[#f8f5f0] [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-col-header-cell-cushion]:font-semibold [&_.fc-col-header-cell-cushion]:text-[#6f665d] [&_.fc-daygrid-day-frame]:min-h-14 [&_.fc-daygrid-day-number]:text-xs [&_.fc-daygrid-day-number]:text-[#6f665d] [&_.fc-day-today]:bg-transparent [&_.fc-day-today]:shadow-none [&_.fc-toolbar-title]:text-lg [&_.fc-toolbar-title]:font-semibold [&_.fc-toolbar-title]:text-[#2f2f2f] [&_.fc-toolbar.fc-header-toolbar]:mb-2 [&_.fc_.fc-button]:rounded-md [&_.fc_.fc-button]:px-2 [&_.fc_.fc-button]:py-1 [&_.fc_.fc-button]:text-xs [&_.fc_.fc-button]:font-medium [&_.fc_.fc-button]:shadow-none [&_.fc_.fc-button-primary:focus]:shadow-none [&_.fc-daygrid-event]:rounded-md [&_.fc-daygrid-event]:text-[10px] [&_.fc-daygrid-event]:leading-tight [&_.fc-daygrid-event]:text-white [&_.fc-daygrid-day.tb-day-not-applicable]:cursor-not-allowed [&_.fc-daygrid-day.tb-day-not-applicable]:bg-[#f4f4f5] [&_.fc-daygrid-day.tb-day-not-applicable_.fc-daygrid-day-number]:text-[#a1a1aa] [&_.fc-daygrid-day.tb-day-occupied]:cursor-not-allowed [&_.fc-daygrid-day.tb-day-occupied]:bg-[#ffe4e6] [&_.fc-daygrid-day.tb-day-occupied_.fc-daygrid-day-number]:text-[#9f1239] [&_.fc-daygrid-day.tb-day-selected]:bg-[#ffedd5] [&_.fc-daygrid-day.tb-day-selected_.fc-daygrid-day-number]:text-[#9a3412]"
           style={{
             '--fc-button-bg-color': '#f5eee4',
             '--fc-button-border-color': '#d5c5b2',
@@ -358,25 +573,30 @@ const StayBooking = () => {
             '--fc-button-hover-border-color': '#c7b39d',
             '--fc-button-active-bg-color': '#f2e8da',
             '--fc-button-active-border-color': '#9b5a2c',
-            '--fc-button-active-text-color': '#9b5a2c'
+            '--fc-button-active-text-color': '#9b5a2c',
+            '--fc-today-bg-color': 'transparent'
           }}
         >
           <FullCalendar
+            ref={stayCalendarRef}
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             events={calendarEvents}
             dateClick={(info) => {
               if (occupiedSet.has(info.dateStr)) return
+              if (isNotApplicableStayDate(info.dateStr, notApplicableCtx)) return
               setValue('checkInDate', info.dateStr, { shouldDirty: true })
             }}
             eventClick={(info) => {
               const dateStr = info.event.startStr.slice(0, 10)
               if (occupiedSet.has(dateStr)) return
+              if (isNotApplicableStayDate(dateStr, notApplicableCtx)) return
               setValue('checkInDate', dateStr, { shouldDirty: true })
             }}
             dayCellClassNames={(arg) => {
-              const dateStr = arg.date.toISOString().slice(0, 10)
+              const dateStr = formatLocalYmd(arg.date)
               if (occupiedSet.has(dateStr)) return ['tb-day-occupied']
+              if (isNotApplicableStayDate(dateStr, notApplicableCtx)) return ['tb-day-not-applicable']
               if (dateStr === String(checkInDate || '').trim()) return ['tb-day-selected']
               return []
             }}
@@ -392,7 +612,9 @@ const StayBooking = () => {
           />
         </div>
         <p className="mt-2 text-xs text-[#6b6b6b]">
-          Tap an available date to auto-fill check-in. Occupied dates are marked in red and cannot be selected.
+          Tap an open date to set check-in; check-out updates to the next valid night automatically (you can change it in
+          the field below). Gray days are not bookable; red days are already booked. The date pickers use the same
+          rules.
         </p>
       </section>
 
@@ -400,19 +622,65 @@ const StayBooking = () => {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-[#7a7a7a]">Check-in date</span>
-            <input type="date" required {...register('checkInDate')} className="w-full rounded-lg border border-[#ddd2c6] px-3 py-2.5 text-sm outline-none focus:border-[#c9b6a3]" />
+            <Controller
+              name="checkInDate"
+              control={control}
+              rules={{ required: true }}
+              render={({ field }) => (
+                <StayDatePickerField
+                  id="stay-check-in-date"
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  inputRef={field.ref}
+                  minYmd={todayYmd}
+                  todayYmd={todayYmd}
+                  isDateDisabled={isCheckInPickerDisabled}
+                  getDisabledVisual={(ymd) => (occupiedSet.has(ymd) ? 'occupied' : 'blocked')}
+                />
+              )}
+            />
           </label>
           <label className="space-y-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-[#7a7a7a]">Check-in time</span>
-            <input type="time" required {...register('checkInTime')} className="w-full rounded-lg border border-[#ddd2c6] px-3 py-2.5 text-sm outline-none focus:border-[#c9b6a3]" />
+            <div className="relative">
+              <input type="time" required {...register('checkInTime')} className={stayTimeInputClassName} />
+              <FiClock
+                className="pointer-events-none absolute right-3 top-1/2 z-0 h-4 w-4 -translate-y-1/2 text-[#7d5b3b]"
+                aria-hidden
+              />
+            </div>
           </label>
           <label className="space-y-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-[#7a7a7a]">Check-out date</span>
-            <input type="date" required {...register('checkOutDate')} className="w-full rounded-lg border border-[#ddd2c6] px-3 py-2.5 text-sm outline-none focus:border-[#c9b6a3]" />
+            <Controller
+              name="checkOutDate"
+              control={control}
+              rules={{ required: true }}
+              render={({ field }) => (
+                <StayDatePickerField
+                  id="stay-check-out-date"
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  inputRef={field.ref}
+                  minYmd={checkOutInputMin}
+                  todayYmd={todayYmd}
+                  isDateDisabled={isCheckOutPickerDisabled}
+                  getDisabledVisual={checkOutPickerVisual}
+                />
+              )}
+            />
           </label>
           <label className="space-y-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-[#7a7a7a]">Check-out time</span>
-            <input type="time" required {...register('checkOutTime')} className="w-full rounded-lg border border-[#ddd2c6] px-3 py-2.5 text-sm outline-none focus:border-[#c9b6a3]" />
+            <div className="relative">
+              <input type="time" required {...register('checkOutTime')} className={stayTimeInputClassName} />
+              <FiClock
+                className="pointer-events-none absolute right-3 top-1/2 z-0 h-4 w-4 -translate-y-1/2 text-[#7d5b3b]"
+                aria-hidden
+              />
+            </div>
           </label>
         </div>
 

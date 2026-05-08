@@ -108,7 +108,7 @@ export const useTouristOrders = () => {
         total: o.total,
         time: o.time,
         statusKey: o.status,
-        statusLabel: touristCustomerOrderStatusLabel(o.status),
+        statusLabel: touristCustomerOrderStatusLabel(o.status, o.orderType || 'MENU_ORDER'),
         statusBadgeClass: touristCustomerOrderStatusBadgeClass(o.status),
         cancelReason: o.cancelReason || '',
         createdAt: o.createdAt,

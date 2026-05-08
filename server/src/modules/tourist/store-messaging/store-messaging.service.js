@@ -8,6 +8,19 @@ import { sealStoreMessagingPayload, openStoreMessagingPayload } from '../../../s
 
 const LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
+/** Tourist hub hides threads when the order is done or canceled (`CustomerOrder.status`). */
+const TOURIST_MESSAGING_CLOSED_STATUSES = new Set(['FINISHED', 'CANCELED'])
+
+const assertOrderAllowsTouristMessaging = (order) => {
+    if (!order) {
+        throw new Error('ORDER_NOT_FOUND')
+    }
+    const s = String(order.status || '').toUpperCase()
+    if (TOURIST_MESSAGING_CLOSED_STATUSES.has(s)) {
+        throw new Error('ORDER_MESSAGING_CLOSED')
+    }
+}
+
 const formatPhp = (amount) => {
     const n = Number(amount)
     if (!Number.isFinite(n)) return '₱0.00'
@@ -49,6 +62,7 @@ const buildOrderSnapshot = (orderLean, businessLean) => {
     const card = extractBusinessCard(businessLean)
     return {
         orderCode: orderLean.orderCode,
+        orderType: orderLean.orderType,
         productName: orderLean.productName,
         productImage: orderLean.productImage || '',
         productDetails: orderLean.productDetails || '',
@@ -61,6 +75,15 @@ const buildOrderSnapshot = (orderLean, businessLean) => {
         businessName: card.businessName,
         businessStoreImage: card.businessStoreImage
     }
+}
+
+/** Keep persisted snapshot extras but always overlay live order fields (status, orderType, totals). */
+const overlayFreshOrderOnSnapshot = (storedSnapshot, orderLean, businessLean) => {
+    const fresh = buildOrderSnapshot(orderLean, businessLean)
+    if (!storedSnapshot || typeof storedSnapshot !== 'object') {
+        return fresh
+    }
+    return { ...storedSnapshot, ...fresh }
 }
 
 const mapMessage = (m) => ({
@@ -89,6 +112,7 @@ export const createStoreMessagingLinkToken = async (touristUserId, { businessId,
     if (!order) {
         throw new Error('ORDER_NOT_FOUND')
     }
+    assertOrderAllowsTouristMessaging(order)
     const exp = Date.now() + LINK_TTL_MS
     const token = sealStoreMessagingPayload({
         v: 1,
@@ -153,6 +177,7 @@ export const resolveTouristMessagingSession = async (touristUserId, messagingTok
     if (!order) {
         throw new Error('ORDER_NOT_FOUND')
     }
+    assertOrderAllowsTouristMessaging(order)
     const b = order.businessId && typeof order.businessId === 'object' && order.businessId._id ? order.businessId : null
     const snapshot = buildOrderSnapshot(order, b)
     const businessObjectId =
@@ -171,7 +196,7 @@ export const resolveTouristMessagingSession = async (touristUserId, messagingTok
         conversationId: String(conv._id),
         businessId: String(order.businessId._id || order.businessId),
         ...card,
-        orderSnapshot: conv.orderSnapshot || snapshot,
+        orderSnapshot: overlayFreshOrderOnSnapshot(conv.orderSnapshot, order, b),
         messages: messages.map(mapMessage)
     }
 }
@@ -193,8 +218,9 @@ export const resolveTouristMessagingThread = async (touristUserId, conversationI
     if (!order) {
         throw new Error('ORDER_NOT_FOUND')
     }
+    assertOrderAllowsTouristMessaging(order)
     const b = order.businessId && typeof order.businessId === 'object' && order.businessId._id ? order.businessId : null
-    const snapshot = conv.orderSnapshot && typeof conv.orderSnapshot === 'object' ? conv.orderSnapshot : buildOrderSnapshot(order, b)
+    const snapshot = overlayFreshOrderOnSnapshot(conv.orderSnapshot, order, b)
     const messages = await StoreMessage.find({ conversationId: conv._id }).sort({ createdAt: 1 }).lean()
     const card = extractBusinessCard(b)
     return {
@@ -211,7 +237,21 @@ export const listTouristConversations = async (touristUserId) => {
         .sort({ lastMessageAt: -1, updatedAt: -1 })
         .populate('businessId', 'name logo coverImage banner')
         .lean()
-    return rows.map((r) => {
+    const orderIds = [...new Set(rows.map((r) => r.customerOrderId).filter(Boolean).map((id) => String(id)))]
+    const validOids = orderIds.filter((id) => mongoose.Types.ObjectId.isValid(id))
+    const orders =
+        validOids.length > 0
+            ? await CustomerOrder.find({ _id: { $in: validOids } })
+                  .select('_id status')
+                  .lean()
+            : []
+    const statusByOrderId = new Map(orders.map((o) => [String(o._id), String(o.status || '').toUpperCase()]))
+    const activeRows = rows.filter((r) => {
+        const st = statusByOrderId.get(String(r.customerOrderId || ''))
+        if (!st) return false
+        return !TOURIST_MESSAGING_CLOSED_STATUSES.has(st)
+    })
+    return activeRows.map((r) => {
         const b = r.businessId && typeof r.businessId === 'object' ? r.businessId : null
         const card = extractBusinessCard(b)
         const snap = r.orderSnapshot && typeof r.orderSnapshot === 'object' ? r.orderSnapshot : {}
@@ -247,7 +287,7 @@ export const appendStoreMessage = async ({ conversationId, senderUserId, senderR
 }
 
 export const listBusinessConversations = async (businessUserId) => {
-    const biz = await Business.findOne({ userId: businessUserId }).lean()
+    const biz = await Business.findOne({ userId: businessUserId }).populate('category', 'name').lean()
     if (!biz) {
         return []
     }
@@ -255,7 +295,45 @@ export const listBusinessConversations = async (businessUserId) => {
         .sort({ lastMessageAt: -1, updatedAt: -1 })
         .populate('touristUserId', 'name avatar')
         .lean()
-    return rows.map((r) => {
+
+    /** Restaurant hub: hide threads tied to finished/canceled orders (same closed set as tourist messaging). */
+    const categorySlug = resolveBusinessCategorySlug(biz)
+    const isRestaurant = categorySlug === 'restaurant'
+    let activeRows = rows
+    if (isRestaurant) {
+        const orderIds = [...new Set(rows.map((r) => r.customerOrderId).filter(Boolean).map((id) => String(id)))]
+        const validOids = orderIds.filter((id) => mongoose.Types.ObjectId.isValid(id))
+        const orders =
+            validOids.length > 0
+                ? await CustomerOrder.find({ _id: { $in: validOids } })
+                      .select('_id status')
+                      .lean()
+                : []
+        const statusByOrderId = new Map(orders.map((o) => [String(o._id), String(o.status || '').toUpperCase()]))
+        activeRows = rows.filter((r) => {
+            const st = statusByOrderId.get(String(r.customerOrderId || ''))
+            if (!st) return false
+            return !TOURIST_MESSAGING_CLOSED_STATUSES.has(st)
+        })
+    }
+
+    /** Resort/hotel chat sidebar: unread customer messages since the business last opened the thread. */
+    const unreadByConvId = new Map()
+    if (categorySlug === 'resort' && activeRows.length > 0) {
+        const ids = activeRows.map((r) => r._id).filter(Boolean)
+        if (ids.length > 0) {
+            const unreadRows = await StoreConversation.aggregate([
+                { $match: { _id: { $in: ids } } },
+                { $lookup: unreadTouristMessagesLookup() },
+                { $project: { _id: 1, unreadFromCustomerCount: { $size: '$unreadTouristMessages' } } }
+            ])
+            for (const ur of unreadRows) {
+                unreadByConvId.set(String(ur._id), Number(ur.unreadFromCustomerCount) || 0)
+            }
+        }
+    }
+
+    return activeRows.map((r) => {
         const u = r.touristUserId && typeof r.touristUserId === 'object' ? r.touristUserId : null
         const snap = r.orderSnapshot && typeof r.orderSnapshot === 'object' ? r.orderSnapshot : {}
         return {
@@ -265,7 +343,9 @@ export const listBusinessConversations = async (businessUserId) => {
             touristAvatar: u?.avatar != null ? String(u.avatar).trim() : '',
             orderCode: snap.orderCode || '',
             productName: snap.productName || '',
-            lastMessageAt: r.lastMessageAt || r.updatedAt
+            lastMessageAt: r.lastMessageAt || r.updatedAt,
+            unreadFromCustomerCount:
+                categorySlug === 'resort' ? unreadByConvId.get(String(r._id)) || 0 : 0
         }
     })
 }
@@ -550,6 +630,8 @@ export const assertSocketAccessToConversation = async ({ conversationId, userId,
         if (String(conv.touristUserId) !== String(userId)) {
             throw new Error('FORBIDDEN')
         }
+        const order = await CustomerOrder.findById(conv.customerOrderId).select('status').lean()
+        assertOrderAllowsTouristMessaging(order)
         return conv
     }
     if (role === 'BUSINESS') {

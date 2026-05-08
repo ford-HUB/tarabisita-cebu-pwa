@@ -17,7 +17,10 @@ const Chat = () => {
   const { user } = useAuth()
   const normalizedCategory = String(user?.businessCategory || '').trim().toUpperCase()
   const isResortBusiness = normalizedCategory === 'RESORT'
-  const { hub, room, sendMessage, deleteConversation } = useBusinessStoreMessaging({ conversationId: c })
+  const { hub, room, sendMessage, deleteConversation } = useBusinessStoreMessaging({
+    conversationId: c,
+    enableHubRefetchOnRemoteTouristMessage: isResortBusiness
+  })
 
   const currentUserId = useMemo(
     () => (user?._id != null ? String(user._id) : user?.id != null ? String(user.id) : null),
@@ -53,6 +56,7 @@ const Chat = () => {
           selectedConversationId={c}
           isLoading={hub.loading}
           errorMessage={hub.error}
+          isResortBusiness={isResortBusiness}
         />
 
         <div className="flex min-h-0 min-w-0 flex-col">

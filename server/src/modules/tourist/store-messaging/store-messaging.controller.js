@@ -19,6 +19,9 @@ const mapErr = (error) => {
         return { status: 404, message: 'Conversation not found.' }
     }
     if (code === 'ORDER_NOT_FOUND') return { status: 404, message: 'Order not found.' }
+    if (code === 'ORDER_MESSAGING_CLOSED') {
+        return { status: 404, message: 'This chat is closed because the order is finished or canceled.' }
+    }
     if (code === 'INVALID_IDS') return { status: 400, message: 'Invalid request.' }
     if (code === 'INVALID_MESSAGING_TOKEN' || code === 'MESSAGING_TOKEN_EXPIRED' || code === 'MESSAGING_TOKEN_MISMATCH') {
         return { status: 400, message: 'This chat link is invalid or has expired. Open a new chat from your order.' }
