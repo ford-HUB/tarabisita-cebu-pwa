@@ -15,6 +15,8 @@ const Chat = () => {
   const navigate = useNavigate()
   const c = searchParams.get('c')
   const { user } = useAuth()
+  const normalizedCategory = String(user?.businessCategory || '').trim().toUpperCase()
+  const isResortBusiness = normalizedCategory === 'RESORT'
   const { hub, room, sendMessage, deleteConversation } = useBusinessStoreMessaging({ conversationId: c })
 
   const currentUserId = useMemo(
@@ -56,7 +58,11 @@ const Chat = () => {
         <div className="flex min-h-0 min-w-0 flex-col">
           {!c ? (
             <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-[#e7dfd5] bg-white/80 px-6 py-16 text-center shadow-sm">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#eff6ff] text-[#2563eb]">
+              <div
+                className={`flex h-16 w-16 items-center justify-center rounded-2xl ${
+                  isResortBusiness ? 'bg-[#fff4e8] text-[#9b5a2c]' : 'bg-[#eff6ff] text-[#2563eb]'
+                }`}
+              >
                 <FiMessageSquare className="h-8 w-8" aria-hidden />
               </div>
               <p className="mt-5 text-base font-semibold text-[#2f2f2f]">Select a conversation</p>

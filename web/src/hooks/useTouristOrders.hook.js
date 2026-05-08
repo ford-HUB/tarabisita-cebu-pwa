@@ -94,6 +94,8 @@ export const useTouristOrders = () => {
         businessId: o.businessId || '',
         businessName: o.businessName || '',
         customerName: o.customer || '',
+        billingType: o.billingType || '',
+        orderType: o.orderType || 'MENU_ORDER',
         businessPhone: o.businessPhone || '',
         businessEmail: o.businessEmail || '',
         businessWebsite: o.businessWebsite || '',

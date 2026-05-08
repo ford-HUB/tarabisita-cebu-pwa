@@ -1,5 +1,7 @@
 export {
     advanceMyCustomerOrderStatusByUserId,
+    advanceMyResortBookingRecordStatusByUserId,
     cancelMyCustomerOrderByUserId,
-    listMyCustomerOrdersByUserId
+    listMyCustomerOrdersByUserId,
+    listMyResortBookingRecordsByUserId
 } from '../../payments/payments.service.js'

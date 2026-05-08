@@ -11,7 +11,7 @@ export const getMyBusinessDashboard = async (req, res) => {
     }
     if (error.message === 'MENU_DASHBOARD_NOT_AVAILABLE') {
       return res.status(403).json({
-        message: 'The dashboard summary is currently available for restaurant menu orders.'
+        message: 'The dashboard summary is currently available for restaurant, resort, or hotel business orders.'
       })
     }
     return res.status(500).json({ message: error.message || 'Failed to load dashboard summary' })

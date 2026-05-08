@@ -71,7 +71,7 @@ const PricingPlansSection = ({
                   : 'border border-[#e1d4c5] text-[#5f5f5f] hover:bg-[#f7f3ed]'
               } ${processingPlanId || isPlanSelectionLocked ? 'cursor-not-allowed opacity-70' : ''}`}
             >
-              {processingPlanId === plan.id ? 'Redirecting to PayMongo...' : 'Choose Plan'}
+              {processingPlanId === plan.id ? 'Redirecting to checkout...' : 'Choose Plan'}
             </button>
           </div>
         ))}

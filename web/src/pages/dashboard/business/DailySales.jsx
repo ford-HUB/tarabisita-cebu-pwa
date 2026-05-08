@@ -25,6 +25,10 @@ const DailySales = () => {
 
   const summary = report?.summary || null
   const analysis = report?.analysis || null
+  const isBookingReport = report?.reportBasis === 'bookings'
+  const unitLabel = isBookingReport ? 'Booking' : 'Order'
+  const unitLabelPlural = `${unitLabel}s`
+  const topSectionTitle = isBookingReport ? 'Top Booking Lines Today' : 'Top Items Today'
 
   const generatedLabel = useMemo(() => {
     if (!report?.generatedAt) return ''
@@ -38,7 +42,7 @@ const DailySales = () => {
     const doc = new jsPDF({ unit: 'pt', format: 'a4' })
 
     doc.setFontSize(16)
-    doc.text('Daily Sales Report', 40, 48)
+    doc.text(isBookingReport ? 'Daily Booking Earnings Report' : 'Daily Sales Report', 40, 48)
     doc.setFontSize(11)
     doc.text(`Business: ${report?.business?.name || 'Business'}`, 40, 68)
     doc.text(`Report Date: ${summary.reportDate}`, 40, 84)
@@ -49,21 +53,21 @@ const DailySales = () => {
       head: [['Metric', 'Value']],
       body: [
         ['Gross Sales', php(summary.grossSales)],
-        ['Total Orders', String(summary.totalOrders || 0)],
-        ['Completed Orders', String(summary.completedOrders || 0)],
-        ['Canceled Orders', String(summary.canceledOrders || 0)],
-        ['Items Sold', String(summary.totalItemsSold || 0)],
-        ['Average Order Value', php(summary.averageOrderValue)]
+        [`Total ${unitLabelPlural}`, String(summary.totalOrders || 0)],
+        [`Completed ${unitLabelPlural}`, String(summary.completedOrders || 0)],
+        [`Canceled ${unitLabelPlural}`, String(summary.canceledOrders || 0)],
+        [isBookingReport ? 'Total Booking Entries' : 'Items Sold', String(summary.totalItemsSold || 0)],
+        [`Average ${unitLabel} Value`, php(summary.averageOrderValue)]
       ],
       styles: { fontSize: 10 }
     })
 
     autoTable(doc, {
       startY: (doc.lastAutoTable?.finalY || 120) + 20,
-      head: [['Top Menu Items', 'Quantity Sold']],
+      head: [[isBookingReport ? 'Top Booking Lines' : 'Top Menu Items', 'Quantity']],
       body: topItems.length
         ? topItems.map((item) => [item.itemName || 'Item', String(item.quantitySold || 0)])
-        : [['No completed menu sales', '0']],
+        : [[isBookingReport ? 'No completed bookings' : 'No completed menu sales', '0']],
       styles: { fontSize: 10 }
     })
 
@@ -98,7 +102,8 @@ const DailySales = () => {
         <div>
           <h1 className="text-2xl font-semibold text-[#1f1f1f]">Daily Sales</h1>
           <p className="mt-1 text-sm text-[#6d645d]">
-            AI-assisted daily sales analysis auto-generates for the selected date, with downloadable PDF.
+            AI-assisted daily {isBookingReport ? 'booking earnings' : 'sales'} analysis auto-generates for the selected
+            date, with downloadable PDF.
           </p>
         </div>
         <button
@@ -151,26 +156,26 @@ const DailySales = () => {
                 <p className="mt-1 text-lg font-semibold text-[#2f2f2f]">{php(summary.grossSales)}</p>
               </article>
               <article className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
-                <p className="text-xs text-[#8a8179]">Completed Orders</p>
+                <p className="text-xs text-[#8a8179]">Completed {unitLabelPlural}</p>
                 <p className="mt-1 text-lg font-semibold text-[#2f2f2f]">{summary.completedOrders || 0}</p>
               </article>
               <article className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
-                <p className="text-xs text-[#8a8179]">Average Order Value</p>
+                <p className="text-xs text-[#8a8179]">Average {unitLabel} Value</p>
                 <p className="mt-1 text-lg font-semibold text-[#2f2f2f]">{php(summary.averageOrderValue)}</p>
               </article>
             </div>
 
             <section className="rounded-xl border border-[#efe3d7] bg-[#fffdf9] p-4">
-              <h3 className="text-sm font-semibold text-[#6b4a2f]">Top Items Today</h3>
+              <h3 className="text-sm font-semibold text-[#6b4a2f]">{topSectionTitle}</h3>
               <div className="mt-2 space-y-1 text-sm text-[#5d5650]">
                 {topItems.length ? (
                   topItems.map((item) => (
                     <p key={item.itemName}>
-                      {item.itemName} - {item.quantitySold} sold
+                      {item.itemName} - {item.quantitySold} {isBookingReport ? 'booking/s' : 'sold'}
                     </p>
                   ))
                 ) : (
-                  <p>No completed sales entries for the selected date.</p>
+                  <p>No completed {isBookingReport ? 'booking' : 'sales'} entries for the selected date.</p>
                 )}
               </div>
             </section>

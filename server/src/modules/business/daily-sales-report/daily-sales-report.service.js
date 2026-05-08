@@ -3,12 +3,14 @@ import CustomerOrder from '../customer-orders/models/customer-order.model.js'
 
 const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash'
 
-const supportsPublicMenuCatalog = (business) => {
+const resolveBusinessCategorySlug = (business) => {
   const category =
     typeof business?.category === 'object' && business?.category?.name != null
       ? String(business.category.name).trim().toUpperCase()
       : String(business?.category || '').trim().toUpperCase()
-  return category === 'RESTAURANT'
+  if (category === 'RESTAURANT') return 'restaurant'
+  if (category === 'RESORT' || category === 'HOTEL') return 'resort'
+  return 'other'
 }
 
 const resolveManilaDateLabel = (dateInput) => {
@@ -50,13 +52,16 @@ const parseGeminiJson = (text) => {
   }
 }
 
-const buildFallbackAnalysis = ({ summary }) => ({
-  executiveSummary: `Sales for ${summary.reportDate} reached ${php(summary.grossSales)} across ${summary.totalOrders} order(s).`,
+const buildFallbackAnalysis = ({ summary, reportBasis = 'orders' }) => ({
+  executiveSummary: `Sales for ${summary.reportDate} reached ${php(summary.grossSales)} across ${summary.totalOrders} ${reportBasis}.`,
   strengths: [
-    `Completed orders: ${summary.completedOrders}`,
-    `Average order value: ${php(summary.averageOrderValue)}`
+    `Completed ${reportBasis}: ${summary.completedOrders}`,
+    `Average ${reportBasis === 'bookings' ? 'booking' : 'order'} value: ${php(summary.averageOrderValue)}`
   ],
-  risks: summary.canceledOrders > 0 ? [`Canceled orders recorded: ${summary.canceledOrders}`] : ['No major risks detected.'],
+  risks:
+    summary.canceledOrders > 0
+      ? [`Canceled ${reportBasis} recorded: ${summary.canceledOrders}`]
+      : ['No major risks detected.'],
   recommendations: [
     'Monitor hourly demand and adjust prep staffing during peak periods.',
     'Promote best-selling menu items to improve conversion.'
@@ -67,14 +72,14 @@ const buildFallbackAnalysis = ({ summary }) => ({
   ]
 })
 
-const createGeminiAnalysis = async ({ businessName, summary, topItems }) => {
+const createGeminiAnalysis = async ({ businessName, summary, topItems, reportBasis = 'orders' }) => {
   const apiKey = String(process.env.GEMINI_APIKEY || '').trim()
   if (!apiKey) {
-    return buildFallbackAnalysis({ summary })
+    return buildFallbackAnalysis({ summary, reportBasis })
   }
 
   const prompt = [
-    'You are a compliance-aware retail analyst.',
+    'You are a compliance-aware business analyst.',
     'Generate a concise DAILY SALES REPORT analysis in strict JSON.',
     'Return ONLY JSON and no markdown.',
     '',
@@ -95,11 +100,11 @@ const createGeminiAnalysis = async ({ businessName, summary, topItems }) => {
     `Business: ${businessName}`,
     `Report date (Asia/Manila): ${summary.reportDate}`,
     `Gross sales (PHP): ${summary.grossSales}`,
-    `Completed orders: ${summary.completedOrders}`,
-    `Canceled orders: ${summary.canceledOrders}`,
-    `Total orders: ${summary.totalOrders}`,
-    `Average order value (PHP): ${summary.averageOrderValue}`,
-    `Top items: ${topItems.map((item) => `${item.itemName} (${item.quantitySold})`).join(', ') || 'None'}`
+    `Completed ${reportBasis}: ${summary.completedOrders}`,
+    `Canceled ${reportBasis}: ${summary.canceledOrders}`,
+    `Total ${reportBasis}: ${summary.totalOrders}`,
+    `Average ${reportBasis === 'bookings' ? 'booking' : 'order'} value (PHP): ${summary.averageOrderValue}`,
+    `Top ${reportBasis === 'bookings' ? 'booking lines' : 'items'}: ${topItems.map((item) => `${item.itemName} (${item.quantitySold})`).join(', ') || 'None'}`
   ].join('\n')
 
   const response = await fetch(
@@ -118,14 +123,14 @@ const createGeminiAnalysis = async ({ businessName, summary, topItems }) => {
   )
 
   if (!response.ok) {
-    return buildFallbackAnalysis({ summary })
+    return buildFallbackAnalysis({ summary, reportBasis })
   }
 
   const payload = await response.json()
   const rawText = payload?.candidates?.[0]?.content?.parts?.[0]?.text || ''
   const parsed = parseGeminiJson(rawText)
   if (!parsed || typeof parsed !== 'object') {
-    return buildFallbackAnalysis({ summary })
+    return buildFallbackAnalysis({ summary, reportBasis })
   }
 
   return {
@@ -164,7 +169,8 @@ const mapTopItems = (orders) => {
 export const generateMyDailySalesReportByUserId = async (userId, reportDate) => {
   const business = await Business.findOne({ userId }).populate('category', 'name').lean()
   if (!business) throw new Error('BUSINESS_NOT_FOUND')
-  if (!supportsPublicMenuCatalog(business)) throw new Error('MENU_ORDERS_NOT_AVAILABLE')
+  const categorySlug = resolveBusinessCategorySlug(business)
+  if (categorySlug !== 'restaurant' && categorySlug !== 'resort') throw new Error('MENU_ORDERS_NOT_AVAILABLE')
 
   const { day, startAt, endAt } = resolveManilaRange(reportDate)
   const allOrders = await CustomerOrder.find({
@@ -194,19 +200,23 @@ export const generateMyDailySalesReportByUserId = async (userId, reportDate) => 
   const analysis = await createGeminiAnalysis({
     businessName: business.name || 'Business',
     summary,
-    topItems
+    topItems,
+    reportBasis: categorySlug === 'resort' ? 'bookings' : 'orders'
   })
+  const subjectLabel = categorySlug === 'resort' ? 'booking(s)' : 'order(s)'
 
   return {
     business: {
       id: String(business._id),
-      name: business.name || 'Business'
+      name: business.name || 'Business',
+      category: categorySlug
     },
     summary,
     topItems,
     analysis,
+    reportBasis: categorySlug === 'resort' ? 'bookings' : 'orders',
     generatedAt: new Date().toISOString(),
     legalNotice:
-      'This report is generated for internal business monitoring. Validate all figures against official accounting records before regulatory filing.'
+      `This report is generated for internal business monitoring based on completed ${subjectLabel}. Validate all figures against official accounting records before regulatory filing.`
   }
 }

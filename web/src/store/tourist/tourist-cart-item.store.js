@@ -24,6 +24,7 @@ const resolveCatalogItemId = (payload) =>
  *   servingSize?: string,
  *   spiceLevel?: string,
  *   allergens?: string,
+ *   listingType?: string,
  *   itemNotes?: string
  * }} TouristCartItem
  */
@@ -82,6 +83,7 @@ export const useTouristCartItemStore = create((set, get) => ({
       next[idx] = {
         ...next[idx],
         qty: merged,
+        listingType: String(payload.listingType || next[idx].listingType || ''),
         ...details,
         ...(incomingNotes.trim() ? { itemNotes: incomingNotes } : {})
       }
@@ -101,6 +103,7 @@ export const useTouristCartItemStore = create((set, get) => ({
           unitPrice: Number(unitPrice) || 0,
           image: image || '',
           qty,
+          listingType: String(payload.listingType || ''),
           ...details,
           itemNotes: clampItemNotes(payload.itemNotes)
         }
@@ -182,6 +185,7 @@ export const useTouristCartItemStore = create((set, get) => ({
         unitPrice: Number(it.unitPrice) || 0,
         image: String(it.image || ''),
         qty: Math.min(99, Math.max(1, Number(it.qty) || 1)),
+        listingType: String(it.listingType || ''),
         ...pickCartItemDetailsFromPayload(it),
         itemNotes: clampItemNotes(it.itemNotes)
       }

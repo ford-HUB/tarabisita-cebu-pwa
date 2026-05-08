@@ -4,8 +4,13 @@ import Register from "../../pages/auth/Register"
 import VerifyEmail from "../../pages/auth/VerifyEmail"
 import ResetPassword from "../../pages/auth/ResetPassword"
 import Landing from "../../pages/public/Landing"
+import BookingPayment from "../../pages/dashboard/tourist/BookingPayment"
 
 export const AuthRoutes = [
+  {
+    path: '/tourist/booking-payment',
+    element: <BookingPayment />,
+  },
   {
     path: '/',
     element: <AuthLayout />,

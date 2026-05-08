@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { FiBell, FiChevronDown, FiLogOut, FiSearch, FiSettings, FiUser } from 'react-icons/fi'
 import { toEncryptedRoute } from '../../../shared/utils/direct.utils'
 import BusinessNotificationCardsSection from '../../business/notifications/sections/BusinessNotificationCardsSection'
-import { businessNotificationsHref } from './businessLayout.constants'
+import { businessNotificationsHref, businessSettingsHref } from './businessLayout.constants'
 
 const BusinessTopbar = ({
   isBusinessVerified,
@@ -99,7 +99,7 @@ const BusinessTopbar = ({
           >
             <FiBell size={16} />
             {showUnreadBadge ? (
-              <span className="absolute -right-0.5 -top-0.5 flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-[#ef4444] px-1 text-[0.65rem] font-bold leading-none text-white">
+              <span className="absolute -right-0.5 -top-0.5 flex min-h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[#ef4444] px-1 text-[0.65rem] font-bold leading-none text-white">
                 {badgeLabel}
               </span>
             ) : null}
@@ -183,13 +183,14 @@ const BusinessTopbar = ({
               <FiUser size={15} />
               Profile
             </Link>
-            <button
-              type="button"
+            <Link
+              to={businessSettingsHref}
+              onClick={onCloseProfile}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#f5eee4]"
             >
               <FiSettings size={15} />
               Settings
-            </button>
+            </Link>
             <button
               type="button"
               onClick={onLogout}

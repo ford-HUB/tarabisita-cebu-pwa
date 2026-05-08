@@ -11,7 +11,7 @@ export const getMyTrafficInsights = async (req, res) => {
     }
     if (error.message === 'MENU_ORDERS_NOT_AVAILABLE') {
       return res.status(403).json({
-        message: 'Traffic insights are currently available for restaurant menu orders.'
+        message: 'Traffic insights are currently available for restaurant orders and resort bookings.'
       })
     }
     return res.status(500).json({ message: error.message || 'Failed to load traffic insights' })

@@ -1,7 +1,9 @@
 import {
     advanceMyCustomerOrderStatusByUserId,
+    advanceMyResortBookingRecordStatusByUserId,
     cancelMyCustomerOrderByUserId,
-    listMyCustomerOrdersByUserId
+    listMyCustomerOrdersByUserId,
+    listMyResortBookingRecordsByUserId
 } from './customer-orders.service.js'
 
 export const getMyCustomerOrders = async (req, res) => {
@@ -21,10 +23,46 @@ export const getMyCustomerOrders = async (req, res) => {
     }
 }
 
+export const getMyResortBookingRecords = async (req, res) => {
+    try {
+        const data = await listMyResortBookingRecordsByUserId(req.user._id)
+        return res.status(200).json({ data })
+    } catch (error) {
+        if (error.message === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        return res.status(500).json({ message: error.message })
+    }
+}
+
 export const advanceMyCustomerOrderStatus = async (req, res) => {
     try {
         const { orderId } = req.validatedData.params
         const data = await advanceMyCustomerOrderStatusByUserId(req.user._id, orderId)
+        return res.status(200).json({ message: 'Order status updated', data })
+    } catch (error) {
+        if (error.message === 'BUSINESS_NOT_FOUND') {
+            return res.status(404).json({ message: 'Business profile not found' })
+        }
+        if (error.message === 'MENU_ORDERS_NOT_AVAILABLE') {
+            return res.status(403).json({
+                message: 'Customer orders are only available for businesses with a supported menu catalog.'
+            })
+        }
+        if (error.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ message: 'Order not found' })
+        }
+        if (error.message === 'INVALID_STATUS_TRANSITION') {
+            return res.status(400).json({ message: 'This order cannot be advanced from its current status.' })
+        }
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const advanceMyResortBookingRecordStatus = async (req, res) => {
+    try {
+        const { orderId } = req.validatedData.params
+        const data = await advanceMyResortBookingRecordStatusByUserId(req.user._id, orderId)
         return res.status(200).json({ message: 'Order status updated', data })
     } catch (error) {
         if (error.message === 'BUSINESS_NOT_FOUND') {

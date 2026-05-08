@@ -3,8 +3,12 @@ import { FiChevronRight, FiFilter } from 'react-icons/fi'
 
 const STATUS_CLASSES = {
   Delivered: 'bg-[#e9fbef] text-[#1f8c4d]',
+  Confirmed: 'bg-[#e9fbef] text-[#1f8c4d]',
   Pending: 'bg-[#fff7e7] text-[#bc7b1f]',
-  Canceled: 'bg-[#fff0ef] text-[#c44238]'
+  'Waiting for approval': 'bg-[#fff2e6] text-[#9b5a2c]',
+  'Waiting for payment': 'bg-[#fff7e7] text-[#bc7b1f]',
+  Canceled: 'bg-[#fff0ef] text-[#c44238]',
+  Cancelled: 'bg-[#fff0ef] text-[#c44238]'
 }
 
 const RecentOrdersSection = ({
@@ -12,13 +16,15 @@ const RecentOrdersSection = ({
   orderStatusFilters,
   activeOrderFilter,
   setActiveOrderFilter,
-  formatCurrency
+  formatCurrency,
+  title = 'Recent Orders',
+  subtitle = 'Filter rows by latest order status'
 }) => (
   <article className="rounded-2xl border border-[#ece3d9] bg-white p-5 shadow-sm xl:col-span-2">
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
       <div>
-        <h2 className="text-xl font-semibold text-[#1f1f1f]">Recent Orders</h2>
-        <p className="text-sm text-[#7a7169]">Filter rows by latest order status</p>
+        <h2 className="text-xl font-semibold text-[#1f1f1f]">{title}</h2>
+        <p className="text-sm text-[#7a7169]">{subtitle}</p>
       </div>
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center gap-1 rounded-xl border border-[#ece3d9] px-3 py-2 text-sm font-medium text-[#4f4f4f]">
@@ -66,7 +72,7 @@ const RecentOrdersSection = ({
           {recentOrders.length === 0 ? (
             <tr>
               <td colSpan={4} className="px-2 py-6 text-center text-xs text-[#8a8179]">
-                No orders yet for the selected filter.
+                No records yet for the selected filter.
               </td>
             </tr>
           ) : (
