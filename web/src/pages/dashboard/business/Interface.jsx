@@ -8,6 +8,7 @@ const Interface = () => {
   const categoryLabel = getBusinessCategoryLabel(user?.businessCategory)
   const businessLabel = `Your ${categoryLabel}`
   const {
+    isResort,
     emptyCards,
     isEditingHeader,
     isSavingHeader,
@@ -29,7 +30,12 @@ const Interface = () => {
     getCardClassName,
     menuItems,
     isLoadingMenuItems,
-    menuCategories
+    menuCategories,
+    resortSpotlightImage,
+    resortGalleryImages,
+    handleResortSpotlightChange,
+    handleResortGalleryAdd,
+    handleResortGalleryReplace
   } = useBusinessInterface({ user, categoryLabel })
 
   return (
@@ -63,6 +69,16 @@ const Interface = () => {
         menuItems={menuItems}
         isLoadingMenuItems={isLoadingMenuItems}
         menuCategories={menuCategories}
+        bannerUrl={bannerUrl}
+        businessNameInput={businessNameInput}
+        businessDescriptionInput={businessDescriptionInput}
+        logoUrl={logoUrl}
+        isResort={isResort}
+        resortSpotlightImage={resortSpotlightImage}
+        resortGalleryImages={resortGalleryImages}
+        handleResortSpotlightChange={handleResortSpotlightChange}
+        handleResortGalleryAdd={handleResortGalleryAdd}
+        handleResortGalleryReplace={handleResortGalleryReplace}
       />
     </div>
   )

@@ -2,8 +2,11 @@ import { create } from 'zustand'
 import { toast } from 'sonner'
 import {
   advanceMyCustomerOrder,
+  advanceMyResortBookingRecord,
   cancelMyCustomerOrder,
-  getMyCustomerOrders
+  cancelMyResortBookingRecord,
+  getMyCustomerOrders,
+  getMyResortBookingRecords
 } from '../../services/business/customerOrders.service'
 
 const readErrorMessage = (error) =>
@@ -12,11 +15,12 @@ const readErrorMessage = (error) =>
 export const useCustomerOrdersStore = create((set, get) => ({
   orders: [],
   isLoading: false,
+  isResortBusiness: false,
 
-  loadOrders: async () => {
-    set({ isLoading: true })
+  loadOrders: async ({ isResortBusiness = false } = {}) => {
+    set({ isLoading: true, isResortBusiness: Boolean(isResortBusiness) })
     try {
-      const response = await getMyCustomerOrders()
+      const response = isResortBusiness ? await getMyResortBookingRecords() : await getMyCustomerOrders()
       const rows = response?.data?.data
       set({ orders: Array.isArray(rows) ? rows : [], isLoading: false })
     } catch (error) {
@@ -33,7 +37,9 @@ export const useCustomerOrdersStore = create((set, get) => ({
 
   advanceOrderStatus: async (orderId) => {
     try {
-      const response = await advanceMyCustomerOrder(orderId)
+      const response = get().isResortBusiness
+        ? await advanceMyResortBookingRecord(orderId)
+        : await advanceMyCustomerOrder(orderId)
       const updated = response?.data?.data
       if (!updated?.id) return
       set((state) => ({
@@ -41,13 +47,15 @@ export const useCustomerOrdersStore = create((set, get) => ({
       }))
     } catch (error) {
       toast.error(readErrorMessage(error))
-      await get().loadOrders()
+      await get().loadOrders({ isResortBusiness: get().isResortBusiness })
     }
   },
 
   cancelOrder: async (orderId, reasonText) => {
     try {
-      const response = await cancelMyCustomerOrder(orderId, reasonText)
+      const response = get().isResortBusiness
+        ? await cancelMyResortBookingRecord(orderId, reasonText)
+        : await cancelMyCustomerOrder(orderId, reasonText)
       const updated = response?.data?.data
       if (!updated?.id) return
       set((state) => ({
@@ -55,7 +63,7 @@ export const useCustomerOrdersStore = create((set, get) => ({
       }))
     } catch (error) {
       toast.error(readErrorMessage(error))
-      await get().loadOrders()
+      await get().loadOrders({ isResortBusiness: get().isResortBusiness })
     }
   }
 }))

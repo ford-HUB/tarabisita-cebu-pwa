@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FiEye, FiEyeOff } from 'react-icons/fi'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { loginSchema } from '../../shared/validators/auth.validator'
 import RequestForgotPassword from '../../components/auth/RequestForgotPasswordModal'
@@ -12,6 +12,7 @@ import { roleBasedRoute } from '../../shared/utils/direct.utils'
 
 const Login = () => {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [showPassword, setShowPassword] = useState(false)
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false)
   const login = useAuthStore((state) => state.login)
@@ -33,8 +34,14 @@ const Login = () => {
     try {
       const response = await login(data)
       const role = response.data?.properties?.user?.role
-      const destin_url = roleBasedRoute(role)
-      navigate(`/${destin_url}`)
+      const nextRaw = String(searchParams.get('next') || '').trim()
+      const safeNext = nextRaw.startsWith('/') ? nextRaw : ''
+      if (safeNext) {
+        navigate(safeNext)
+      } else {
+        const destin_url = roleBasedRoute(role)
+        navigate(`/${destin_url}`)
+      }
       showSuccessToast('Welcome back! You are now signed in.')
     } catch (error) {
       showErrorToast(error?.response?.data?.message)

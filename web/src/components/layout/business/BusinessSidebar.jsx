@@ -53,7 +53,7 @@ const BusinessSidebar = ({
                       typeof profileHref === 'string' &&
                       menu.path === profileHref
                     const isLocked = isRestricted && !isProfileMenu
-                    const showLockIcon = isRestricted
+                    const showLockIcon = isLocked
                     const lockTitle = isProfileMenu
                       ? 'Complete business verification to unlock the rest of the dashboard'
                       : 'Complete business verification to unlock this section'

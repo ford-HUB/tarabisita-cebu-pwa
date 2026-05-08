@@ -35,6 +35,9 @@ const paymentSchema = new mongoose.Schema(
             type: Number,
             required: true
         },
+        /** Legacy unique indexes still exist on the collection; keep these populated for new billing rows. */
+        orderId: { type: String, default: undefined },
+        transactionId: { type: String, default: undefined },
         currency: {
             type: String,
             default: 'PHP',

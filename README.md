@@ -7,9 +7,11 @@ It includes role-based dashboards, booking/order workflows, business analytics, 
 
 - **Frontend (`web/`)**: React, Vite, React Router, Zustand, React Hook Form, Tailwind CSS
 - **Backend (`server/`)**: Node.js, Express, MongoDB (Mongoose), Socket.IO, Agenda jobs
-- **Payments and external services**: Xendit/PayMongo webhook handling, Brevo/Nodemailer email workflows, Cloudinary asset storage
+- **Payments and external services**: Xendit webhook handling, Brevo/Nodemailer email workflows, Cloudinary asset storage
 
 ## Repository Structure
+
+This project follows a **monorepo architecture**, where the frontend and backend live in one repository for coordinated development and versioning.
 
 ```text
 TaraBisita-Web/

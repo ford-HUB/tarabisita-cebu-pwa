@@ -1,5 +1,64 @@
 import zod from 'zod'
 
+export const updateBusinessSettingsSchema = zod.object({
+    body: zod.object({
+        receiveOrderEmailAlerts: zod.boolean(),
+        receiveChatNotifications: zod.boolean(),
+        autoAcceptOrders: zod.boolean(),
+        prepTimeMinutes: zod.number().int().min(5).max(120),
+        lowStockThreshold: zod.number().int().min(1).max(500),
+        paymentMethods: zod.object({
+            GCASH: zod.object({
+                enabled: zod.boolean(),
+                accountName: zod.string().max(120).optional().default(''),
+                accountNumber: zod.string().max(120).optional().default(''),
+                instructions: zod.string().max(500).optional().default(''),
+                isVerified: zod.boolean().optional().default(false),
+                verifiedAt: zod.union([zod.string(), zod.date()]).optional().nullable()
+            }),
+            MAYA: zod.object({
+                enabled: zod.boolean(),
+                accountName: zod.string().max(120).optional().default(''),
+                accountNumber: zod.string().max(120).optional().default(''),
+                instructions: zod.string().max(500).optional().default(''),
+                isVerified: zod.boolean().optional().default(false),
+                verifiedAt: zod.union([zod.string(), zod.date()]).optional().nullable()
+            }),
+            GRAB_PAY: zod.object({
+                enabled: zod.boolean(),
+                accountName: zod.string().max(120).optional().default(''),
+                accountNumber: zod.string().max(120).optional().default(''),
+                instructions: zod.string().max(500).optional().default(''),
+                isVerified: zod.boolean().optional().default(false),
+                verifiedAt: zod.union([zod.string(), zod.date()]).optional().nullable()
+            }),
+            CARD: zod.object({
+                enabled: zod.boolean(),
+                accountName: zod.string().max(120).optional().default(''),
+                accountNumber: zod.string().max(120).optional().default(''),
+                instructions: zod.string().max(500).optional().default(''),
+                isVerified: zod.boolean().optional().default(false),
+                verifiedAt: zod.union([zod.string(), zod.date()]).optional().nullable()
+            })
+        })
+    })
+})
+
+export const verifyBusinessPaymentMethodSchema = zod.object({
+    body: zod.object({
+        methodCode: zod.enum(['GCASH', 'MAYA', 'GRAB_PAY', 'CARD']),
+        accountName: zod.string().trim().min(2).max(120),
+        accountNumber: zod.string().trim().min(3).max(120)
+    })
+})
+
+export const createBusinessPaymentMethodSetupCheckoutSchema = zod.object({
+    body: zod.object({
+        methodCode: zod.enum(['GCASH', 'MAYA', 'GRAB_PAY', 'CARD']),
+        returnBaseUrl: zod.string().trim().url().optional().default('')
+    })
+})
+
 export const submitBusinessProofSchema = zod.object({
     body: zod.object({
         proofs: zod.array(zod.string().min(1, 'Proof is required')).default([]),
@@ -61,5 +120,14 @@ export const changeBusinessPasswordSchema = zod.object({
     }).refine((data) => data.newPassword === data.confirmPassword, {
         message: 'New password and confirm password do not match',
         path: ['confirmPassword']
+    })
+})
+
+export const updateResortListingStockSchema = zod.object({
+    params: zod.object({
+        menuItemId: zod.string().min(1, 'Listing id is required')
+    }),
+    body: zod.object({
+        stockStatus: zod.enum(['AVAILABLE_TO_ORDER', 'OUT_OF_STOCK'])
     })
 })

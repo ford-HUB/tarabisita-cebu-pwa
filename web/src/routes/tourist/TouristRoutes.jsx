@@ -8,6 +8,7 @@ import StoreMessages from '../../pages/dashboard/tourist/StoreMessages'
 import RestaurantCart from '../../pages/dashboard/tourist/RestaurantCart'
 import RestaurantCheckout from '../../pages/dashboard/tourist/RestaurantCheckout'
 import BusinessDetail from '../../pages/dashboard/tourist/BusinessDetail'
+import StayBooking from '../../pages/dashboard/tourist/StayBooking'
 import { ProtectedRoute } from '../ProtectedRoute'
 
 export const TouristRoutes = [
@@ -38,6 +39,10 @@ export const TouristRoutes = [
       {
         path: 'explore/business/:businessId',
         element: <BusinessDetail />
+      },
+      {
+        path: 'explore/stay-booking',
+        element: <StayBooking />
       },
       {
         path: 'orders',

@@ -6,7 +6,8 @@ export const CART_ITEM_DETAIL_FIELD_KEYS = [
   'preparationTime',
   'servingSize',
   'spiceLevel',
-  'allergens'
+  'allergens',
+  'amenities'
 ]
 
 /**
@@ -38,5 +39,6 @@ export const pickCartItemDetailsFromMenuItem = (item) =>
     preparationTime: item?.preparationTime,
     servingSize: item?.servingSize,
     spiceLevel: item?.spiceLevel,
-    allergens: item?.allergens
+    allergens: item?.allergens,
+    amenities: item?.amenities || item?.allergens
   })

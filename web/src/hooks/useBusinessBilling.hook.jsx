@@ -19,6 +19,8 @@ import {
   isTrustedXenditCheckoutUrl
 } from '../shared/utils/xenditCheckoutRedirect.utils'
 
+const BILLING_PENDING_CANCEL_SUPPRESSION_KEY = 'tb:billing:hidePendingCheckout'
+
 /**
  * Billing page controller: profile rows, checkout, billing-address save, plan modals, payment return UX.
  * Mirrors the Profile page pattern (thin page + dedicated hook).
@@ -29,6 +31,10 @@ export const useBusinessBilling = () => {
   const [isAvailablePlansModalOpen, setIsAvailablePlansModalOpen] = useState(false)
   const [isCompareFeaturesModalOpen, setIsCompareFeaturesModalOpen] = useState(false)
   const [xenditInAppCheckoutUrl, setXenditInAppCheckoutUrl] = useState(null)
+  const [hidePendingCheckoutSummary, setHidePendingCheckoutSummary] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.sessionStorage.getItem(BILLING_PENDING_CANCEL_SUPPRESSION_KEY) === '1'
+  })
 
   const { ledgerPayments, ledgerSubscriptions, monthlyCapacity, isLedgerLoading } = useBillingStore(
     useShallow((s) => ({
@@ -95,17 +101,45 @@ export const useBusinessBilling = () => {
       return null
     }
     const b = profileData.billing || {}
+    const isStalePendingCheckout =
+      hidePendingCheckoutSummary && b.lastStatus === 'PENDING' && !b.lastPaidAt
+    if (
+      isStalePendingCheckout ||
+      b.lastStatus === 'PENDING' ||
+      b.lastStatus === 'CANCELLED' ||
+      b.lastStatus === 'CANCELED'
+    ) {
+      return null
+    }
     return {
       lastStatus: b.lastStatus || 'NONE',
       lastAmountLabel: formatBillingPeso(b.lastAmount),
       lastPaidAtLabel: formatBillingDateTime(b.lastPaidAt)
     }
-  }, [profileData])
+  }, [profileData, hidePendingCheckoutSummary])
+
+  useEffect(() => {
+    const status = profileData?.billing?.lastStatus
+    if (typeof window !== 'undefined' && status && status !== 'PENDING') {
+      window.sessionStorage.removeItem(BILLING_PENDING_CANCEL_SUPPRESSION_KEY)
+      setHidePendingCheckoutSummary(false)
+    }
+  }, [profileData?.billing?.lastStatus])
 
   useEffect(() => {
     const paymentStatus = searchParams.get('payment')
     if (!paymentStatus) {
       return
+    }
+
+    if (typeof window !== 'undefined') {
+      if (paymentStatus === 'cancelled') {
+        window.sessionStorage.setItem(BILLING_PENDING_CANCEL_SUPPRESSION_KEY, '1')
+        setHidePendingCheckoutSummary(true)
+      } else if (paymentStatus === 'success') {
+        window.sessionStorage.removeItem(BILLING_PENDING_CANCEL_SUPPRESSION_KEY)
+        setHidePendingCheckoutSummary(false)
+      }
     }
 
     if (paymentStatus === 'success') {
@@ -180,6 +214,10 @@ export const useBusinessBilling = () => {
       return
     }
     try {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem(BILLING_PENDING_CANCEL_SUPPRESSION_KEY)
+      }
+      setHidePendingCheckoutSummary(false)
       setProcessingPlanId(plan.id)
       const checkoutUrl = await useBillingStore.getState().createBillingCheckout({
         months: plan.months,

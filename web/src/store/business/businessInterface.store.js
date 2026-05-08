@@ -16,10 +16,10 @@ export const useBusinessInterfaceStore = create((set) => ({
   setIsLoadingProfile: (isLoadingProfile) => set({ isLoadingProfile }),
   setIsSavingHeader: (isSavingHeader) => set({ isSavingHeader }),
 
-  loadInterfaceProfile: async () => {
+  loadInterfaceProfile: async ({ businessCategory } = {}) => {
     set({ isLoadingProfile: true })
     try {
-      const response = await getMyBusinessProfile()
+      const response = await getMyBusinessProfile({ businessCategory })
       const profile = response?.data?.data
       set({ businessProfile: profile || null, isLoadingProfile: false })
       return { ok: true, profile: profile || null }

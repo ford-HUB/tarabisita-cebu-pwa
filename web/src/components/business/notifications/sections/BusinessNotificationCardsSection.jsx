@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { FiShoppingBag } from 'react-icons/fi'
 import {
+  businessBookingRequestsHref,
   buildBusinessOrderDeepLinkHref,
   buildBusinessStoreMessagingThreadHref
 } from '../../../layout/business/businessLayout.constants'
@@ -43,12 +44,13 @@ const BusinessNotificationCardsSection = ({
         {!isLoading && !items.length && !errorMessage ? (
           <div className="rounded-xl border border-dashed border-[#e7dfd5] bg-[#fcfaf7] px-4 py-12 text-center">
             <p className="text-sm font-medium text-[#4a433c]">{"You're all caught up"}</p>
-            <p className="mt-1 text-xs text-[#8a8179]">New orders and customer messages will show here.</p>
+            <p className="mt-1 text-xs text-[#8a8179]">New bookings/orders and customer messages will show here.</p>
           </div>
         ) : null}
 
         {items.map((n) => {
-          const isOrder = n.kind === 'ORDER' || Boolean(n.orderId)
+          const isBooking = n.kind === 'BOOKING'
+          const isOrder = n.kind === 'ORDER' || isBooking || Boolean(n.orderId)
           const isReadRow = n.isRead === true || (Number(n.unreadCount) || 0) === 0
           const readCardClass = isReadRow
             ? 'border-[#ebe4dc] bg-[#faf8f5] opacity-[0.92]'
@@ -56,10 +58,13 @@ const BusinessNotificationCardsSection = ({
           const pad = variant === 'page' ? 'px-4 py-4' : 'px-3 py-3'
 
           if (isOrder) {
-            const href = `/${buildBusinessOrderDeepLinkHref(n.orderId)}`
+            const href = isBooking ? businessBookingRequestsHref : `/${buildBusinessOrderDeepLinkHref(n.orderId)}`
             const img = (n.productImage || '').trim()
             const meta = [n.orderCode, n.productName].filter(Boolean).join(' · ')
-            const preview = (n.messagePreview || 'New order').slice(0, variant === 'page' ? 280 : 160)
+            const preview = (n.messagePreview || `New ${isBooking ? 'booking' : 'order'}`).slice(
+              0,
+              variant === 'page' ? 280 : 160
+            )
             return (
               <Link
                 key={`order-${n.orderId}`}
@@ -84,7 +89,7 @@ const BusinessNotificationCardsSection = ({
                             : 'rounded-md bg-[#ecfdf3] px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-[#166534]'
                         }
                       >
-                        {isReadRow ? 'Order' : 'New order'}
+                        {isReadRow ? (isBooking ? 'Booking' : 'Order') : `New ${isBooking ? 'booking' : 'order'}`}
                       </span>
                       <p className="truncate text-sm font-semibold text-[#3f3a35] md:text-base">
                         {n.customerName || 'Customer'}
