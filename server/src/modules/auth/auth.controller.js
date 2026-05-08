@@ -269,6 +269,12 @@ export const verifyCode = async (req, res) => {
             { returnDocument: 'after' }
         )
 
+        await User.findByIdAndUpdate(
+            verificationCodeExists.userId,
+            { $set: { isEmailVerified: true, emailVerifiedAt: new Date() } },
+            { new: false }
+        )
+
         return res.status(200).json({ message: "Verification code sent successfully" })
     } catch (error) {
         res.status(500).json({ message: error.message })
@@ -366,14 +372,70 @@ export const resetPassword = async (req, res) => {
     }
 }
 
+/**
+ * Users who completed OTP verification before `User.isEmailVerified` existed (or if the flag was never written)
+ * still have a used signup `VerificationCode`. Treat that as verified and optionally backfill the user row.
+ */
+const getSignupEmailVerifiedFromCodes = async (userId) => {
+    const record = await VerificationCode.findOne({
+        userId,
+        used: true,
+        purpose: { $ne: 'EMAIL_CHANGE' }
+    })
+        .sort({ updatedAt: -1 })
+        .select('updatedAt createdAt')
+        .lean()
+
+    if (!record) {
+        return { verified: false, verifiedAt: null }
+    }
+
+    const verifiedAt = record.updatedAt || record.createdAt || new Date()
+    return { verified: true, verifiedAt }
+}
+
 export const internalEmailChecker = async (req, res) => {
     try {
         const { email } = req.validatedData.body
         const user = await User.findOne({ email })
+            .select('_id isEmailVerified emailVerifiedAt roleId')
+            .populate('roleId', 'name')
         if (!user) {
-            return res.status(404).json({ message: "System cannot find your email existance" })
+            return res.status(404).json({
+                message: "System cannot find your email existance",
+                properties: {
+                    exists: false,
+                    isEmailVerified: false,
+                    accountRole: null
+                }
+            })
         }
-        return res.status(200).json({ message: "System found your email existance" })
+        const accountRole = user.roleId?.name ? String(user.roleId.name) : null
+
+        let isEmailVerified = Boolean(user.isEmailVerified)
+        let emailVerifiedAt = user.emailVerifiedAt || null
+
+        if (!isEmailVerified) {
+            const inferred = await getSignupEmailVerifiedFromCodes(user._id)
+            if (inferred.verified) {
+                isEmailVerified = true
+                emailVerifiedAt = inferred.verifiedAt
+                await User.updateOne(
+                    { _id: user._id },
+                    { $set: { isEmailVerified: true, emailVerifiedAt: inferred.verifiedAt } }
+                )
+            }
+        }
+
+        return res.status(200).json({
+            message: "System found your email existance",
+            properties: {
+                exists: true,
+                isEmailVerified,
+                emailVerifiedAt,
+                accountRole
+            }
+        })
     } catch (error) {
         res.status(500).json({ message: error.message })
     }

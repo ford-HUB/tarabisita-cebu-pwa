@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { FiEye, FiEyeOff, FiMapPin, FiBriefcase } from 'react-icons/fi'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -9,6 +9,21 @@ import { showErrorToast, showSuccessToast } from '../../shared/ui/toast.util'
 import { useNavigate } from 'react-router-dom'
 import { BUSINESS_CATEGORIES } from '../../shared/constants/businessCategories.constants'
 
+/** Basic shape check before calling the mail-checker API (avoids spam while typing). */
+const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
+
+const EMAIL_CHECK_DEBOUNCE_MS = 450
+
+const verifiedEmailTakenMessage = (accountRole) => {
+  if (accountRole === 'BUSINESS') {
+    return 'This email is already verified and is registered to a business account. Someone is already using it—please sign in or use a different email.'
+  }
+  if (accountRole === 'TOURIST') {
+    return 'This email is already verified and is registered to a tourist account. Someone is already using it—please sign in or use a different email.'
+  }
+  return 'This email is already verified and is already taken by an existing account. Please sign in or use a different email.'
+}
+
 const Register = () => {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
@@ -17,7 +32,16 @@ const Register = () => {
   const [hasAttemptedBusinessSubmit, setHasAttemptedBusinessSubmit] = useState(false)
   const registerUser = useAuthStore((state) => state.register)
   const sendVerificationCode = useAuthStore((state) => state.sendVerificationCode)
+  const mailChecker = useAuthStore((state) => state.mailChecker)
   const setVerificationExpiry = useAuthStore((state) => state.setVerificationExpiry)
+  const [emailStatus, setEmailStatus] = useState({
+    state: 'idle', // idle | checking | ok | not_found | error
+    exists: false,
+    isEmailVerified: false,
+    accountRole: null,
+    message: '',
+  })
+  const latestEmailCheckIdRef = useRef(0)
   const defaultFormValues = {
     name: '',
     email: '',
@@ -37,6 +61,7 @@ const Register = () => {
     trigger,
     reset,
     clearErrors,
+    setError,
     handleSubmit,
     formState: { errors, isSubmitting, submitCount, touchedFields },
   } = useForm({
@@ -47,11 +72,149 @@ const Register = () => {
   })
 
   const accountType = watch('accountType')
+  const emailValue = watch('email')
   const isBusiness = accountType === 'BUSINESS'
   const isBusinessDetailsStep = isBusiness && businessStep === 2
 
+  const handleEmailCheck = useCallback(
+    async (rawEmail) => {
+      const nextEmail = String(rawEmail || '').trim().toLowerCase()
+      if (!nextEmail) {
+        setEmailStatus({
+          state: 'idle',
+          exists: false,
+          isEmailVerified: false,
+          accountRole: null,
+          message: '',
+        })
+        return { exists: false, isEmailVerified: false, accountRole: null }
+      }
+
+      const checkId = latestEmailCheckIdRef.current + 1
+      latestEmailCheckIdRef.current = checkId
+      setEmailStatus((previous) => ({
+        ...previous,
+        state: 'checking',
+        message: '',
+        exists: false,
+        isEmailVerified: false,
+        accountRole: null,
+      }))
+
+      try {
+        const response = await mailChecker({ email: nextEmail })
+        if (latestEmailCheckIdRef.current !== checkId) return
+
+        const properties = response?.data?.properties || {}
+        const exists = Boolean(properties.exists)
+        const isEmailVerified = Boolean(properties.isEmailVerified)
+        const accountRole = properties.accountRole ? String(properties.accountRole) : null
+
+        if (exists && isEmailVerified) {
+          setEmailStatus({
+            state: 'ok',
+            exists: true,
+            isEmailVerified: true,
+            accountRole,
+            message: verifiedEmailTakenMessage(accountRole),
+          })
+          return { exists: true, isEmailVerified: true, accountRole }
+        }
+
+        if (exists && !isEmailVerified) {
+          setEmailStatus({
+            state: 'ok',
+            exists: true,
+            isEmailVerified: false,
+            accountRole,
+            message:
+              accountRole === 'BUSINESS'
+                ? 'This email is already used for a business signup but is not verified yet. You can continue—we’ll send a new verification code to finish setting up that account.'
+                : 'This email is already registered but not verified yet. You can reuse it—we’ll send you a new verification code.',
+          })
+          return { exists: true, isEmailVerified: false, accountRole }
+        }
+
+        setEmailStatus({
+          state: 'ok',
+          exists: false,
+          isEmailVerified: false,
+          accountRole: null,
+          message: 'This email is available to register.',
+        })
+        return { exists: false, isEmailVerified: false, accountRole: null }
+      } catch (error) {
+        if (latestEmailCheckIdRef.current !== checkId) return
+
+        const status = error?.response?.status
+        if (status === 404) {
+          setEmailStatus({
+            state: 'not_found',
+            exists: false,
+            isEmailVerified: false,
+            accountRole: null,
+            message: 'This email is available to register.',
+          })
+          return { exists: false, isEmailVerified: false, accountRole: null }
+        }
+
+        setEmailStatus({
+          state: 'error',
+          exists: false,
+          isEmailVerified: false,
+          accountRole: null,
+          message: 'Unable to check email right now. Please try again.',
+        })
+        return { exists: false, isEmailVerified: false, accountRole: null }
+      }
+    },
+    [mailChecker]
+  )
+
+  useEffect(() => {
+    if (isBusinessDetailsStep) {
+      return undefined
+    }
+
+    const trimmed = String(emailValue || '').trim()
+    if (!trimmed) {
+      setEmailStatus({
+        state: 'idle',
+        exists: false,
+        isEmailVerified: false,
+        accountRole: null,
+        message: '',
+      })
+      return undefined
+    }
+
+    if (!looksLikeEmail(trimmed)) {
+      setEmailStatus((previous) => ({
+        ...previous,
+        state: 'idle',
+        exists: false,
+        isEmailVerified: false,
+        accountRole: null,
+        message: '',
+      }))
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void handleEmailCheck(trimmed)
+    }, EMAIL_CHECK_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [emailValue, handleEmailCheck, isBusinessDetailsStep])
+
   const onSubmit = async (data) => {
     try {
+      if (emailStatus.exists && emailStatus.isEmailVerified) {
+        setError('email', { type: 'manual', message: 'This email is already taken.' })
+        showErrorToast(verifiedEmailTakenMessage(emailStatus.accountRole))
+        return
+      }
+
       const isBusinessAccount = data.accountType === 'BUSINESS'
       const normalizedPayload = isBusinessAccount
         ? {
@@ -70,7 +233,10 @@ const Register = () => {
             accountType: data.accountType,
           }
 
-      await registerUser(normalizedPayload)
+      if (!emailStatus.exists) {
+        await registerUser(normalizedPayload)
+      }
+
       const response = await sendVerificationCode({ email: data.email })
       const sessionToken = response.data.properties.sessionToken
       const expiresAt = response.data.properties.expiresAt
@@ -80,15 +246,66 @@ const Register = () => {
         email: data.email,
       })
       navigate(`/verify-email?${query.toString()}`)
-      showSuccessToast('Verification code sent to your email. Please check your inbox.')
+      showSuccessToast(
+        emailStatus.exists && !emailStatus.isEmailVerified
+          ? 'Account found but not verified. We sent a new verification code to your email.'
+          : 'Verification code sent to your email. Please check your inbox.'
+      )
       setHasAttemptedBusinessSubmit(false)
     } catch (error) {
-      console.error(error)
-      throw error
+      const status = error?.response?.status
+      const message = error?.response?.data?.message || 'Unable to create account right now.'
+
+      if (status === 409) {
+        const checked = await handleEmailCheck(data.email)
+        if (checked?.exists && checked?.isEmailVerified) {
+          setError('email', { type: 'manual', message: 'This email is already taken.' })
+          showErrorToast(verifiedEmailTakenMessage(checked.accountRole))
+          return
+        }
+        if (checked?.exists && !checked?.isEmailVerified) {
+          try {
+            const response = await sendVerificationCode({ email: data.email })
+            const sessionToken = response.data.properties.sessionToken
+            const expiresAt = response.data.properties.expiresAt
+            setVerificationExpiry({ sessionToken, expiresAt })
+            const query = new URLSearchParams({
+              token: sessionToken,
+              email: data.email,
+            })
+            navigate(`/verify-email?${query.toString()}`)
+            showSuccessToast(
+              'Account found but not verified. We sent a new verification code to your email.'
+            )
+            return
+          } catch (sendError) {
+            showErrorToast(
+              sendError?.response?.data?.message || 'Could not send verification code right now.'
+            )
+            return
+          }
+        }
+
+        setError('email', { type: 'manual', message: 'This email is already taken.' })
+        showErrorToast('This email is already registered. Please sign in or use a different email.')
+        return
+      }
+
+      showErrorToast(message)
     }
   }
 
   const handleBusinessNext = async () => {
+    const trimmed = String(emailValue || '').trim()
+    if (looksLikeEmail(trimmed)) {
+      const checked = await handleEmailCheck(trimmed)
+      if (checked?.exists && checked?.isEmailVerified) {
+        setError('email', { type: 'manual', message: 'This email is already taken.' })
+        showErrorToast(verifiedEmailTakenMessage(checked.accountRole))
+        return
+      }
+    }
+
     const isStepValid = await trigger(['name', 'email', 'password', 'confirmPassword'])
     if (isStepValid) {
       setBusinessStep(2)
@@ -123,6 +340,21 @@ const Register = () => {
   const shouldShowStep1Errors = !isBusiness && submitCount > 0
   const shouldShowBusinessDetailsErrors = hasAttemptedBusinessSubmit
   const shouldShowTouchedError = (fieldName) => Boolean(touchedFields?.[fieldName])
+
+  /** Email is already verified on another account — cannot register with it. */
+  const isEmailUnavailableForRegister =
+    emailStatus.state === 'ok' && emailStatus.exists && emailStatus.isEmailVerified
+
+  const trimmedEmailValue = String(emailValue || '').trim()
+  const emailLooksComplete = looksLikeEmail(trimmedEmailValue)
+  /** Step where the email field is shown (tourist-only flow or business account step 1). */
+  const isOnEmailCaptureStep = !isBusiness || businessStep === 1
+  /** Wait for mail-checker to finish so “Next” / “Create account” cannot race ahead of availability. */
+  const isEmailAvailabilityPending =
+    isOnEmailCaptureStep && emailLooksComplete && emailStatus.state === 'checking'
+
+  const disablePrimaryRegisterAction =
+    isSubmitting || isEmailUnavailableForRegister || isEmailAvailabilityPending
 
   return (
     <main className="grid min-h-[calc(100svh-57px)] grid-cols-1 lg:grid-cols-2">
@@ -236,8 +468,24 @@ const Register = () => {
                     id="email"
                     placeholder="you@example.com"
                     type="email"
+                    autoComplete="email"
                     {...register('email')}
                   />
+                  {(emailStatus.state === 'checking' || emailStatus.message) && (
+                    <span
+                      role="status"
+                      aria-live="polite"
+                      className={`mt-1 block text-xs ${
+                        emailStatus.state === 'error' || (emailStatus.exists && emailStatus.isEmailVerified)
+                          ? 'text-[#bb3a2d]'
+                          : emailStatus.exists && !emailStatus.isEmailVerified
+                            ? 'text-[#6f6a62]'
+                            : 'text-[#4a7c59]'
+                      }`}
+                    >
+                      {emailStatus.state === 'checking' ? 'Checking email...' : emailStatus.message}
+                    </span>
+                  )}
                   {(shouldShowStep1Errors || shouldShowTouchedError('email')) && errors.email && (
                     <p className={errorTextClassName}>{errors.email.message}</p>
                   )}
@@ -423,7 +671,7 @@ const Register = () => {
 
               <button
                 className="flex h-11 w-full cursor-pointer items-center justify-center rounded-xl bg-[#ff7a1a] font-semibold text-white transition hover:bg-[#eb6c12] disabled:cursor-not-allowed disabled:opacity-75"
-                disabled={isSubmitting}
+                disabled={disablePrimaryRegisterAction}
                 type={isBusiness && businessStep === 1 ? 'button' : 'submit'}
                 onClick={
                   isBusiness && businessStep === 1
