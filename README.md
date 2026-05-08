@@ -174,3 +174,7 @@ Common types:
 - `docs` - documentation-only changes
 - `chore` - maintenance or tooling changes
 - `test` - test additions/updates
+<<<<<<< HEAD
+=======
+
+>>>>>>> 38dc81d (docs(readme): add system documentation for setup and commit standards)
