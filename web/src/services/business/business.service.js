@@ -15,7 +15,9 @@ export const getMyBusinessProfile = async ({ businessCategory } = {}) => {
 }
 
 export const getMyBusinessSettings = async () => {
-  const response = await apiInstance.get('business/me/settings')
+  const response = await apiInstance.get('business/me/settings', {
+    headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' }
+  })
   return response
 }
 

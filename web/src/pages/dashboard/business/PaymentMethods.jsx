@@ -7,6 +7,7 @@ import { businessDashboardHref } from '../../../components/layout/business/busin
 import { useBusinessSettings } from '../../../hooks/useBusinessSettings.hook'
 import PaymentPreferenceMark from '../../../components/tourist/checkout/PaymentPreferenceMark'
 import { checkoutPaymentLogos } from '../../../components/business/profile/ui'
+import { useBusinessSettingsStore } from '../../../store/business/businessSettings.store'
 
 const METHOD_META = [
   { key: 'GCASH', label: 'GCash', hint: 'Mobile wallet payments', Icon: FiSmartphone },
@@ -42,16 +43,72 @@ const PaymentMethods = () => {
     const payment = String(searchParams.get('payment') || '').toLowerCase()
     const method = String(searchParams.get('method') || '').toUpperCase()
     if (!payment) return
-    if (payment === 'success') {
-      toast.success(method ? `${method} verified successfully.` : 'Payment method verified successfully.')
-      void loadSettings()
-    } else if (payment === 'cancelled') {
-      toast.message(method ? `${method} setup was cancelled.` : 'Payment method setup was cancelled.')
-    }
+
+    // Always clear return params so this effect won't re-trigger (prevents "blinking").
     const next = new URLSearchParams(searchParams)
     next.delete('payment')
     next.delete('method')
     setSearchParams(next, { replace: true })
+
+    if (payment === 'cancelled') {
+      toast.message(method ? `${method} setup was cancelled.` : 'Payment method setup was cancelled.')
+      return
+    }
+
+    if (payment !== 'success') {
+      return
+    }
+
+    const toastId = `payment-method-setup-${method || 'unknown'}-${Date.now()}`
+    toast.success(method ? `${method} payment successful.` : 'Payment method payment successful.', {
+      id: toastId,
+      description: method ? `Finalizing ${method} verification…` : 'Finalizing verification…'
+    })
+
+    if (!method) {
+      void loadSettings()
+      return
+    }
+
+    const POLL_MS = 2000
+    const MAX_ATTEMPTS = 15
+
+    let cancelled = false
+    let attempts = 0
+    let timerId = null
+
+    const poll = async () => {
+      if (cancelled) return
+      attempts += 1
+      try {
+        await loadSettings()
+        const latest = useBusinessSettingsStore.getState().settings
+        const isVerified = Boolean(latest?.paymentMethods?.[method]?.isVerified)
+        if (isVerified) {
+          toast.success(`${method} verified.`, { id: toastId })
+          return
+        }
+      } catch {
+        // keep polling briefly
+      }
+
+      if (cancelled) return
+      if (attempts >= MAX_ATTEMPTS) {
+        toast.success('Payment successful.', {
+          id: toastId,
+          description: 'Verification is still processing. Please refresh in a moment if it does not update.'
+        })
+        return
+      }
+      timerId = window.setTimeout(poll, POLL_MS)
+    }
+
+    void poll()
+
+    return () => {
+      cancelled = true
+      if (timerId) window.clearTimeout(timerId)
+    }
   }, [loadSettings, searchParams, setSearchParams])
 
   const handleConfigure = async (methodKey) => {
