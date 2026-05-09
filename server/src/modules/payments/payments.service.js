@@ -1643,7 +1643,7 @@ export const createBusinessPaymentMethodSetupCheckoutByUserId = async (
     }
 
     const externalId = `TBPMV${String(business._id).slice(-6).toUpperCase()}${Date.now().toString().slice(-8)}`
-    const verificationAmount = Number(readFirstEnv(['XENDIT_PM_VERIFY_AMOUNT']) || 1)
+    const verificationAmount = Number(readFirstEnv(['XENDIT_PM_VERIFY_AMOUNT']) || 50)
     const payload = {
         external_id: externalId.slice(0, 36),
         amount: verificationAmount,
