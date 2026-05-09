@@ -1643,9 +1643,10 @@ export const createBusinessPaymentMethodSetupCheckoutByUserId = async (
     }
 
     const externalId = `TBPMV${String(business._id).slice(-6).toUpperCase()}${Date.now().toString().slice(-8)}`
+    const verificationAmount = Number(readFirstEnv(['XENDIT_PM_VERIFY_AMOUNT']) || 1)
     const payload = {
         external_id: externalId.slice(0, 36),
-        amount: Number(readFirstEnv(['XENDIT_PM_VERIFY_AMOUNT']) || 1),
+        amount: verificationAmount,
         currency: 'PHP',
         description: `Payment method setup verification - ${code}`,
         success_redirect_url: successUrl,
@@ -1700,7 +1701,9 @@ export const createBusinessPaymentMethodSetupCheckoutByUserId = async (
         methodCode: code,
         checkoutUrl,
         checkoutId,
-        requestReferenceNumber: payload.external_id
+        requestReferenceNumber: payload.external_id,
+        verificationAmount: Number.isFinite(verificationAmount) ? verificationAmount : 1,
+        currency: String(payload.currency || 'PHP')
     }
 }
 
