@@ -17,6 +17,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/vite": "^4.2.2",
     "axios": "^1.15.0",
+    "cors": "^2.8.6",
     "dayjs": "^1.11.20",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
