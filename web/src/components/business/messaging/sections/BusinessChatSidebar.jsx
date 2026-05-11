@@ -33,13 +33,20 @@ const GuestAvatar = ({ src, label, selected }) => {
 
 /**
  * @param {{
- *   items: { conversationId: string, touristName: string, touristAvatar?: string, orderCode?: string, productName?: string, lastMessageAt?: string }[],
+ *   items: { conversationId: string, touristName: string, touristAvatar?: string, orderCode?: string, productName?: string, lastMessageAt?: string, unreadFromCustomerCount?: number }[],
  *   selectedConversationId: string | null,
  *   isLoading: boolean,
- *   errorMessage: string | null
+ *   errorMessage: string | null,
+ *   isResortBusiness?: boolean
  * }} props
  */
-const BusinessChatSidebar = ({ items, selectedConversationId, isLoading, errorMessage }) => {
+const BusinessChatSidebar = ({
+  items,
+  selectedConversationId,
+  isLoading,
+  errorMessage,
+  isResortBusiness = false
+}) => {
   const [q, setQ] = useState('')
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase()
@@ -115,6 +122,10 @@ const BusinessChatSidebar = ({ items, selectedConversationId, isLoading, errorMe
             const selected = selectedConversationId === row.conversationId
             const href = `/${buildBusinessStoreMessagingThreadHref(row.conversationId)}`
             const timeLabel = row.lastMessageAt ? formatSidebarTime(row.lastMessageAt) : ''
+            const boldGuestName =
+              isResortBusiness &&
+              !selected &&
+              (Number(row.unreadFromCustomerCount) || 0) > 0
             return (
               <li key={row.conversationId}>
                 <Link
@@ -125,7 +136,11 @@ const BusinessChatSidebar = ({ items, selectedConversationId, isLoading, errorMe
                 >
                   <GuestAvatar src={row.touristAvatar} label={row.touristName} selected={selected} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-[#2f2f2f]">{row.touristName || 'Guest'}</p>
+                    <p
+                      className={`truncate text-sm text-[#2f2f2f] ${boldGuestName ? 'font-bold' : 'font-semibold'}`}
+                    >
+                      {row.touristName || 'Guest'}
+                    </p>
                     <p className="truncate text-xs text-[#8a8179]">
                       {row.orderCode ? <span className="font-mono text-[11px] text-[#6b5545]">{row.orderCode}</span> : null}
                       {row.orderCode && row.productName ? <span> · </span> : null}

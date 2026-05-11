@@ -10,9 +10,15 @@ import {
 import { useBusinessStoreNotificationsStore } from '../store/business/business-store-notifications.store.js'
 
 /**
- * @param {{ conversationId: string | null }} params
+ * @param {{
+ *   conversationId: string | null,
+ *   enableHubRefetchOnRemoteTouristMessage?: boolean
+ * }} params
  */
-export const useBusinessStoreMessaging = ({ conversationId }) => {
+export const useBusinessStoreMessaging = ({
+  conversationId,
+  enableHubRefetchOnRemoteTouristMessage = false
+}) => {
   const [hub, setHub] = useState({ items: [], loading: false, error: null })
   const [room, setRoom] = useState({
     session: null,
@@ -25,23 +31,29 @@ export const useBusinessStoreMessaging = ({ conversationId }) => {
   const loadSeqRef = useRef(0)
   const conversationIdRef = useRef(null)
 
-  useEffect(() => {
-    let cancelled = false
-    setHub((h) => ({ ...h, loading: true, error: null }))
-    ;(async () => {
-      try {
-        const res = await getBusinessStoreMessagingConversations()
-        const items = res.data?.data || []
-        if (!cancelled) setHub({ items, loading: false, error: null })
-      } catch (e) {
-        const msg = e?.response?.data?.message || e?.message || 'Could not load chats.'
-        if (!cancelled) setHub({ items: [], loading: false, error: msg })
+  const fetchHub = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setHub((h) => ({ ...h, loading: true, error: null }))
+    }
+    try {
+      const res = await getBusinessStoreMessagingConversations()
+      const items = res.data?.data || []
+      setHub((h) => ({
+        ...h,
+        items,
+        ...(silent ? {} : { loading: false, error: null })
+      }))
+    } catch (e) {
+      const msg = e?.response?.data?.message || e?.message || 'Could not load chats.'
+      if (!silent) {
+        setHub({ items: [], loading: false, error: msg })
       }
-    })()
-    return () => {
-      cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    void fetchHub()
+  }, [fetchHub])
 
   useEffect(() => {
     if (!conversationId) {
@@ -81,7 +93,11 @@ export const useBusinessStoreMessaging = ({ conversationId }) => {
 
         const socket = io(`${socketBase}/store-messaging`, {
           withCredentials: true,
-          transports: ['websocket', 'polling']
+          transports: ['websocket', 'polling'],
+          timeout: 10000,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 800,
+          reconnectionDelayMax: 4000
         })
         socketRef.current = socket
 
@@ -99,16 +115,21 @@ export const useBusinessStoreMessaging = ({ conversationId }) => {
           setRoom((r) => ({ ...r, socketConnected: false }))
         })
 
+        socket.on('connect_error', () => {
+          setRoom((r) => ({ ...r, socketConnected: false }))
+        })
+
         socket.on('message:new', (msg) => {
           setRoom((r) => {
             if (!msg?.id || r.messages.some((x) => x.id === msg.id)) return r
             return { ...r, messages: [...r.messages, msg] }
           })
-          if (
-            msg?.senderRole === 'TOURIST' &&
-            String(msg.conversationId || '') !== String(conversationId || '')
-          ) {
-            void useBusinessStoreNotificationsStore.getState().fetchSummary()
+          if (msg?.senderRole === 'TOURIST') {
+            const other = String(msg.conversationId || '') !== String(conversationId || '')
+            if (other) {
+              void useBusinessStoreNotificationsStore.getState().fetchSummary()
+              if (enableHubRefetchOnRemoteTouristMessage) void fetchHub({ silent: true })
+            }
           }
         })
       } catch (e) {
@@ -126,7 +147,7 @@ export const useBusinessStoreMessaging = ({ conversationId }) => {
       s?.removeAllListeners()
       s?.disconnect()
     }
-  }, [conversationId])
+  }, [conversationId, enableHubRefetchOnRemoteTouristMessage, fetchHub])
 
   useEffect(() => {
     conversationIdRef.current = room.session?.conversationId || null

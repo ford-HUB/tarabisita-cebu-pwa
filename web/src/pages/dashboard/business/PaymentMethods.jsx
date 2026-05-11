@@ -23,6 +23,7 @@ const PaymentMethods = () => {
     isSavingSettings,
     isStartingPaymentMethodSetup,
     activeSetupMethodKey,
+    setupVerificationMetaByMethod,
     hasUnsavedChanges,
     updatePaymentMethodToggle,
     startPaymentMethodSetupCheckout,
@@ -31,6 +32,13 @@ const PaymentMethods = () => {
     resetToSaved
   } = useBusinessSettings()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  const formatVerificationAmountLabel = (amount, currency = 'PHP') => {
+    const n = Number(amount)
+    if (!Number.isFinite(n) || n <= 0) return ''
+    if (String(currency).toUpperCase() === 'PHP') return `₱${n.toLocaleString('en-PH')}`
+    return `${n.toLocaleString('en-PH')} ${currency}`
+  }
 
   useEffect(() => {
     document.title = 'Payment Methods | Tara - Bisita Cebu'
@@ -114,6 +122,14 @@ const PaymentMethods = () => {
   const handleConfigure = async (methodKey) => {
     const result = await startPaymentMethodSetupCheckout(methodKey)
     if (!result?.ok || !result.checkoutUrl) return
+    if (result?.verificationAmount) {
+      const amountLabel = formatVerificationAmountLabel(result.verificationAmount, result.currency)
+      if (amountLabel) {
+        toast.message(`${methodKey} setup requires a minimum payment of ${amountLabel}.`, {
+          description: 'This is used for payment method verification in Xendit.'
+        })
+      }
+    }
     window.location.assign(result.checkoutUrl)
   }
 
@@ -149,6 +165,11 @@ const PaymentMethods = () => {
             const isVerified = Boolean(row?.isVerified)
             const Icon = method.Icon
             const isMethodLoading = isStartingPaymentMethodSetup && activeSetupMethodKey === method.key
+            const verificationMeta = setupVerificationMetaByMethod?.[method.key] || null
+            const verificationAmountLabel =
+              verificationMeta?.verificationAmount != null
+                ? formatVerificationAmountLabel(verificationMeta.verificationAmount, verificationMeta.currency)
+                : ''
             return (
               <article
                 key={method.key}
@@ -198,6 +219,11 @@ const PaymentMethods = () => {
                 >
                   {isMethodLoading ? 'Opening Xendit...' : 'Configure'}
                 </button>
+                {verificationAmountLabel ? (
+                  <p className="mt-2 text-xs text-[#6d645d]">
+                    Minimum required to pay for verification: <span className="font-semibold text-[#2f2a26]">{verificationAmountLabel}</span>
+                  </p>
+                ) : null}
               </article>
             )
           })}

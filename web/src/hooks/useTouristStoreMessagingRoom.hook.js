@@ -80,7 +80,11 @@ export const useTouristStoreMessagingRoom = ({ m, c }) => {
 
         const socket = io(`${socketBase}/store-messaging`, {
           withCredentials: true,
-          transports: ['websocket', 'polling']
+          transports: ['websocket', 'polling'],
+          timeout: 10000,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 800,
+          reconnectionDelayMax: 4000
         })
         socketRef.current = socket
 
@@ -95,6 +99,10 @@ export const useTouristStoreMessagingRoom = ({ m, c }) => {
         })
 
         socket.on('disconnect', () => {
+          setRoom((r) => ({ ...r, socketConnected: false }))
+        })
+
+        socket.on('connect_error', () => {
           setRoom((r) => ({ ...r, socketConnected: false }))
         })
 

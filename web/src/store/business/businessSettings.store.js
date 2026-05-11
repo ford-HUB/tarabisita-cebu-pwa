@@ -38,6 +38,7 @@ export const useBusinessSettingsStore = create((set, get) => ({
   isVerifyingPaymentMethod: false,
   isStartingPaymentMethodSetup: false,
   activeSetupMethodKey: '',
+  setupVerificationMetaByMethod: {},
 
   loadSettings: async () => {
     set({ isLoadingSettings: true })
@@ -129,13 +130,26 @@ export const useBusinessSettingsStore = create((set, get) => ({
         methodCode: methodKey,
         returnBaseUrl: typeof window !== 'undefined' ? window.location.origin : ''
       })
+      const verificationAmountRaw = response?.data?.data?.verificationAmount
+      const currency = String(response?.data?.data?.currency || 'PHP')
+      const verificationAmount = Number(verificationAmountRaw)
+      if (Number.isFinite(verificationAmount) && verificationAmount > 0) {
+        set((state) => ({
+          setupVerificationMetaByMethod: {
+            ...(state.setupVerificationMetaByMethod || {}),
+            [methodKey]: { verificationAmount, currency }
+          }
+        }))
+      }
       return {
         ok: true,
-        checkoutUrl: response?.data?.data?.checkoutUrl || ''
+        checkoutUrl: response?.data?.data?.checkoutUrl || '',
+        verificationAmount: Number.isFinite(verificationAmount) ? verificationAmount : null,
+        currency
       }
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to start setup checkout.')
-      return { ok: false, checkoutUrl: '' }
+      return { ok: false, checkoutUrl: '', verificationAmount: null, currency: 'PHP' }
     } finally {
       set({ isStartingPaymentMethodSetup: false, activeSetupMethodKey: '' })
     }

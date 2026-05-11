@@ -3,10 +3,7 @@
  * @returns {string}
  */
 export const getSocketBaseUrl = () => {
-  const api = import.meta.env.VITE_SERVER_LOCAL || ''
-  try {
-    return new URL(api).origin
-  } catch {
-    return typeof window !== 'undefined' ? window.location.origin : ''
-  }
+  const isDev = import.meta.env.VITE_ENV === 'development'
+  const api = isDev ? import.meta.env.VITE_SERVER_LOCAL : import.meta.env.VITE_SERVER_PRODUCTION
+  return api ? new URL(api).origin : ''
 }

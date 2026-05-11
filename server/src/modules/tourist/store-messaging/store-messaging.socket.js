@@ -62,7 +62,9 @@ export const attachStoreMessagingSocket = (io) => {
             } catch (e) {
                 const code = String(e?.message || '')
                 if (code === 'FORBIDDEN') return reply({ ok: false, error: 'FORBIDDEN' })
+                if (code === 'ORDER_MESSAGING_CLOSED') return reply({ ok: false, error: 'ORDER_CLOSED' })
                 if (code === 'CONVERSATION_NOT_FOUND') return reply({ ok: false, error: 'NOT_FOUND' })
+                if (code === 'ORDER_NOT_FOUND') return reply({ ok: false, error: 'NOT_FOUND' })
                 return reply({ ok: false, error: 'FAILED' })
             }
         })
@@ -93,7 +95,9 @@ export const attachStoreMessagingSocket = (io) => {
                 const code = String(e?.message || '')
                 if (code === 'EMPTY_MESSAGE') return reply({ ok: false, error: 'EMPTY_MESSAGE' })
                 if (code === 'FORBIDDEN') return reply({ ok: false, error: 'FORBIDDEN' })
+                if (code === 'ORDER_MESSAGING_CLOSED') return reply({ ok: false, error: 'ORDER_CLOSED' })
                 if (code === 'CONVERSATION_NOT_FOUND') return reply({ ok: false, error: 'NOT_FOUND' })
+                if (code === 'ORDER_NOT_FOUND') return reply({ ok: false, error: 'NOT_FOUND' })
                 return reply({ ok: false, error: 'FAILED' })
             }
         })

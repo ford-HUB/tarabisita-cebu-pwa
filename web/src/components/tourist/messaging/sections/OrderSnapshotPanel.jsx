@@ -1,50 +1,33 @@
-import { FiExternalLink, FiMail, FiPackage, FiPhone } from 'react-icons/fi'
+import { FiPackage } from 'react-icons/fi'
 import {
-  buildMailtoHref,
-  buildTelHref,
-  buildWebsiteHref,
-  buildWhatsAppHref
-} from '../../../../shared/utils/touristOrderStoreMessaging.utils.js'
+  touristCustomerOrderStatusBadgeClass,
+  touristCustomerOrderStatusLabel
+} from '../../../../shared/utils/touristOrderDisplay.utils.js'
+
+/** Drop internal `Billing: …` line from order detail blocks (still stored on the order). */
+const withoutBillingLine = (text) => {
+  const raw = String(text || '')
+  const lines = raw.split(/\r?\n/)
+  const kept = lines.filter((line) => !/^\s*Billing:\s*/i.test(line))
+  return kept.join('\n').trim()
+}
 
 /**
- * @param {{
- *   snapshot: Record<string, unknown> | null,
- *   businessPhone?: string,
- *   businessEmail?: string,
- *   businessWebsite?: string,
- *   businessWhatsapp?: string,
- *   hideReachOutSection?: boolean
- * }} props
+ * @param {{ snapshot: Record<string, unknown> | null }} props
  */
-const OrderSnapshotPanel = ({
-  snapshot,
-  businessPhone,
-  businessEmail,
-  businessWebsite,
-  businessWhatsapp,
-  hideReachOutSection = false
-}) => {
+const OrderSnapshotPanel = ({ snapshot }) => {
   if (!snapshot || typeof snapshot !== 'object') return null
 
   const orderCode = snapshot.orderCode != null ? String(snapshot.orderCode) : ''
   const productName = snapshot.productName != null ? String(snapshot.productName) : ''
-  const details = snapshot.productDetails != null ? String(snapshot.productDetails) : ''
+  const detailsRaw = snapshot.productDetails != null ? String(snapshot.productDetails) : ''
+  const details = withoutBillingLine(detailsRaw)
   const total = snapshot.total != null ? String(snapshot.total) : ''
   const itemsCount = snapshot.itemsCount
-  const status = snapshot.status != null ? String(snapshot.status) : ''
-
-  const tel = buildTelHref(businessPhone)
-  const mailto = buildMailtoHref({
-    email: businessEmail,
-    subject: orderCode ? `Order ${orderCode}` : 'Order inquiry',
-    body: `Hello,\n\nRegarding order ${orderCode || '—'} (${productName || 'menu order'}).\n\n`
-  })
-  const site = buildWebsiteHref(businessWebsite)
-  const wa = buildWhatsAppHref({
-    whatsappRaw: businessWhatsapp,
-    phoneRaw: businessPhone,
-    prefilledText: `Hi — about order ${orderCode || ''} (${productName || 'menu order'}).`
-  })
+  const rawStatus = snapshot.status != null ? String(snapshot.status) : ''
+  const orderType = snapshot.orderType != null ? String(snapshot.orderType) : ''
+  const statusLabel = rawStatus ? touristCustomerOrderStatusLabel(rawStatus, orderType) : ''
+  const statusBadgeClass = touristCustomerOrderStatusBadgeClass(rawStatus)
 
   return (
     <aside className="rounded-2xl border border-[#e7dfd5] bg-white p-4 shadow-sm md:p-5">
@@ -56,9 +39,11 @@ const OrderSnapshotPanel = ({
           <p className="text-xs font-semibold uppercase tracking-wide text-[#9f9387]">Order in this chat</p>
           <p className="mt-1 font-semibold text-[#1f1f1f]">{productName || 'Menu order'}</p>
           {orderCode ? <p className="mt-0.5 font-mono text-xs text-[#6b5545]">{orderCode}</p> : null}
-          {status ? (
-            <span className="mt-2 inline-block rounded-full bg-[#fff0e3] px-2.5 py-0.5 text-xs font-medium text-[#9b5a2c]">
-              {status}
+          {statusLabel ? (
+            <span
+              className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass}`}
+            >
+              {statusLabel}
             </span>
           ) : null}
         </div>
@@ -78,57 +63,6 @@ const OrderSnapshotPanel = ({
         ) : null}
         {total ? <span className="font-medium text-[#1f1f1f]">{total}</span> : null}
       </div>
-
-      {!hideReachOutSection ? (
-        <div className="mt-5 border-t border-[#f0e8de] pt-4">
-          <p className="text-xs font-semibold text-[#5b5b5b]">Reach the store</p>
-          <div className="mt-2 flex flex-col gap-2">
-            {tel ? (
-              <a
-                href={tel}
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#9b5a2c] hover:underline"
-              >
-                <FiPhone className="h-4 w-4 shrink-0" aria-hidden />
-                Call
-              </a>
-            ) : null}
-            {mailto ? (
-              <a
-                href={mailto}
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#9b5a2c] hover:underline"
-              >
-                <FiMail className="h-4 w-4 shrink-0" aria-hidden />
-                Email
-              </a>
-            ) : null}
-            {wa ? (
-              <a
-                href={wa}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#9b5a2c] hover:underline"
-              >
-                <FiExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-                WhatsApp
-              </a>
-            ) : null}
-            {site ? (
-              <a
-                href={site}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-[#9b5a2c] hover:underline"
-              >
-                <FiExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-                Website
-              </a>
-            ) : null}
-            {!tel && !mailto && !wa && !site ? (
-              <p className="text-xs text-[#9f9387]">No extra contact details on file for this store.</p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
     </aside>
   )
 }

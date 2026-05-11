@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -11,7 +11,13 @@ import { fetchPublicBusinessById } from '../services/tourist/touristExplore.serv
 import { groupCartItemsByBusiness, useTouristCartItemStore } from '../store/tourist/tourist-cart-item.store.js'
 import { getTouristMenuOrderCheckoutStatus, postTouristCustomerOrderCheckout } from '../services/tourist/touristCustomerOrder.service.js'
 import { putTouristCartItems } from '../services/tourist/tourist-cart-item.service.js'
-import { touristCartHref, touristExploreHref } from '../components/layout/tourist/touristLayout.constants.js'
+import {
+  touristCartHref,
+  touristCheckoutHref,
+  touristExploreHref,
+  touristStayBookingHref
+} from '../components/layout/tourist/touristLayout.constants.js'
+import { categoryMatchesLabel } from '../shared/utils/touristExplore.utils.js'
 import {
   assignXenditCheckout,
   isLikelySocialInAppBrowser,
@@ -37,6 +43,8 @@ export const useTouristRestaurantCheckout = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [xenditInAppCheckoutUrl, setXenditInAppCheckoutUrl] = useState(null)
   const [availablePaymentMethods, setAvailablePaymentMethods] = useState(['GCASH', 'MAYA', 'GRAB_PAY', 'CARD'])
+  const [isProceedingFromCart, setIsProceedingFromCart] = useState(false)
+  const proceedFromCartLockRef = useRef(false)
 
   const {
     items,
@@ -299,6 +307,73 @@ export const useTouristRestaurantCheckout = () => {
     navigate(touristCartHref)
   }, [navigate])
 
+  /** Restaurant prepayment checkout vs. stay booking details (resort/hotel), based on the selected store. */
+  const proceedFromCart = useCallback(async () => {
+    if (proceedFromCartLockRef.current) return
+    const st = useTouristCartItemStore.getState()
+    const selectedList = st.items.filter((it) => st.isItemSelected(it.key))
+    if (!selectedList.length) {
+      toast.error('Select at least one item to check out.')
+      return
+    }
+    const batches = groupCartItemsByBusiness(selectedList).filter((g) => g.items.length)
+    if (batches.length > 1) {
+      toast.error(
+        'Checkout supports one store at a time. Uncheck or remove items from other stores, then try again.'
+      )
+      return
+    }
+    const batch = batches[0]
+    proceedFromCartLockRef.current = true
+    setIsProceedingFromCart(true)
+    try {
+      const res = await fetchPublicBusinessById(String(batch.businessId))
+      const d = res?.data?.data
+      if (!d || typeof d !== 'object') {
+        toast.error('Could not load this business. Try again.')
+        return
+      }
+      const isStayBusiness =
+        categoryMatchesLabel(d.category, 'Resort') || categoryMatchesLabel(d.category, 'Hotel')
+      if (isStayBusiness) {
+        const ids = new Set(batch.items.map((it) => String(it.catalogItemId)))
+        if (ids.size !== 1) {
+          toast.error('Select one stay package at a time to continue to booking details.')
+          return
+        }
+        const catalogItemId = [...ids][0]
+        const menuItems = Array.isArray(d.menuItems) ? d.menuItems : []
+        const found = menuItems.find((it) => String(it?.id) === catalogItemId)
+        if (!found) {
+          toast.error('This stay package is no longer available.')
+          return
+        }
+        navigate(touristStayBookingHref, {
+          state: {
+            stayPackage: {
+              ...found,
+              businessId: String(batch.businessId),
+              businessName: batch.items[0]?.businessName || d.name
+            },
+            stayBusiness: {
+              _id: String(d._id || batch.businessId),
+              name: d.name,
+              addOns: d.addOns
+            }
+          }
+        })
+        return
+      }
+      navigate(touristCheckoutHref)
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Could not continue. Try again.'
+      toast.error(msg)
+    } finally {
+      proceedFromCartLockRef.current = false
+      setIsProceedingFromCart(false)
+    }
+  }, [navigate])
+
   return {
     items,
     groups,
@@ -321,6 +396,8 @@ export const useTouristRestaurantCheckout = () => {
     toggleItemSelected,
     goExplore,
     goCart,
+    proceedFromCart,
+    isProceedingFromCart,
     isXenditMobileCheckoutModalOpen: Boolean(xenditInAppCheckoutUrl),
     xenditMobileCheckoutUrl: xenditInAppCheckoutUrl || '',
     closeXenditMobileCheckoutModal: closeXenditInAppCheckoutModal,

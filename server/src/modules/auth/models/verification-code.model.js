@@ -27,6 +27,18 @@ const verificationSchema = new mongoose.Schema({
         required: true
     },
 
+    /** `EMAIL_CHANGE`: code is emailed to `pendingEmail`; user confirms to update login email. */
+    purpose: {
+        type: String,
+        enum: ['DEFAULT', 'EMAIL_CHANGE'],
+        default: 'DEFAULT'
+    },
+
+    pendingEmail: {
+        type: String,
+        default: null
+    },
+
     createdAt: {
         type: Date,
         default: Date.now
