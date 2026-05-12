@@ -19,6 +19,20 @@ export const registerSchema = zod.object({
     }).refine((data) => data.password === data.confirmPassword, {
         message: 'Passwords do not match',
         path: ['confirmPassword']
+    }).refine((data) => {
+        if (data.accountType !== 'BUSINESS') {
+            return true
+        }
+
+        const businessContact = String(data.businessContact || '').trim()
+        if (!businessContact) {
+            return true
+        }
+
+        return /^\d+$/.test(businessContact)
+    }, {
+        message: 'Business contact must contain numbers only',
+        path: ['businessContact']
     })
 })
 

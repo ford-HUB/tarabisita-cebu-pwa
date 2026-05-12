@@ -108,16 +108,62 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
 const stayTimeInputClassName =
   'relative w-full rounded-lg border border-[#ddd2c6] bg-white py-2.5 pl-3 pr-10 text-sm text-[#1f1f1f] outline-none focus:border-[#c9b6a3] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:bottom-0 [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:z-[1] [&::-webkit-calendar-picker-indicator]:w-10 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0'
 
-const computeStayDays = (checkInDate, checkOutDate) => {
+const normalizeStayTime = (value) => {
+  const raw = String(value || '').trim()
+  if (/^\d{2}:\d{2}$/.test(raw)) return raw
+  return '00:00'
+}
+
+const computeStayDays = (checkInDate, checkOutDate, checkInTime, checkOutTime) => {
   const inDate = String(checkInDate || '').trim()
   const outDate = String(checkOutDate || '').trim()
   if (!inDate || !outDate) return 1
-  const inMs = Date.parse(`${inDate}T00:00:00`)
-  const outMs = Date.parse(`${outDate}T00:00:00`)
+  const inMs = Date.parse(`${inDate}T${normalizeStayTime(checkInTime)}:00`)
+  const outMs = Date.parse(`${outDate}T${normalizeStayTime(checkOutTime)}:00`)
   if (!Number.isFinite(inMs) || !Number.isFinite(outMs)) return 1
+  if (outMs <= inMs) return 1
   const diffDays = Math.ceil((outMs - inMs) / MS_PER_DAY)
   return Math.min(99, Math.max(1, diffDays))
 }
+
+const isStayCheckoutSpanOpen = (checkIn, checkOut, occupiedSet, notApplicableCtx) => {
+  const ci = String(checkIn || '').trim()
+  const co = String(checkOut || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ci) || !/^\d{4}-\d{2}-\d{2}$/.test(co) || co <= ci) return false
+  const span = enumerateStayNights(ci, co)
+  if (!span.length) return false
+  for (const d of span) {
+    if (occupiedSet.has(d)) return false
+    if (notApplicableCtx.whitelistMode && !notApplicableCtx.availableSet.has(d)) return false
+    if (isNotApplicableStayDate(d, notApplicableCtx)) return false
+  }
+  return true
+}
+
+const isDisplayedOccupiedStayDate = (dateStr, occupiedSet, todayYmd) =>
+  occupiedSet.has(dateStr) && dateStr >= todayYmd
+
+const buildStayRangeCellClasses = (dateStr, checkInDate, checkOutDate) => {
+  const ci = String(checkInDate || '').trim()
+  const co = String(checkOutDate || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ci)) return []
+
+  const hasCo = /^\d{4}-\d{2}-\d{2}$/.test(co) && co > ci
+  if (!hasCo) {
+    return dateStr === ci ? ['tb-day-selected-start'] : []
+  }
+
+  if (dateStr < ci || dateStr > co) return []
+
+  const classes = ['tb-day-in-range']
+  if (dateStr === ci) classes.push('tb-day-selected-start')
+  else if (dateStr === co) classes.push('tb-day-selected-end')
+
+  return classes
+}
+
+const stayCalendarSkinClassName =
+  'mt-3 rounded-xl border border-[#efe5db] bg-[#fcfaf7] p-3 [&_.fc]:text-[#2f2f2f] [&_.fc-theme-standard_.fc-scrollgrid]:border-[#e7dfd5] [&_.fc-theme-standard_td]:border-[#efe5db] [&_.fc-theme-standard_th]:border-[#efe5db] [&_.fc-col-header-cell]:bg-[#f8f5f0] [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-col-header-cell-cushion]:font-semibold [&_.fc-col-header-cell-cushion]:text-[#6f665d] [&_.fc-daygrid-day-frame]:relative [&_.fc-daygrid-day-frame]:min-h-14 [&_.fc-daygrid-day-top]:relative [&_.fc-daygrid-day-top]:z-[1] [&_.fc-daygrid-day-number]:text-xs [&_.fc-daygrid-day-number]:text-[#6f665d] [&_.fc-day-today]:bg-transparent [&_.fc-day-today]:shadow-none [&_.fc-toolbar-title]:text-lg [&_.fc-toolbar-title]:font-semibold [&_.fc-toolbar-title]:text-[#2f2f2f] [&_.fc-toolbar.fc-header-toolbar]:mb-2 [&_.fc_.fc-button]:rounded-md [&_.fc_.fc-button]:px-2 [&_.fc_.fc-button]:py-1 [&_.fc_.fc-button]:text-xs [&_.fc_.fc-button]:font-medium [&_.fc_.fc-button]:shadow-none [&_.fc_.fc-button-primary:focus]:shadow-none [&_.fc-daygrid-event]:rounded-md [&_.fc-daygrid-event]:text-[10px] [&_.fc-daygrid-event]:leading-tight [&_.fc-daygrid-event]:text-white [&_.fc-daygrid-day.tb-day-not-applicable]:cursor-not-allowed [&_.fc-daygrid-day.tb-day-not-applicable]:bg-[#f4f4f5] [&_.fc-daygrid-day.tb-day-not-applicable_.fc-daygrid-day-number]:text-[#a1a1aa] [&_.fc-daygrid-day.tb-day-occupied]:cursor-not-allowed [&_.fc-daygrid-day.tb-day-occupied]:bg-[#ffe4e6] [&_.fc-daygrid-day.tb-day-occupied_.fc-daygrid-day-number]:text-[#9f1239] [&_.fc-daygrid-day.tb-day-in-range_.fc-daygrid-day-number]:font-bold [&_.fc-daygrid-day.tb-day-in-range_.fc-daygrid-day-number]:text-[#7d3f12] [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:relative [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:z-[2] [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:mx-auto [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:flex [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:h-8 [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:w-8 [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:items-center [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:justify-center [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:rounded-full [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:bg-[#ff7a1a] [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:font-semibold [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:text-white [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:shadow-[0_2px_4px_rgba(155,90,44,0.28)] [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:ring-2 [&_.fc-daygrid-day.tb-day-selected-start_.fc-daygrid-day-number]:ring-white/90 [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:relative [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:z-[2] [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:mx-auto [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:flex [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:h-8 [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:w-8 [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:items-center [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:justify-center [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:rounded-full [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:bg-[#ff7a1a] [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:font-semibold [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:text-white [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:shadow-[0_2px_4px_rgba(155,90,44,0.28)] [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:ring-2 [&_.fc-daygrid-day.tb-day-selected-end_.fc-daygrid-day-number]:ring-white/90]'
 
 const deriveGuestLimit = (stayPackage) => {
   const directCandidates = [
@@ -200,7 +246,10 @@ const StayBooking = () => {
   const checkInDate = useWatch({ control, name: 'checkInDate' })
   const checkOutDate = useWatch({ control, name: 'checkOutDate' })
   const todayYmd = useMemo(() => formatLocalYmd(new Date()), [])
-  const stayDays = useMemo(() => computeStayDays(checkInDate, checkOutDate), [checkInDate, checkOutDate])
+  const stayDays = useMemo(
+    () => computeStayDays(checkInDate, checkOutDate, checkInTime, checkOutTime),
+    [checkInDate, checkOutDate, checkInTime, checkOutTime]
+  )
   const baseNightCost = useMemo(() => Math.max(0, Number(stayPackage?.price) || 0), [stayPackage?.price])
   const baseCoveredDays = 1
   const extraDays = Math.max(0, stayDays - baseCoveredDays)
@@ -241,12 +290,14 @@ const StayBooking = () => {
   }, [checkInDate, todayYmd])
 
   const calendarEvents = useMemo(() => {
-    const occupiedEvents = occupiedDates.map((date) => ({
-      id: `occ-${date}`,
-      title: 'Occupied',
-      date,
-      color: '#e11d48'
-    }))
+    const occupiedEvents = occupiedDates
+      .filter((date) => isDisplayedOccupiedStayDate(date, occupiedSet, todayYmd))
+      .map((date) => ({
+        id: `occ-${date}`,
+        title: 'Occupied',
+        date,
+        color: '#e11d48'
+      }))
     const availableEvents = availableDates
       .filter(
         (date) =>
@@ -259,7 +310,7 @@ const StayBooking = () => {
         color: '#059669'
       }))
     return [...availableEvents, ...occupiedEvents]
-  }, [availableDates, occupiedDates, occupiedSet, notApplicableCtx])
+  }, [availableDates, occupiedDates, occupiedSet, notApplicableCtx, todayYmd])
 
   const isCheckInPickerDisabled = useCallback(
     (ymd) => occupiedSet.has(ymd) || isNotApplicableStayDate(ymd, notApplicableCtx),
@@ -289,23 +340,129 @@ const StayBooking = () => {
       const ci = String(checkInDate || '').trim()
       if (!/^\d{4}-\d{2}-\d{2}$/.test(ci) || ymd <= ci) return 'blocked'
       const span = enumerateStayNights(ci, ymd)
-      if (span.some((d) => occupiedSet.has(d))) return 'occupied'
+      if (span.some((d) => isDisplayedOccupiedStayDate(d, occupiedSet, todayYmd))) return 'occupied'
       return 'blocked'
     },
-    [checkInDate, occupiedSet]
+    [checkInDate, occupiedSet, todayYmd]
   )
 
   const stayCalendarRef = useRef(null)
   const didPrimeFirstCheckInRef = useRef(false)
   const lastStayPackageIdRef = useRef('')
+  const selectionClearedRef = useRef(false)
 
-  /** Default check-in to the first bookable day (so the orange “selected” marker matches first availability, not “today”). */
+  const handleCalendarDateSelect = useCallback(
+    (dateStr) => {
+      if (isDisplayedOccupiedStayDate(dateStr, occupiedSet, todayYmd)) return
+      if (isNotApplicableStayDate(dateStr, notApplicableCtx)) return
+
+      selectionClearedRef.current = false
+
+      const ci = String(checkInDate || '').trim()
+      const co = String(checkOutDate || '').trim()
+      const hasCi = /^\d{4}-\d{2}-\d{2}$/.test(ci)
+      const hasCo = /^\d{4}-\d{2}-\d{2}$/.test(co) && co > ci
+
+      const commitCheckIn = (nextCheckIn) => {
+        setValue('checkInDate', nextCheckIn, { shouldDirty: true })
+        const nextCo = String(getValues('checkOutDate') || '').trim()
+        if (
+          nextCo &&
+          /^\d{4}-\d{2}-\d{2}$/.test(nextCo) &&
+          !isStayCheckoutSpanOpen(nextCheckIn, nextCo, occupiedSet, notApplicableCtx)
+        ) {
+          setValue('checkOutDate', '', { shouldDirty: true })
+        }
+      }
+
+      if (!hasCi) {
+        commitCheckIn(dateStr)
+        return
+      }
+
+      if (!hasCo) {
+        if (dateStr === ci) return
+        if (dateStr > ci && isStayCheckoutSpanOpen(ci, dateStr, occupiedSet, notApplicableCtx)) {
+          setValue('checkOutDate', dateStr, { shouldDirty: true })
+          return
+        }
+        if (dateStr < ci) {
+          commitCheckIn(dateStr)
+          return
+        }
+        commitCheckIn(dateStr)
+        return
+      }
+
+      if (dateStr > co && isStayCheckoutSpanOpen(ci, dateStr, occupiedSet, notApplicableCtx)) {
+        setValue('checkOutDate', dateStr, { shouldDirty: true })
+        return
+      }
+      if (dateStr > ci && dateStr < co) {
+        commitCheckIn(dateStr)
+        return
+      }
+      if (dateStr < ci) {
+        commitCheckIn(dateStr)
+        return
+      }
+      if (dateStr === ci || dateStr === co) return
+      if (dateStr > ci && isStayCheckoutSpanOpen(ci, dateStr, occupiedSet, notApplicableCtx)) {
+        setValue('checkOutDate', dateStr, { shouldDirty: true })
+        return
+      }
+      commitCheckIn(dateStr)
+    },
+    [checkInDate, checkOutDate, getValues, notApplicableCtx, occupiedSet, setValue, todayYmd]
+  )
+
+  const handleClearStaySelection = useCallback(() => {
+    selectionClearedRef.current = true
+    setValue('checkInDate', '', { shouldDirty: true })
+    setValue('checkOutDate', '', { shouldDirty: true })
+    requestAnimationFrame(() => {
+      const api = stayCalendarRef.current?.getApi?.()
+      if (api) api.gotoDate(todayYmd)
+    })
+  }, [setValue, todayYmd])
+
+  const handleCheckInDateFieldChange = useCallback(
+    (ymd) => {
+      if (!ymd) {
+        handleClearStaySelection()
+        return
+      }
+      handleCalendarDateSelect(ymd)
+    },
+    [handleCalendarDateSelect, handleClearStaySelection]
+  )
+
+  const handleCheckOutDateFieldChange = useCallback(
+    (ymd) => {
+      if (!ymd) {
+        setValue('checkOutDate', '', { shouldDirty: true })
+        return
+      }
+      const ci = String(checkInDate || '').trim()
+      if (/^\d{4}-\d{2}-\d{2}$/.test(ci) && ymd > ci && isStayCheckoutSpanOpen(ci, ymd, occupiedSet, notApplicableCtx)) {
+        selectionClearedRef.current = false
+        setValue('checkOutDate', ymd, { shouldDirty: true })
+        return
+      }
+      handleCalendarDateSelect(ymd)
+    },
+    [checkInDate, handleCalendarDateSelect, notApplicableCtx, occupiedSet, setValue]
+  )
+
+  /** Default check-in to the first bookable day; check-out stays empty until the guest picks it. */
   useEffect(() => {
     if (!stayPackage || !stayBusiness) return
+    if (selectionClearedRef.current) return
     const sid = String(stayPackage.id || '')
     if (sid !== lastStayPackageIdRef.current) {
       lastStayPackageIdRef.current = sid
       didPrimeFirstCheckInRef.current = false
+      selectionClearedRef.current = false
     }
     if (didPrimeFirstCheckInRef.current) return
 
@@ -331,6 +488,7 @@ const StayBooking = () => {
     const found = findFirstOpenCheckInYmd(todayYmd, isCheckInPickerDisabled)
     if (found) {
       setValue('checkInDate', found, { shouldDirty: false })
+      setValue('checkOutDate', '', { shouldDirty: false })
       scrollTo(found)
     }
     didPrimeFirstCheckInRef.current = true
@@ -366,30 +524,31 @@ const StayBooking = () => {
     }
   }, [guestLimit, getValues, setValue])
 
-  /** Keep check-out in sync with check-in: clear when check-in clears; otherwise preserve a still-valid check-out or pick the earliest valid check-out (next open night). */
+  /** Drop check-out when check-in is cleared or the saved range is no longer valid. */
   useEffect(() => {
     const ci = String(checkInDate || '').trim()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ci)) {
-      setValue('checkOutDate', '', { shouldDirty: true })
-      return
-    }
-
-    const coCurrent = String(getValues('checkOutDate') || '').trim()
-    if (coCurrent && /^\d{4}-\d{2}-\d{2}$/.test(coCurrent) && !isCheckOutPickerDisabled(coCurrent)) {
-      return
-    }
-
-    let candidate = addOneCalendarDayYmd(ci)
-    let found = ''
-    for (let i = 0; i < 400 && candidate; i++) {
-      if (!isCheckOutPickerDisabled(candidate)) {
-        found = candidate
-        break
+      if (String(getValues('checkOutDate') || '').trim()) {
+        setValue('checkOutDate', '', { shouldDirty: true })
       }
-      candidate = addOneCalendarDayYmd(candidate)
+      return
     }
-    setValue('checkOutDate', found, { shouldDirty: true })
-  }, [checkInDate, getValues, isCheckOutPickerDisabled, setValue])
+
+    const co = String(getValues('checkOutDate') || '').trim()
+    if (!co) return
+    if (!isStayCheckoutSpanOpen(ci, co, occupiedSet, notApplicableCtx)) {
+      setValue('checkOutDate', '', { shouldDirty: true })
+    }
+  }, [checkInDate, getValues, notApplicableCtx, occupiedSet, setValue])
+
+  useEffect(() => {
+    const target = String(checkInDate || checkOutDate || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(target)) return
+    requestAnimationFrame(() => {
+      const api = stayCalendarRef.current?.getApi?.()
+      if (api) api.gotoDate(target)
+    })
+  }, [checkInDate, checkOutDate])
 
   if (!stayPackage || !stayBusiness) {
     return (
@@ -408,7 +567,12 @@ const StayBooking = () => {
   }
 
   const onSubmit = async (values) => {
-    const nights = computeStayDays(values.checkInDate, values.checkOutDate)
+    const nights = computeStayDays(
+      values.checkInDate,
+      values.checkOutDate,
+      values.checkInTime,
+      values.checkOutTime
+    )
     const parsedCheckInDate = Date.parse(`${String(values.checkInDate || '').trim()}T00:00:00`)
     const parsedCheckOutDate = Date.parse(`${String(values.checkOutDate || '').trim()}T00:00:00`)
     if (!Number.isFinite(parsedCheckInDate) || !Number.isFinite(parsedCheckOutDate)) {
@@ -535,16 +699,26 @@ const StayBooking = () => {
       </div>
 
       <section className="rounded-2xl border border-[#e7dfd5] bg-white p-4 shadow-sm md:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a79a8b]">Availability calendar</p>
-            <h2 className="mt-1 text-base font-semibold text-[#1f1f1f]">Mini calendar for stay dates</h2>
+            <h2 className="mt-1 text-base font-semibold text-[#1f1f1f]">Choose your stay dates</h2>
             <p className="mt-1 text-xs text-[#6b6b6b]">
-              Applicable booking hours: Check-in from <span className="font-semibold text-[#7d5b3b]">{checkInTime || '14:00'}</span>,
-              check-out by <span className="font-semibold text-[#7d5b3b]">{checkOutTime || '12:00'}</span>.
+              Mark check-in and check-out on the calendar below. Applicable booking hours: Check-in from{' '}
+              <span className="font-semibold text-[#7d5b3b]">{checkInTime || '14:00'}</span>, check-out by{' '}
+              <span className="font-semibold text-[#7d5b3b]">{checkOutTime || '12:00'}</span>.
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs text-[#5b5b5b]">
+          <button
+            type="button"
+            onClick={handleClearStaySelection}
+            disabled={!checkInDate && !checkOutDate}
+            className="shrink-0 rounded-full border border-[#e7dfd5] bg-white px-3 py-1.5 text-xs font-semibold text-[#7d5b3b] transition hover:border-[#d4c4b6] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Clear selection
+          </button>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#5b5b5b]">
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-[#059669]" />
               Available
@@ -554,17 +728,20 @@ const StayBooking = () => {
               Occupied
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#fb923c]" />
-              Selected check-in
+              <span className="h-2.5 w-2.5 rounded-full bg-[#ff7a1a]" />
+              Check-in / check-out
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="text-xs font-bold text-[#7d3f12]">15</span>
+              Your stay
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-[#d4d4d8]" />
               Not applicable
             </span>
-          </div>
         </div>
         <div
-          className="mt-3 rounded-xl border border-[#efe5db] bg-[#fcfaf7] p-3 [&_.fc]:text-[#2f2f2f] [&_.fc-theme-standard_.fc-scrollgrid]:border-[#e7dfd5] [&_.fc-theme-standard_td]:border-[#efe5db] [&_.fc-theme-standard_th]:border-[#efe5db] [&_.fc-col-header-cell]:bg-[#f8f5f0] [&_.fc-col-header-cell-cushion]:text-xs [&_.fc-col-header-cell-cushion]:font-semibold [&_.fc-col-header-cell-cushion]:text-[#6f665d] [&_.fc-daygrid-day-frame]:min-h-14 [&_.fc-daygrid-day-number]:text-xs [&_.fc-daygrid-day-number]:text-[#6f665d] [&_.fc-day-today]:bg-transparent [&_.fc-day-today]:shadow-none [&_.fc-toolbar-title]:text-lg [&_.fc-toolbar-title]:font-semibold [&_.fc-toolbar-title]:text-[#2f2f2f] [&_.fc-toolbar.fc-header-toolbar]:mb-2 [&_.fc_.fc-button]:rounded-md [&_.fc_.fc-button]:px-2 [&_.fc_.fc-button]:py-1 [&_.fc_.fc-button]:text-xs [&_.fc_.fc-button]:font-medium [&_.fc_.fc-button]:shadow-none [&_.fc_.fc-button-primary:focus]:shadow-none [&_.fc-daygrid-event]:rounded-md [&_.fc-daygrid-event]:text-[10px] [&_.fc-daygrid-event]:leading-tight [&_.fc-daygrid-event]:text-white [&_.fc-daygrid-day.tb-day-not-applicable]:cursor-not-allowed [&_.fc-daygrid-day.tb-day-not-applicable]:bg-[#f4f4f5] [&_.fc-daygrid-day.tb-day-not-applicable_.fc-daygrid-day-number]:text-[#a1a1aa] [&_.fc-daygrid-day.tb-day-occupied]:cursor-not-allowed [&_.fc-daygrid-day.tb-day-occupied]:bg-[#ffe4e6] [&_.fc-daygrid-day.tb-day-occupied_.fc-daygrid-day-number]:text-[#9f1239] [&_.fc-daygrid-day.tb-day-selected]:bg-[#ffedd5] [&_.fc-daygrid-day.tb-day-selected_.fc-daygrid-day-number]:text-[#9a3412]"
+          className={stayCalendarSkinClassName}
           style={{
             '--fc-button-bg-color': '#f5eee4',
             '--fc-button-border-color': '#d5c5b2',
@@ -582,23 +759,13 @@ const StayBooking = () => {
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             events={calendarEvents}
-            dateClick={(info) => {
-              if (occupiedSet.has(info.dateStr)) return
-              if (isNotApplicableStayDate(info.dateStr, notApplicableCtx)) return
-              setValue('checkInDate', info.dateStr, { shouldDirty: true })
-            }}
-            eventClick={(info) => {
-              const dateStr = info.event.startStr.slice(0, 10)
-              if (occupiedSet.has(dateStr)) return
-              if (isNotApplicableStayDate(dateStr, notApplicableCtx)) return
-              setValue('checkInDate', dateStr, { shouldDirty: true })
-            }}
+            dateClick={(info) => handleCalendarDateSelect(info.dateStr)}
+            eventClick={(info) => handleCalendarDateSelect(info.event.startStr.slice(0, 10))}
             dayCellClassNames={(arg) => {
               const dateStr = formatLocalYmd(arg.date)
-              if (occupiedSet.has(dateStr)) return ['tb-day-occupied']
+              if (isDisplayedOccupiedStayDate(dateStr, occupiedSet, todayYmd)) return ['tb-day-occupied']
               if (isNotApplicableStayDate(dateStr, notApplicableCtx)) return ['tb-day-not-applicable']
-              if (dateStr === String(checkInDate || '').trim()) return ['tb-day-selected']
-              return []
+              return buildStayRangeCellClasses(dateStr, checkInDate, checkOutDate)
             }}
             height="auto"
             aspectRatio={2.3}
@@ -612,9 +779,10 @@ const StayBooking = () => {
           />
         </div>
         <p className="mt-2 text-xs text-[#6b6b6b]">
-          Tap an open date to set check-in; check-out updates to the next valid night automatically (you can change it in
-          the field below). Gray days are not bookable; red days are already booked. The date pickers use the same
-          rules.
+          The first open day is marked as check-in by default. Tap a later open day to set check-out, then tap another
+          open day between check-in and check-out to move check-in forward. Nights between your dates are highlighted and
+          the estimated total updates with your check-in and check-out times below. Clear selection resets the range.
+          Gray days are not bookable; red days are already booked. The date fields follow the same rules.
         </p>
       </section>
 
@@ -630,13 +798,15 @@ const StayBooking = () => {
                 <StayDatePickerField
                   id="stay-check-in-date"
                   value={field.value || ''}
-                  onChange={field.onChange}
+                  onChange={handleCheckInDateFieldChange}
                   onBlur={field.onBlur}
                   inputRef={field.ref}
                   minYmd={todayYmd}
                   todayYmd={todayYmd}
                   isDateDisabled={isCheckInPickerDisabled}
-                  getDisabledVisual={(ymd) => (occupiedSet.has(ymd) ? 'occupied' : 'blocked')}
+                  getDisabledVisual={(ymd) =>
+                    isDisplayedOccupiedStayDate(ymd, occupiedSet, todayYmd) ? 'occupied' : 'blocked'
+                  }
                 />
               )}
             />
@@ -661,7 +831,7 @@ const StayBooking = () => {
                 <StayDatePickerField
                   id="stay-check-out-date"
                   value={field.value || ''}
-                  onChange={field.onChange}
+                  onChange={handleCheckOutDateFieldChange}
                   onBlur={field.onBlur}
                   inputRef={field.ref}
                   minYmd={checkOutInputMin}
@@ -759,7 +929,8 @@ const StayBooking = () => {
             </p>
           </div>
           <p className="text-[11px] text-[#6b6b6b]">
-            Base cost covers the first day. Every additional day adds another {formatPrice(baseNightCost)}.
+            Base cost covers the first day. Every additional day adds another {formatPrice(baseNightCost)}. Day count
+            follows your selected dates and check-in/check-out times.
           </p>
         </div>
 

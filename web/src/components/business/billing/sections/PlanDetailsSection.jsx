@@ -145,7 +145,7 @@ const PlanDetailsSection = ({
                 <button
                   type="button"
                   onClick={() => onOpenCompareFeatures?.()}
-                  className="rounded-xl border border-[#e1d4c5] px-4 py-2.5 text-sm font-medium text-[#5f5f5f] transition hover:bg-[#f7f3ed]"
+                  className="rounded-xl border-1 border-[#d7bea1] px-4 py-2.5 text-sm font-medium text-[#ca732b] transition hover:bg-[#f7f3ed]"
                 >
                   Compare features
                 </button>
