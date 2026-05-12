@@ -16,6 +16,7 @@ import PaymentMethods from "../../pages/dashboard/business/PaymentMethods";
 import TodaysRecord from "../../pages/dashboard/business/TodaysRecord";
 import Records from "../../pages/dashboard/business/Records";
 import TrafficInsights from "../../pages/dashboard/business/TrafficInsights";
+import Ratings from "../../pages/dashboard/business/Ratings";
 import { ProtectedRoute } from "../ProtectedRoute";
 
 
@@ -95,6 +96,10 @@ export const BusinessRoutes = [
             {
                 path: 'reports/traffic-insights',
                 element: <TrafficInsights />
+            },
+            {
+                path: 'ratings',
+                element: <Ratings />
             }
         ]
     }

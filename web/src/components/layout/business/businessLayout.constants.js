@@ -8,6 +8,7 @@ import {
   FiMessageSquare,
   FiSettings,
   FiShield,
+  FiStar,
   FiUser
 } from 'react-icons/fi'
 import { toEncryptedRoute } from '../../../shared/utils/direct.utils'
@@ -124,6 +125,11 @@ export const buildBusinessSidebarLinks = (businessCategory) => {
           path: `/${toEncryptedRoute('business/dashboard/reports/traffic-insights')}`
         }
       ]
+    },
+    {
+      label: 'Ratings',
+      icon: FiStar,
+      path: `/${toEncryptedRoute('business/dashboard/ratings')}`
     },
     {
       label: 'Security & Activity Log',
