@@ -5,8 +5,12 @@ import {
     resolveTouristBookingPaymentLinkByPublicToken,
     resolveTouristBookingPaymentLinkByToken
 } from '../../payments/payments.service.js'
+import { mergeRestaurantReviewFlagsOntoOrders } from '../restaurant-order-reviews/restaurant-order-reviews.service.js'
 
-export const getMyTouristCustomerOrders = async (userId) => listTouristCustomerOrdersByUserId(userId)
+export const getMyTouristCustomerOrders = async (userId) => {
+    const orders = await listTouristCustomerOrdersByUserId(userId)
+    return mergeRestaurantReviewFlagsOntoOrders(orders)
+}
 export const createMyBookingRequestPaymentCheckout = async ({
     userId,
     customerOrderId,

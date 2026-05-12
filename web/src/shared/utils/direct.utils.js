@@ -25,7 +25,7 @@ export const roleBasedRoute = (role) => {
   const normalizedRole = typeof role === 'string' ? role.trim().toUpperCase() : ''
 
   const routeByRole = {
-    TOURIST: 'tourist/explore',
+    TOURIST: 'tourist/home',
     BUSINESS: 'business/dashboard',
     ADMIN: 'admin/dashboard'
   }

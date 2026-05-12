@@ -296,8 +296,12 @@ const BusinessDetail = () => {
   const categoryLabel = categoryDisplayLabel(business?.category)
   const listingLabel = isStayBusiness ? 'Stay List' : 'Restaurant List'
   const businessName = business?.name || 'Restaurant'
-  const rating = formatRating(business?.averageRating || business?.rating)
-  const ratingCount = Number(business?.ratingCount || business?.reviewsCount || business?.reviewCount || 1000)
+  const reviewSum = business?.restaurantReviewSummary
+  const ratingAvg = reviewSum?.averageRating != null ? Number(reviewSum.averageRating) : null
+  const ratingCount = Number(reviewSum?.reviewCount || 0)
+  const hasReviews = Number.isFinite(ratingAvg) && ratingCount > 0
+  const ratingDisplay = hasReviews ? formatRating(ratingAvg) : null
+  const recentGuestReviews = Array.isArray(reviewSum?.recentReviews) ? reviewSum.recentReviews : []
   const sidebarStickyTop = stickyTopOffset + 8
   const destination = hasValidMapCoordinates(business?.businessLocation)
     ? { lat: business.businessLocation.lat, lng: business.businessLocation.lng }
@@ -426,7 +430,13 @@ const BusinessDetail = () => {
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#555]">
                   <span className="inline-flex items-center gap-1">
                     <FiStar className="h-3.5 w-3.5 text-[#f59f0b]" aria-hidden />
-                    {rating}/5 ({ratingCount.toLocaleString('en-PH')}+) · See reviews
+                    {hasReviews ? (
+                      <>
+                        {ratingDisplay} out of 5 · {ratingCount} review{ratingCount === 1 ? '' : 's'}
+                      </>
+                    ) : (
+                      <>New on Tara Bisita — reviews appear after guests pay online</>
+                    )}
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <FiInfo className="h-3.5 w-3.5" aria-hidden />
@@ -469,6 +479,32 @@ const BusinessDetail = () => {
             </a>
           </div>
         </div>
+
+        {!isStayBusiness && recentGuestReviews.length > 0 ? (
+          <div className="border-b border-[#efefef] px-4 py-5 md:px-5">
+            <h3 className="text-lg font-semibold text-[#1f1f1f]">Guest reviews</h3>
+            <p className="mt-1 text-xs text-[#666]">From customers who completed an online order.</p>
+            <ul className="mt-4 list-none space-y-3 p-0">
+              {recentGuestReviews.map((r) => (
+                <li key={String(r.id)} className="rounded-xl border border-[#ececec] bg-[#fafafa] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-[#9b5a2c]">{String(r.authorLabel || 'Guest')}</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#1f1f1f]">
+                      <FiStar className="h-3.5 w-3.5 text-[#f59f0b]" aria-hidden />
+                      {Number(r.rating).toFixed(1)} / 5
+                    </span>
+                  </div>
+                  {r.comment ? <p className="mt-2 text-sm leading-relaxed text-[#3d3d3d]">{String(r.comment)}</p> : null}
+                  {r.createdAt ? (
+                    <p className="mt-2 text-[10px] text-[#888]">
+                      {new Date(r.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {isStayBusiness ? (
           <div className="border-b border-[#efefef] px-4 py-4 md:px-5">

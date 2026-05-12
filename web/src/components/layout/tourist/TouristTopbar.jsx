@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Link, useLocation } from 'react-router-dom'
-import { FiCompass, FiMessageCircle, FiShoppingBag, FiShoppingCart } from 'react-icons/fi'
+import { FiCompass, FiHome, FiMessageCircle, FiShoppingBag, FiShoppingCart } from 'react-icons/fi'
 import { isSignedRouteValid } from '../../../shared/utils/direct.utils'
 import { useTouristCartItemStore } from '../../../store/tourist/tourist-cart-item.store.js'
 import {
   touristCartHref,
   touristExploreHref,
+  touristHomeHref,
   touristMessagesHref,
   touristOrdersHref,
   touristShellContentClass
@@ -40,7 +41,7 @@ const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallb
         className={`${touristShellContentClass} flex min-w-0 items-center gap-3 py-3 md:gap-6`}
       >
         <Link
-          to={touristExploreHref}
+          to={touristHomeHref}
           onClick={() => onCloseAccount?.()}
           className="flex min-w-0 flex-1 items-center gap-2 text-[#9b5a2c]"
         >
@@ -54,7 +55,11 @@ const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallb
             aria-label="Primary"
             onClick={() => onCloseAccount?.()}
           >
-            <NavLink to={touristExploreHref} end className={navLinkClass} title="Explore">
+            <NavLink to={touristHomeHref} end className={navLinkClass} title="Home">
+              <FiHome className="h-5 w-5 shrink-0" aria-hidden />
+              <span className="hidden sm:inline">Home</span>
+            </NavLink>
+            <NavLink to={touristExploreHref} className={navLinkClass} title="Explore">
               <FiCompass className="h-5 w-5 shrink-0" aria-hidden />
               <span className="hidden sm:inline">Explore</span>
             </NavLink>
