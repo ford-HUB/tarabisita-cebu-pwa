@@ -233,9 +233,7 @@ const Register = () => {
             accountType: data.accountType,
           }
 
-      if (!emailStatus.exists) {
-        await registerUser(normalizedPayload)
-      }
+      await registerUser(normalizedPayload)
 
       const response = await sendVerificationCode({ email: data.email })
       const sessionToken = response.data.properties.sessionToken
