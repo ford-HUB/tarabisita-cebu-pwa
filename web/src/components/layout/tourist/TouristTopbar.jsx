@@ -20,6 +20,15 @@ const navLinkClass = ({ isActive }) =>
       : 'text-[#5b5b5b] hover:bg-white/80 hover:text-[#1f1f1f]'
   ].join(' ')
 
+const exploreOwnedNavPaths = new Set([
+  'tourist/explore/cart',
+  'tourist/explore/checkout',
+  'tourist/explore/stay-booking'
+])
+
+const exploreNavIsActive = ({ isActive }, pathSeg) =>
+  isActive && !exploreOwnedNavPaths.has(pathSeg)
+
 const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallback }) => {
   const location = useLocation()
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false)
@@ -31,7 +40,8 @@ const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallb
   const pathSeg = (location.pathname || '').replace(/^\/+/, '')
   const suppressCartCountBadge =
     pathSeg.startsWith('tourist/explore/business/') ||
-    pathSeg === 'tourist/explore/checkout'
+    pathSeg === 'tourist/explore/checkout' ||
+    pathSeg === 'tourist/explore/cart'
   const routeKey = new URLSearchParams(location.search).get('rk')
   const messagesActive = pathSeg === 'tourist/messages' && isSignedRouteValid('tourist/messages', routeKey)
 
@@ -59,7 +69,11 @@ const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallb
               <FiHome className="h-5 w-5 shrink-0" aria-hidden />
               <span className="hidden sm:inline">Home</span>
             </NavLink>
-            <NavLink to={touristExploreHref} className={navLinkClass} title="Explore">
+            <NavLink
+              to={touristExploreHref}
+              className={(state) => navLinkClass({ isActive: exploreNavIsActive(state, pathSeg) })}
+              title="Explore"
+            >
               <FiCompass className="h-5 w-5 shrink-0" aria-hidden />
               <span className="hidden sm:inline">Explore</span>
             </NavLink>
