@@ -11,7 +11,8 @@ import { sanitizeBusinessPayload } from '../../../shared/utils/business-controll
 import {
     getRestaurantRecentReviewsGrouped,
     getRestaurantReviewPublicSummary,
-    getRestaurantReviewStatsMapForBusinessIds
+    getRestaurantReviewStatsMapForBusinessIds,
+    listPublicRestaurantReviewsForBusiness
 } from '../../tourist/restaurant-order-reviews/restaurant-order-reviews.service.js'
 
 const hasActivePaidSubscription = (business) => {
@@ -198,6 +199,37 @@ export const recordPublicBusinessView = async (req, res) => {
         return res.status(200).json({
             data: { publicProfileViewCount: business.publicProfileViewCount ?? 0 }
         })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const getPublicBusinessRestaurantReviews = async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store')
+        const { businessId } = req.validatedData.params
+        const { sort, rating, page, limit } = req.validatedData.query
+
+        const business = await Business.findById(businessId).select('_id verificationStatus subscription')
+
+        if (!business) {
+            return res.status(404).json({ message: 'Business not found' })
+        }
+        if (business.verificationStatus !== 'VERIFIED') {
+            return res.status(403).json({ message: 'Business is not yet publicly available' })
+        }
+        if (!hasActivePaidSubscription(business)) {
+            return res.status(403).json({ message: 'Business is not yet publicly available' })
+        }
+
+        const data = await listPublicRestaurantReviewsForBusiness(business._id, {
+            sort,
+            rating: rating ?? null,
+            page,
+            limit
+        })
+
+        return res.status(200).json({ data })
     } catch (error) {
         return res.status(500).json({ message: error.message })
     }

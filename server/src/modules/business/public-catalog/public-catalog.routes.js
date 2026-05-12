@@ -8,11 +8,13 @@ import {
     postTouristCustomerOrderCheckout,
     getPublicBusinesses,
     recordPublicBusinessView,
+    getPublicBusinessRestaurantReviews,
     getBusinessById
 } from './public-catalog.controller.js'
 import {
     createTouristCustomerOrderSchema,
-    createTouristCustomerOrderCheckoutSchema
+    createTouristCustomerOrderCheckoutSchema,
+    listPublicRestaurantReviewsSchema
 } from './public-catalog.validator.js'
 
 const publicCatalogRoutes = express.Router()
@@ -32,6 +34,11 @@ publicCatalogRoutes.post(
     postTouristCustomerOrderCheckout
 )
 publicCatalogRoutes.post('/public/:businessId/view', recordPublicBusinessView)
+publicCatalogRoutes.get(
+    '/public/:businessId/restaurant-reviews',
+    validateRequest(listPublicRestaurantReviewsSchema),
+    getPublicBusinessRestaurantReviews
+)
 publicCatalogRoutes.get('/public/:businessId', getBusinessById)
 publicCatalogRoutes.get('/subscription-catalog', getManageSubscriptionCatalog)
 
