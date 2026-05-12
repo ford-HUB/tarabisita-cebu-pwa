@@ -9,6 +9,7 @@ import VerificationCode from './models/verification-code.model.js'
 import ResetPasswordModel from './models/reset-password.model.js'
 import Business from '../business/models/business.model.js'
 import ActivityLog from './models/activity-log.model.js'
+import { BUSINESS_CATEGORY_LABELS } from '../../shared/constants/businessCategories.js'
 
 // Backward-compatible alias for any lingering ResetPassword references.
 const ResetPassword = ResetPasswordModel
