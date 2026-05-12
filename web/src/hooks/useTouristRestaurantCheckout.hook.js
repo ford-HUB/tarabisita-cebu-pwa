@@ -38,7 +38,15 @@ const stripItemKeyForApi = (item) => {
   return rest
 }
 
-export const useTouristRestaurantCheckout = () => {
+const distinctBusinessIds = (list) => [...new Set((list || []).map((it) => String(it.businessId || '')).filter(Boolean))]
+
+/**
+ * @param {{ variant?: 'cart' | 'checkout' }} [options]
+ * - `cart`: full saved cart (grouped by restaurant). Clears checkout scope on mount.
+ * - `checkout`: only rows for the active checkout restaurant (or implicit single-store cart).
+ */
+export const useTouristRestaurantCheckout = (options = {}) => {
+  const variant = options.variant === 'checkout' ? 'checkout' : 'cart'
   const { user } = useAuth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -48,41 +56,99 @@ export const useTouristRestaurantCheckout = () => {
   const proceedFromCartLockRef = useRef(false)
 
   const {
-    items,
+    items: storeItems,
+    activeCheckoutBusinessId,
     deselectedItemKeys,
-    groupByBusiness,
     setItemQty,
     setItemNotes,
     removeItem,
     removeItemsForBusiness,
-    toggleItemSelected
+    toggleItemSelected,
+    setActiveCheckoutBusinessId,
+    clearActiveCheckoutBusinessId,
+    rehydrateActiveCheckoutBusinessIdFromStorage
   } = useTouristCartItemStore(
     useShallow((s) => ({
       items: s.items,
+      activeCheckoutBusinessId: s.activeCheckoutBusinessId,
       deselectedItemKeys: s.deselectedItemKeys,
-      groupByBusiness: s.groupByBusiness,
       setItemQty: s.setItemQty,
       setItemNotes: s.setItemNotes,
       removeItem: s.removeItem,
       removeItemsForBusiness: s.removeItemsForBusiness,
-      toggleItemSelected: s.toggleItemSelected
+      toggleItemSelected: s.toggleItemSelected,
+      setActiveCheckoutBusinessId: s.setActiveCheckoutBusinessId,
+      clearActiveCheckoutBusinessId: s.clearActiveCheckoutBusinessId,
+      rehydrateActiveCheckoutBusinessIdFromStorage: s.rehydrateActiveCheckoutBusinessIdFromStorage
     }))
   )
 
-  const groups = useMemo(() => groupByBusiness(), [items, groupByBusiness])
+  useEffect(() => {
+    if (variant === 'cart') {
+      clearActiveCheckoutBusinessId()
+    } else {
+      rehydrateActiveCheckoutBusinessIdFromStorage()
+    }
+  }, [variant, clearActiveCheckoutBusinessId, rehydrateActiveCheckoutBusinessIdFromStorage])
+
+  const storeDistinctIds = useMemo(() => distinctBusinessIds(storeItems), [storeItems])
+
+  const implicitSingleBusinessId = useMemo(
+    () => (storeDistinctIds.length === 1 ? storeDistinctIds[0] : null),
+    [storeDistinctIds]
+  )
+
+  const effectiveCheckoutBusinessId = useMemo(() => {
+    if (activeCheckoutBusinessId) return String(activeCheckoutBusinessId)
+    if (implicitSingleBusinessId) return implicitSingleBusinessId
+    return null
+  }, [activeCheckoutBusinessId, implicitSingleBusinessId])
+
+  /** Checkout route: multiple restaurants saved and user did not start checkout from one store. */
+  const checkoutBlockedMultiStore = useMemo(
+    () => variant === 'checkout' && storeDistinctIds.length > 1 && !activeCheckoutBusinessId,
+    [variant, storeDistinctIds.length, activeCheckoutBusinessId]
+  )
+
+  const checkoutWorkingItems = useMemo(() => {
+    if (variant === 'cart') return storeItems
+    if (checkoutBlockedMultiStore) return []
+    if (effectiveCheckoutBusinessId) {
+      return storeItems.filter((it) => String(it.businessId) === String(effectiveCheckoutBusinessId))
+    }
+    return storeItems
+  }, [variant, storeItems, checkoutBlockedMultiStore, effectiveCheckoutBusinessId])
+
+  const otherStoresSummary = useMemo(() => {
+    if (variant !== 'checkout' || !effectiveCheckoutBusinessId) {
+      return { count: 0, rowCount: 0, total: 0 }
+    }
+    const others = storeItems.filter((it) => String(it.businessId) !== String(effectiveCheckoutBusinessId))
+    const rowCount = others.length
+    const count = others.reduce((n, it) => n + (Number(it.qty) || 0), 0)
+    const total = others.reduce((sum, it) => sum + (Number(it.unitPrice) || 0) * (Number(it.qty) || 0), 0)
+    return { count, rowCount, total }
+  }, [variant, storeItems, effectiveCheckoutBusinessId])
+
+  const groups = useMemo(() => groupCartItemsByBusiness(checkoutWorkingItems), [checkoutWorkingItems])
 
   const isItemSelected = useCallback((key) => !deselectedItemKeys[key], [deselectedItemKeys])
 
   const selectedItems = useMemo(
-    () => items.filter((it) => isItemSelected(it.key)),
-    [items, isItemSelected]
+    () => checkoutWorkingItems.filter((it) => isItemSelected(it.key)),
+    [checkoutWorkingItems, isItemSelected]
   )
 
   const groupsForCheckout = useMemo(() => groupCartItemsByBusiness(selectedItems), [selectedItems])
 
   const cartTotal = useMemo(
-    () => items.reduce((sum, it) => sum + (Number(it.unitPrice) || 0) * it.qty, 0),
-    [items]
+    () => checkoutWorkingItems.reduce((sum, it) => sum + (Number(it.unitPrice) || 0) * it.qty, 0),
+    [checkoutWorkingItems]
+  )
+
+  const fullStoreCartTotal = useMemo(
+    () => storeItems.reduce((sum, it) => sum + (Number(it.unitPrice) || 0) * it.qty, 0),
+    [storeItems]
   )
 
   const selectedItemRowCount = selectedItems.length
@@ -202,6 +268,7 @@ export const useTouristRestaurantCheckout = () => {
         const data = res?.data?.data
         if (data?.status === 'PAID' && data?.order && data?.businessId) {
           removeItemsForBusiness(data.businessId)
+          clearActiveCheckoutBusinessId()
           try {
             const st = useTouristCartItemStore.getState()
             await putTouristCartItems({
@@ -241,7 +308,7 @@ export const useTouristRestaurantCheckout = () => {
       cancelled = true
       if (timerId) window.clearTimeout(timerId)
     }
-  }, [searchParams, clearXenditReturnParams, navigate, removeItemsForBusiness])
+  }, [searchParams, clearXenditReturnParams, navigate, removeItemsForBusiness, clearActiveCheckoutBusinessId])
 
   const closeXenditInAppCheckoutModal = useCallback(() => {
     setXenditInAppCheckoutUrl(null)
@@ -257,17 +324,29 @@ export const useTouristRestaurantCheckout = () => {
     }
   }, [xenditInAppCheckoutUrl])
 
-  const placeOrders = form.handleSubmit(async (values) => {
+  const resolveScopedSelectedList = useCallback(() => {
     const st = useTouristCartItemStore.getState()
-    const selectedList = st.items.filter((it) => st.isItemSelected(it.key))
-    const batches = groupCartItemsByBusiness(selectedList).filter((g) => g.items.length)
+    const all = st.items
+    const ids = distinctBusinessIds(all)
+    const implicit = ids.length === 1 ? ids[0] : null
+    const scope = st.activeCheckoutBusinessId || implicit
+    const selectedList = all.filter((it) => st.isItemSelected(it.key))
+    if (scope) {
+      return selectedList.filter((it) => String(it.businessId) === String(scope))
+    }
+    return selectedList
+  }, [])
+
+  const placeOrders = form.handleSubmit(async (values) => {
+    const scopedSelected = resolveScopedSelectedList()
+    const batches = groupCartItemsByBusiness(scopedSelected).filter((g) => g.items.length)
     if (!batches.length) {
       toast.error('Select at least one item to check out.')
       return
     }
     if (batches.length > 1) {
       toast.error(
-        'Online prepayment supports one restaurant per checkout. Remove items from other stores, pay for this one, then repeat for the next.'
+        'Online prepayment supports one restaurant per checkout. Open your cart and use “Check out this restaurant” for each store.'
       )
       return
     }
@@ -312,6 +391,16 @@ export const useTouristRestaurantCheckout = () => {
     navigate(touristCartHref)
   }, [navigate])
 
+  const startCheckoutForBusinessId = useCallback(
+    (businessId) => {
+      const id = String(businessId || '').trim()
+      if (!id) return
+      setActiveCheckoutBusinessId(id)
+      navigate(touristCheckoutHref)
+    },
+    [navigate, setActiveCheckoutBusinessId]
+  )
+
   /** Restaurant prepayment checkout vs. stay booking details (resort/hotel), based on the selected store. */
   const proceedFromCart = useCallback(async () => {
     if (proceedFromCartLockRef.current) return
@@ -323,9 +412,7 @@ export const useTouristRestaurantCheckout = () => {
     }
     const batches = groupCartItemsByBusiness(selectedList).filter((g) => g.items.length)
     if (batches.length > 1) {
-      toast.error(
-        'Checkout supports one store at a time. Uncheck or remove items from other stores, then try again.'
-      )
+      toast.error('Choose one restaurant below and use “Check out this restaurant”.')
       return
     }
     const batch = batches[0]
@@ -341,6 +428,7 @@ export const useTouristRestaurantCheckout = () => {
       const isStayBusiness =
         categoryMatchesLabel(d.category, 'Resort') || categoryMatchesLabel(d.category, 'Hotel')
       if (isStayBusiness) {
+        clearActiveCheckoutBusinessId()
         const ids = new Set(batch.items.map((it) => String(it.catalogItemId)))
         if (ids.size !== 1) {
           toast.error('Select one stay package at a time to continue to booking details.')
@@ -369,6 +457,7 @@ export const useTouristRestaurantCheckout = () => {
         })
         return
       }
+      setActiveCheckoutBusinessId(String(batch.businessId))
       navigate(touristCheckoutHref)
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Could not continue. Try again.'
@@ -377,13 +466,16 @@ export const useTouristRestaurantCheckout = () => {
       proceedFromCartLockRef.current = false
       setIsProceedingFromCart(false)
     }
-  }, [navigate])
+  }, [navigate, setActiveCheckoutBusinessId, clearActiveCheckoutBusinessId])
 
   return {
-    items,
+    variant,
+    items: checkoutWorkingItems,
+    storeItems,
     groups,
     groupsForCheckout,
     cartTotal,
+    fullStoreCartTotal,
     selectedItemRowCount,
     selectedCount,
     selectedTotal,
@@ -402,7 +494,12 @@ export const useTouristRestaurantCheckout = () => {
     goExplore,
     goCart,
     proceedFromCart,
+    startCheckoutForBusinessId,
     isProceedingFromCart,
+    checkoutBlockedMultiStore,
+    effectiveCheckoutBusinessId,
+    otherStoresSummary,
+    multiStoreInSavedCart: storeDistinctIds.length > 1,
     isXenditMobileCheckoutModalOpen: Boolean(xenditInAppCheckoutUrl),
     xenditMobileCheckoutUrl: xenditInAppCheckoutUrl || '',
     closeXenditMobileCheckoutModal: closeXenditInAppCheckoutModal,

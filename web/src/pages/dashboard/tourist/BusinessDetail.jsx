@@ -178,6 +178,7 @@ const BusinessDetail = () => {
   const cartItems = useTouristCartItemStore((s) => s.items)
   const setItemQty = useTouristCartItemStore((s) => s.setItemQty)
   const removeItem = useTouristCartItemStore((s) => s.removeItem)
+  const setActiveCheckoutBusinessId = useTouristCartItemStore((s) => s.setActiveCheckoutBusinessId)
 
   const [business, setBusiness] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -196,6 +197,7 @@ const BusinessDetail = () => {
     setMenuSearchTerm('')
     setSelectedPackageId('')
     setIsPackageModalOpen(false)
+    useTouristCartItemStore.getState().clearActiveCheckoutBusinessId()
   }, [businessId])
 
   useEffect(() => {
@@ -715,7 +717,12 @@ const BusinessDetail = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => navigate(touristCheckoutHref)}
+                    onClick={() => {
+                      const id = business?._id ? String(business._id) : ''
+                      if (!id) return
+                      setActiveCheckoutBusinessId(id)
+                      navigate(touristCheckoutHref)
+                    }}
                     disabled={!cartCount}
                     className="mt-3 w-full rounded-md bg-[#e0e0e0] px-4 py-2.5 text-sm font-semibold text-[#4a4a4a] transition enabled:bg-[#222] enabled:text-white enabled:hover:bg-black disabled:cursor-not-allowed"
                   >
