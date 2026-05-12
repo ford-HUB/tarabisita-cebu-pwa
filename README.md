@@ -1,4 +1,4 @@
-# TaraBisita Web System
+# TaraBisita Cebu Web System
 
 TaraBisita is a full-stack web platform for tourism-focused businesses and tourists.  
 It includes role-based dashboards, booking/order workflows, business analytics, messaging, and payment integrations.
