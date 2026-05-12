@@ -1,86 +1,10 @@
+import nodemailer from 'nodemailer'
 import 'dotenv/config'
 
-const BREVO_SEND_EMAIL_ENDPOINT = 'https://api.brevo.com/v3/smtp/email'
-
-const buildRecipients = (to) => {
-    if (Array.isArray(to)) {
-        return to
-            .map((email) => String(email || '').trim())
-            .filter(Boolean)
-            .map((email) => ({ email }))
+export const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     }
-
-    return String(to || '')
-        .split(',')
-        .map((email) => email.trim())
-        .filter(Boolean)
-        .map((email) => ({ email }))
-}
-
-const buildAttachments = (attachments = []) => {
-    return (attachments || [])
-        .filter((attachment) => attachment?.filename && attachment?.content)
-        .map((attachment) => {
-            const base64Content = Buffer.isBuffer(attachment.content)
-                ? attachment.content.toString('base64')
-                : String(attachment.content)
-
-            return {
-                name: attachment.filename,
-                content: base64Content
-            }
-        })
-}
-
-export const sendBrevoEmail = async ({ to, subject, html, attachments = [] }) => {
-    const recipients = buildRecipients(to)
-    if (!recipients.length) {
-        throw new Error('No recipient email was provided')
-    }
-
-    const fromEmail = (process.env.BREVO_USER).trim()
-    if (!fromEmail) {
-        throw new Error('Email sender is not configured. Set BREVO_LOGIN.')
-    }
-
-    const apiKey = String(process.env.BREVO_APIKEY).trim()
-    if (!apiKey) {
-        throw new Error('Brevo API key is missing. Set BREVO_API_KEY (preferred) or BREVO_APIKEY.')
-    }
-
-    if (apiKey.startsWith('xsmtpsib-')) {
-        throw new Error('Detected Brevo SMTP key (xsmtpsib). Use a Brevo HTTP API key (xkeysib) for API sending.')
-    }
-
-    const payload = {
-        sender: {
-            email: fromEmail,
-            name: '[TaraBisita-Cebu] No Reply'
-        },
-        to: recipients,
-        subject,
-        htmlContent: html
-    }
-
-    const normalizedAttachments = buildAttachments(attachments)
-    if (normalizedAttachments.length) {
-        payload.attachment = normalizedAttachments
-    }
-
-    const response = await fetch(BREVO_SEND_EMAIL_ENDPOINT, {
-        method: 'POST',
-        headers: {
-            'accept': 'application/json',
-            'api-key': apiKey,
-            'content-type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    })
-
-    if (!response.ok) {
-        const details = await response.text()
-        throw new Error(`Brevo API request failed (${response.status}): ${details}`)
-    }
-
-    return response.json()
-}
+})

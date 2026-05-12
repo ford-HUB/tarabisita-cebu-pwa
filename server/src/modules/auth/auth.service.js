@@ -1,7 +1,7 @@
-import { sendBrevoEmail } from "../../configs/nodemailer.js";
+import { sendEmail } from "../../shared/utils/send-email.js";
 
 export const sendMailer = async (to, subject, html) => {
-    const message = await sendBrevoEmail({
+    const message = await sendEmail({
         to,
         subject,
         html
@@ -12,7 +12,7 @@ export const sendMailer = async (to, subject, html) => {
 
 
 export const sendMailerWithAttachments = async (to, subject, html, attachments = []) => {
-    const message = await sendBrevoEmail({
+    const message = await sendEmail({
         to,
         subject,
         html,
