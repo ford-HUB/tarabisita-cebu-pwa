@@ -6,6 +6,10 @@ import {
     resolveBookingPaymentLinkPublic,
     resolveMyBookingPaymentLink
 } from './tourist-customer-orders.service.js'
+import {
+    getRestaurantOrderReviewForTouristOrder,
+    upsertRestaurantOrderReviewForTourist
+} from '../restaurant-order-reviews/restaurant-order-reviews.service.js'
 
 const noStoreJson = (res, payload) => {
     res.set({
@@ -259,5 +263,43 @@ export const postBookingPaymentLinkCheckoutPublicHandler = async (req, res) => {
             })
         }
         return res.status(500).json({ message: error.message || 'Could not start booking payment.' })
+    }
+}
+
+export const getMyRestaurantOrderReviewHandler = async (req, res) => {
+    try {
+        const { orderId } = req.validatedData.params
+        const data = await getRestaurantOrderReviewForTouristOrder(req.user._id, orderId)
+        return noStoreJson(res, { data })
+    } catch (error) {
+        const msg = error?.message || ''
+        if (msg === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ message: 'Order not found.' })
+        }
+        return res.status(500).json({ message: error.message || 'Could not load review.' })
+    }
+}
+
+export const putMyRestaurantOrderReviewHandler = async (req, res) => {
+    try {
+        const { orderId } = req.validatedData.params
+        const { rating, comment } = req.validatedData.body
+        const data = await upsertRestaurantOrderReviewForTourist(req.user._id, orderId, { rating, comment })
+        return res.status(200).json({
+            message: 'Thanks for your feedback.',
+            data
+        })
+    } catch (error) {
+        const msg = error?.message || ''
+        if (msg === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ message: 'Order not found.' })
+        }
+        if (msg === 'REVIEW_NOT_ALLOWED_FOR_ORDER_TYPE' || msg === 'ORDER_NOT_REVIEWABLE') {
+            return res.status(403).json({ message: 'This order cannot be reviewed.' })
+        }
+        if (msg === 'INVALID_RATING') {
+            return res.status(400).json({ message: 'Pick a rating from 1 to 5 stars.' })
+        }
+        return res.status(500).json({ message: error.message || 'Could not save review.' })
     }
 }

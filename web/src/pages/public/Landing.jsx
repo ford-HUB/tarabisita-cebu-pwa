@@ -12,7 +12,7 @@ const Landing = () => {
   return (
     <div className="bg-[#f8f5f0] text-[#1f1f1f]">
       <LandingHeroSection ctaVariant="marketing" />
-
+      
       <section className="mx-auto w-full max-w-6xl px-6 py-16 lg:px-10">
         <motion.div {...fadeUp} className="mb-8 text-center">
           <h3 className="text-3xl font-semibold text-[#231d18]">What Tara Bisita is all about</h3>

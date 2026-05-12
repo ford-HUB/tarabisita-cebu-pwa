@@ -98,7 +98,7 @@ const LandingHeroSection = ({
       </video>
 
       <div
-        className="inset-0 z-[1]"
+        className="inset-0 "
         style={{
           background:
             'linear-gradient(120deg, rgba(22, 15, 10, 0.72), rgba(183, 93, 30, 0.52)), radial-gradient(circle at 14% 20%, rgba(255, 122, 26, 0.28), transparent 40%)'

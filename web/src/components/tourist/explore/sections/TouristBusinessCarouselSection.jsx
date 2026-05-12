@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { FiStar } from 'react-icons/fi'
 import { categoryDisplayLabel } from '../../../../shared/utils/touristExplore.utils.js'
 
 const thumb = (business) => business?.banner || business?.coverImage || business?.logo
@@ -55,6 +56,10 @@ const TouristBusinessCarouselSection = ({
         {items.map((business) => {
           const img = thumb(business)
           const label = categoryDisplayLabel(business.category)
+          const sum = business?.restaurantReviewSummary
+          const avg = sum?.averageRating != null ? Number(sum.averageRating) : null
+          const cnt = Number(sum?.reviewCount || 0)
+          const showStars = Number.isFinite(avg) && cnt > 0
           return (
             <button
               key={String(business._id)}
@@ -71,12 +76,20 @@ const TouristBusinessCarouselSection = ({
                     style={{
                       background: `linear-gradient(160deg, ${business.themeColor || '#9b5a2c'}, #3d2918)`
                     }}
-                />
+                  />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-[#ffd4bc]">{label}</p>
                   <p className="mt-1 line-clamp-2 text-sm font-semibold leading-snug">{business.name}</p>
+                  {showStars ? (
+                    <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-amber-100/95">
+                      <FiStar className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" aria-hidden />
+                      <span>
+                        {avg.toFixed(1)} · {cnt} review{cnt === 1 ? '' : 's'}
+                      </span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </button>

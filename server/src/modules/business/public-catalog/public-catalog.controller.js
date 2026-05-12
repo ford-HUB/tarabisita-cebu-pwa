@@ -8,6 +8,11 @@ import {
     createTouristMenuOrderXenditCheckout
 } from './public-catalog.service.js'
 import { sanitizeBusinessPayload } from '../../../shared/utils/business-controller.helpers.js'
+import {
+    getRestaurantRecentReviewsGrouped,
+    getRestaurantReviewPublicSummary,
+    getRestaurantReviewStatsMapForBusinessIds
+} from '../../tourist/restaurant-order-reviews/restaurant-order-reviews.service.js'
 
 const hasActivePaidSubscription = (business) => {
     const sub = business?.subscription || {}
@@ -156,8 +161,25 @@ export const getPublicBusinesses = async (_req, res) => {
             .populate('category')
             .sort({ publicProfileViewCount: -1, createdAt: -1 })
 
+        const filtered = businesses.filter(hasActivePaidSubscription)
+        const ids = filtered.map((b) => b._id)
+        const statsMap = await getRestaurantReviewStatsMapForBusinessIds(ids)
+        const recentMap = await getRestaurantRecentReviewsGrouped(ids, { perBusiness: 3 })
+
         return res.status(200).json({
-            data: businesses.filter(hasActivePaidSubscription).map(sanitizeBusinessPayload)
+            data: filtered.map((b) => {
+                const id = String(b._id)
+                const stats = statsMap.get(id) || { averageRating: null, reviewCount: 0 }
+                const recentReviews = recentMap.get(id) || []
+                return {
+                    ...sanitizeBusinessPayload(b),
+                    restaurantReviewSummary: {
+                        averageRating: stats.averageRating,
+                        reviewCount: stats.reviewCount,
+                        recentReviews
+                    }
+                }
+            })
         })
     } catch (error) {
         return res.status(500).json({ message: error.message })
@@ -204,11 +226,14 @@ export const getBusinessById = async (req, res) => {
             listPublicMenuItemsFromBusinessDoc(business)
         )
 
+        const restaurantReviewSummary = await getRestaurantReviewPublicSummary(business._id, { recentLimit: 8 })
+
         return res.status(200).json({
             data: {
                 ...sanitizeBusinessPayload(business),
                 menuItems,
-                availablePaymentMethods: resolveAvailableTouristPaymentMethods(business)
+                availablePaymentMethods: resolveAvailableTouristPaymentMethods(business),
+                restaurantReviewSummary
             }
         })
     } catch (error) {

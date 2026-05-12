@@ -15,6 +15,7 @@ import {
   touristCartHref,
   touristCheckoutHref,
   touristExploreHref,
+  touristHistoryHref,
   touristStayBookingHref
 } from '../components/layout/tourist/touristLayout.constants.js'
 import { categoryMatchesLabel } from '../shared/utils/touristExplore.utils.js'
@@ -212,7 +213,11 @@ export const useTouristRestaurantCheckout = () => {
           }
           toast.success(`Order placed — ${data.order.productName || 'Your order'}`)
           clearXenditReturnParams()
-          navigate(touristExploreHref)
+          const joiner = touristHistoryHref.includes('?') ? '&' : '?'
+          const orderId = encodeURIComponent(String(data.order.id || '').trim())
+          const bid = encodeURIComponent(String(data.businessId || '').trim())
+          const storeName = encodeURIComponent(String(data.order.businessName || 'Restaurant').trim())
+          navigate(`${touristHistoryHref}${joiner}reviewOrder=${orderId}&reviewBusiness=${bid}&reviewStore=${storeName}`)
           return
         }
       } catch {
