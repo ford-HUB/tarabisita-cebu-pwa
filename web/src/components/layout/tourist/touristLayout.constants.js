@@ -11,6 +11,7 @@ export const getAvatarFallback = (name) => {
 }
 
 /** Signed paths for `ProtectedRoute` (requires `rk` query). */
+export const touristHomeHref = `/${toEncryptedRoute('tourist/home')}`
 export const touristExploreHref = `/${toEncryptedRoute('tourist/explore')}`
 export const buildTouristExploreBusinessDetailHref = (businessId) => {
   const id = String(businessId || '').trim()

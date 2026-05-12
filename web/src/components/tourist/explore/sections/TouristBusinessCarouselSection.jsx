@@ -1,13 +1,50 @@
+import { Link } from 'react-router-dom'
 import { categoryDisplayLabel } from '../../../../shared/utils/touristExplore.utils.js'
 
 const thumb = (business) => business?.banner || business?.coverImage || business?.logo
 
-const TouristBusinessCarouselSection = ({ title, items, onOpen }) => {
+/**
+ * @param {{
+ *   title: string,
+ *   items: unknown[],
+ *   onOpen: (business: unknown) => void,
+ *   subtitle?: string,
+ *   seeAllTo?: string,
+ *   seeAllLabel?: string
+ * }} props
+ */
+const TouristBusinessCarouselSection = ({
+  title,
+  items,
+  onOpen,
+  subtitle,
+  seeAllTo,
+  seeAllLabel = 'See all'
+}) => {
   if (!items?.length) return null
+
+  const showHeaderRow = Boolean(subtitle || seeAllTo)
 
   return (
     <section aria-label={title} className="scroll-mt-4">
-      <h2 className="mb-2.5 text-base font-semibold tracking-tight text-[#1f1f1f] md:mb-3 md:text-xl">{title}</h2>
+      {showHeaderRow ? (
+        <div className="mb-2.5 flex flex-wrap items-end justify-between gap-3 md:mb-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-tight text-[#1f1f1f] md:text-xl">{title}</h2>
+            {subtitle ? <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#6b5f54]">{subtitle}</p> : null}
+          </div>
+          {seeAllTo ? (
+            <Link
+              to={seeAllTo}
+              className="shrink-0 rounded-full border border-[#eadfce] bg-[#fffaf6] px-3 py-1.5 text-xs font-semibold text-[#9b5a2c] transition hover:border-[#c66b2b]/40 hover:bg-[#fff7ed] md:text-sm"
+            >
+              {seeAllLabel}
+            </Link>
+          ) : null}
+        </div>
+      ) : (
+        <h2 className="mb-2.5 text-base font-semibold tracking-tight text-[#1f1f1f] md:mb-3 md:text-xl">{title}</h2>
+      )}
       <div
         className={
           'gap-3 pb-2 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto max-md:pb-3 ' +

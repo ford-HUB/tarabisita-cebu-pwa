@@ -1,7 +1,8 @@
 import { Navigate } from 'react-router-dom'
 import TouristLayout from '../../components/layout/tourist/TouristLayout'
-import { touristExploreHref, touristOrdersHref } from '../../components/layout/tourist/touristLayout.constants'
+import { touristExploreHref, touristHomeHref, touristOrdersHref } from '../../components/layout/tourist/touristLayout.constants'
 import Home from '../../pages/dashboard/tourist/Home'
+import TouristHomeHub from '../../pages/dashboard/tourist/TouristHomeHub'
 import History from '../../pages/dashboard/tourist/History'
 import Orders from '../../pages/dashboard/tourist/Orders'
 import StoreMessages from '../../pages/dashboard/tourist/StoreMessages'
@@ -20,6 +21,10 @@ export const TouristRoutes = [
       </ProtectedRoute>
     ),
     children: [
+      {
+        path: 'home',
+        element: <TouristHomeHub />
+      },
       {
         path: 'explore/orders',
         element: <Navigate to={touristOrdersHref} replace />
@@ -58,7 +63,7 @@ export const TouristRoutes = [
       },
       {
         index: true,
-        element: <Navigate to={touristExploreHref} replace />
+        element: <Navigate to={touristHomeHref} replace />
       }
     ]
   }
