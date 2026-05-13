@@ -10,13 +10,15 @@ import {
     recordPublicBusinessView,
     getPublicBusinessRestaurantReviews,
     getPublicLandingRestaurantReviews,
-    getBusinessById
+    getBusinessById,
+    postTouristCatalogSearchRank
 } from './public-catalog.controller.js'
 import {
     createTouristCustomerOrderSchema,
     createTouristCustomerOrderCheckoutSchema,
     listPublicRestaurantReviewsSchema,
-    listPublicLandingRestaurantReviewsSchema
+    listPublicLandingRestaurantReviewsSchema,
+    touristCatalogSearchRankSchema
 } from './public-catalog.validator.js'
 
 const publicCatalogRoutes = express.Router()
@@ -28,6 +30,12 @@ publicCatalogRoutes.get(
     getPublicLandingRestaurantReviews
 )
 publicCatalogRoutes.get('/public/menu-feed', guard(['TOURIST']), getPublicMenuFeed)
+publicCatalogRoutes.post(
+    '/public/tourist-catalog-search-rank',
+    guard(['TOURIST']),
+    validateRequest(touristCatalogSearchRankSchema),
+    postTouristCatalogSearchRank
+)
 publicCatalogRoutes.post(
     '/public/:businessId/customer-order',
     guard(['TOURIST']),

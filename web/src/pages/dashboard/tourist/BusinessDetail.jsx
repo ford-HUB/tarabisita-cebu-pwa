@@ -421,6 +421,12 @@ const BusinessDetail = () => {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-[#ededed] bg-white">
+        {img ? (
+          <div className="relative h-44 w-full border-b border-[#efefef] bg-[#eaeaea] sm:h-52 md:h-56">
+            <img src={img} alt="" className="h-full w-full object-cover" />
+          </div>
+        ) : null}
+
         <div className="border-b border-[#efefef] px-4 py-4 md:px-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-3">
@@ -501,22 +507,6 @@ const BusinessDetail = () => {
             </a>
           </div>
         </div>
-
-        {isStayBusiness ? (
-          <div className="border-b border-[#efefef] px-4 py-4 md:px-5">
-            <div className="relative h-52 overflow-hidden rounded-xl border border-[#e7dfd5] bg-[#f1f1f1] sm:h-64">
-              {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
-              <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/30 to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <p className="text-xs font-semibold uppercase tracking-wide text-white/80">{categoryLabel}</p>
-                <h2 className="mt-1 text-3xl leading-tight font-semibold sm:text-5xl">{String(businessName || '').toUpperCase()}</h2>
-                <p className="mt-1 line-clamp-2 text-sm text-white/90">
-                  {business?.description || 'Curated stay experiences with relaxing views and resort comfort.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
 
         {isStayBusiness ? null : (
           <MenuTabs

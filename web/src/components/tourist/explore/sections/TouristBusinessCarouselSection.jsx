@@ -11,8 +11,8 @@ const thumb = (business) => business?.banner || business?.coverImage || business
  *   onOpen: (business: unknown) => void,
  *   subtitle?: string,
  *   seeAllTo?: string,
- *   seeAllLabel?: string,
- *   headerAlign?: 'left' | 'center'
+ * }}
+
  * }} props
  */
 const TouristBusinessCarouselSection = ({

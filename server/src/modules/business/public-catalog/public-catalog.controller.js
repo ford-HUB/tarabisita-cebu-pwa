@@ -7,6 +7,7 @@ import {
     createTouristCustomerOrder,
     createTouristMenuOrderXenditCheckout
 } from './public-catalog.service.js'
+import { rankTouristCatalogItemsWithGemini } from './public-catalog-ai.service.js'
 import { sanitizeBusinessPayload } from '../../../shared/utils/business-controller.helpers.js'
 import {
     getRestaurantRecentReviewsGrouped,
@@ -244,6 +245,17 @@ export const getPublicBusinessRestaurantReviews = async (req, res) => {
         })
 
         return res.status(200).json({ data })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const postTouristCatalogSearchRank = async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store')
+        const { query, items } = req.validatedData.body
+        const indices = await rankTouristCatalogItemsWithGemini({ query, items })
+        return res.status(200).json({ data: { indices } })
     } catch (error) {
         return res.status(500).json({ message: error.message })
     }

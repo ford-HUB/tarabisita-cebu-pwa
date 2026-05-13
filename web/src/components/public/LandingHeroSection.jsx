@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FiSearch } from 'react-icons/fi'
+import { useShallow } from 'zustand/react/shallow'
 import { buildTouristSearchHref } from '../layout/tourist/touristLayout.constants.js'
+import { useTouristExploreStore } from '../../store/tourist/touristExplore.store.js'
+import TouristCatalogSearchField from '../tourist/search/TouristCatalogSearchField.jsx'
 
 const MotionDiv = motion.div
 
@@ -33,6 +35,27 @@ const LandingHeroSection = (props) => {
   const [heroQuery, setHeroQuery] = useState('')
   const navigate = useNavigate()
 
+  const { menuFeedItems, loadMenuFeed, loadPublicBusinesses } = useTouristExploreStore(
+    useShallow((s) => ({
+      menuFeedItems: s.menuFeedItems,
+      loadMenuFeed: s.loadMenuFeed,
+      loadPublicBusinesses: s.loadPublicBusinesses
+    }))
+  )
+
+  useEffect(() => {
+    if (!isTourist) return
+    void loadMenuFeed('ALL')
+    void loadPublicBusinesses()
+  }, [isTourist, loadMenuFeed, loadPublicBusinesses])
+
+  const handleHeroCatalogSearch = useCallback(
+    (q) => {
+      navigate(buildTouristSearchHref(q))
+    },
+    [navigate]
+  )
+
   const revealVideo = useCallback(() => {
     setVideoRevealed(true)
   }, [])
@@ -48,14 +71,6 @@ const LandingHeroSection = (props) => {
       link.remove()
     }
   }, [isTourist])
-
-  const handleTouristSearchSubmit = useCallback(
-    (e) => {
-      e.preventDefault()
-      navigate(buildTouristSearchHref(heroQuery))
-    },
-    [heroQuery, navigate]
-  )
 
   if (isTourist) {
     return (
@@ -83,36 +98,19 @@ const LandingHeroSection = (props) => {
               Discover the Queen City of the South. From pristine beaches to world-class lechon.
             </p>
 
-            <form
-              onSubmit={handleTouristSearchSubmit}
-              className="w-full max-w-xl"
-              role="search"
-              aria-label="Search catalog"
-            >
-              <div className="flex items-center gap-2 rounded-full border border-white/25 bg-white/18 py-1.5 pl-3 pr-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:gap-3 sm:pl-4 sm:pr-2">
-                <FiSearch className="h-5 w-5 shrink-0 text-white/90 sm:h-[1.35rem] sm:w-[1.35rem]" aria-hidden />
-                <input
-                  type="search"
-                  name="tourist-hero-search"
-                  value={heroQuery}
-                  onChange={(e) => setHeroQuery(e.target.value)}
-                  placeholder="Where to next? (e.g., Moalboal, Lechon)"
-                  className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-white outline-none placeholder:text-white/55 sm:text-[0.9375rem]"
-                  autoComplete="off"
-                  enterKeyHint="search"
-                />
-                <button
-                  type="submit"
-                  className="shrink-0 rounded-full bg-[#ff7a1a] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#eb6c12] sm:px-6"
-                >
-                  Explore
-                </button>
-              </div>
-            </form>
+            <div className="w-full max-w-xl">
+              <TouristCatalogSearchField
+                variant="hero"
+                inputName="tourist-hero-search"
+                value={heroQuery}
+                onChange={setHeroQuery}
+                onSearch={handleHeroCatalogSearch}
+                catalogItems={Array.isArray(menuFeedItems) ? menuFeedItems : []}
+                placeholder="Where to next? (e.g., Moalboal, Lechon)"
+                aria-label="Search catalog"
+              />
+            </div>
 
-            <p className="mt-3 text-xs text-white/55 sm:text-[13px]">
-              Welcome back, {firstName} — search dishes and stay packages, or jump in below.
-            </p>
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium">
               <a

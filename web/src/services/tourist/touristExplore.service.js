@@ -37,3 +37,12 @@ export const fetchPublicMenuFeed = async (menuCategory = 'ALL') => {
   })
   return response
 }
+
+/**
+ * Gemini-backed relevance ranking for tourist catalog search (API key stays on the server).
+ * @param {{ query: string, items: { name?: string, category?: string, businessName?: string }[] }} body
+ */
+export const postTouristCatalogSearchRank = async (body) => {
+  const response = await apiInstance.post('business/public/tourist-catalog-search-rank', body)
+  return response
+}

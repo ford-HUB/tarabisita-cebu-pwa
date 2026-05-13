@@ -55,7 +55,7 @@ const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallb
           onClick={() => onCloseAccount?.()}
           className="flex min-w-0 flex-1 items-center gap-2 text-[#9b5a2c]"
         >
-          <img src="/web-logo.png" alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" width={36} height={36} />
+          <img src="/logo.png" alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" width={36} height={36} />
           <span className="truncate text-base font-semibold tracking-tight sm:text-lg md:text-xl">TARA Bisita Cebu</span>
         </Link>
 

@@ -68,6 +68,22 @@ export const createTouristCustomerOrderCheckoutSchema = zod.object({
     })
 })
 
+export const touristCatalogSearchRankSchema = zod.object({
+    body: zod.object({
+        query: zod.string().trim().min(1).max(220),
+        items: zod
+            .array(
+                zod.object({
+                    name: zod.string().max(160).optional().default(''),
+                    category: zod.string().max(100).optional().default(''),
+                    businessName: zod.string().max(120).optional().default('')
+                })
+            )
+            .min(1)
+            .max(100)
+    })
+})
+
 export const listPublicRestaurantReviewsSchema = zod.object({
     params: zod.object({
         businessId: zod.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid business id')

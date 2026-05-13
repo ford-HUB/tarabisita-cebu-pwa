@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { FiArrowLeft, FiSearch } from 'react-icons/fi'
 import TouristMenuItemDetailModal from '../../../components/tourist/explore/modals/TouristMenuItemDetailModal.jsx'
+import TouristCatalogSearchField from '../../../components/tourist/search/TouristCatalogSearchField.jsx'
 import { touristExploreHref, touristHomeHref } from '../../../components/layout/tourist/touristLayout.constants.js'
-import { fetchPublicBusinessById } from '../../../services/tourist/touristExplore.service.js'
+import { fetchPublicBusinessById, postTouristCatalogSearchRank } from '../../../services/tourist/touristExplore.service.js'
 import { useTouristExploreStore } from '../../../store/tourist/touristExplore.store.js'
 import { categoryDisplayLabel, categoryMatchesLabel } from '../../../shared/utils/touristExplore.utils.js'
 import {
@@ -12,6 +13,7 @@ import {
   menuFeedItemTitleMatchesQuery,
   splitTitleForHighlight
 } from '../../../shared/utils/touristSearchHighlight.utils.js'
+import { applyGeminiRankOrder } from '../../../shared/utils/touristSearchSuggestions.utils.js'
 
 const formatPrice = (n) => {
   const num = Number(n)
@@ -42,15 +44,46 @@ const ItemTitle = ({ item, query }) => {
 
 const catalogItemKey = (item) => `${String(item?.businessId || '')}-${String(item?.id || '')}`
 
+const AI_RANK_HEAD = 100
+
 const TouristSearchResults = () => {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const qRaw = String(searchParams.get('q') || '').trim()
   const needle = qRaw.toLowerCase()
+  const [draftQ, setDraftQ] = useState(qRaw)
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      setDraftQ(qRaw)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [qRaw])
+
+  const commitSearch = useCallback(
+    (q) => {
+      const next = String(q ?? '').trim()
+      setDraftQ(next)
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev)
+          if (next) p.set('q', next)
+          else p.delete('q')
+          return p
+        },
+        { replace: true }
+      )
+    },
+    [setSearchParams]
+  )
 
   const [selectedItem, setSelectedItem] = useState(null)
   const [stayCatalogItems, setStayCatalogItems] = useState([])
   const [stayCatalogLoading, setStayCatalogLoading] = useState(false)
   const [stayCatalogError, setStayCatalogError] = useState('')
+  const [aiRankIndices, setAiRankIndices] = useState(null)
+  const [aiRankLoading, setAiRankLoading] = useState(false)
+  const [aiRankError, setAiRankError] = useState('')
+  const rankedResultsRef = useRef([])
 
   const {
     businesses,
@@ -172,6 +205,65 @@ const TouristSearchResults = () => {
     })
   }, [mergedCatalogItems, needle])
 
+  useEffect(() => {
+    rankedResultsRef.current = rankedResults
+  }, [rankedResults])
+
+  const rankFingerprint = useMemo(
+    () =>
+      `${needle}:${rankedResults.length}:${rankedResults
+        .slice(0, 24)
+        .map(catalogItemKey)
+        .join('|')}`,
+    [needle, rankedResults]
+  )
+
+  const displayResults = useMemo(() => {
+    if (!needle || !aiRankIndices?.length) return rankedResults
+    return applyGeminiRankOrder(rankedResults, aiRankIndices, { headSize: AI_RANK_HEAD })
+  }, [rankedResults, aiRankIndices, needle])
+
+  useEffect(() => {
+    let cancelled = false
+    let timer = null
+    if (!needle || rankedResultsRef.current.length === 0) {
+      setAiRankIndices(null)
+      setAiRankLoading(false)
+      setAiRankError('')
+      return
+    }
+    setAiRankIndices(null)
+    setAiRankLoading(true)
+    setAiRankError('')
+    timer = setTimeout(() => {
+      const base = rankedResultsRef.current
+      const head = base.slice(0, AI_RANK_HEAD).map((it) => ({
+        name: String(it?.name || '').slice(0, 160),
+        category: String(it?.category || '').slice(0, 100),
+        businessName: String(it?.businessName || '').slice(0, 120)
+      }))
+      void postTouristCatalogSearchRank({ query: qRaw, items: head })
+        .then((res) => {
+          if (cancelled) return
+          const idx = res?.data?.data?.indices
+          setAiRankIndices(Array.isArray(idx) && idx.length > 0 ? idx : null)
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setAiRankIndices(null)
+            setAiRankError('Smart ranking is temporarily unavailable.')
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setAiRankLoading(false)
+        })
+    }, 420)
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [rankFingerprint, qRaw, needle])
+
   const listBlockingLoading =
     Boolean(qRaw) && !rankedResults.length && (menuFeedLoading || businessesListLoading || stayRelevantLoading)
 
@@ -209,6 +301,19 @@ const TouristSearchResults = () => {
         </Link>
       </div>
 
+      <div className="max-w-2xl">
+        <TouristCatalogSearchField
+          variant="page"
+          inputName="tourist-search-results"
+          value={draftQ}
+          onChange={setDraftQ}
+          onSearch={commitSearch}
+          catalogItems={mergedCatalogItems}
+          placeholder="Search dishes, stays, partners, categories…"
+          aria-label="Refine catalog search"
+        />
+      </div>
+
       {menuFeedError ? (
         <p className="rounded-xl border border-[#fecdca] bg-[#fff4f2] p-4 text-sm text-[#7a271a]">{menuFeedError}</p>
       ) : null}
@@ -239,13 +344,22 @@ const TouristSearchResults = () => {
 
       {!listBlockingLoading && !qRaw ? (
         <p className="rounded-xl border border-dashed border-[#e7dfd5] bg-white p-6 text-sm text-[#5b5b5b]">
-          No search query in the address bar. Use the search bar on your home hub, then press Explore.
+          Type a keyword above and press Explore, or use trending chips — results update from dishes and stay packages in
+          our catalog.
         </p>
       ) : null}
 
       {!listBlockingLoading && rankedResults.length > 0 ? (
-        <ul className="grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
-          {rankedResults.map((item) => {
+        <>
+          {aiRankLoading ? (
+            <p className="text-xs text-[#6b6b6b]">Applying AI relevance ranking (Gemini)…</p>
+          ) : null}
+          {aiRankError ? <p className="text-xs text-amber-800">{aiRankError}</p> : null}
+          {!aiRankLoading && aiRankIndices?.length ? (
+            <p className="text-xs text-[#5b8a5b]">Order refined with AI for the top matches.</p>
+          ) : null}
+          <ul className="grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
+          {displayResults.map((item) => {
             const img = Array.isArray(item.images) && item.images.length ? item.images[0] : null
             const showAvailable = Boolean(item.isAvailable) && item.stockStatus !== 'OUT_OF_STOCK'
             return (
@@ -287,6 +401,7 @@ const TouristSearchResults = () => {
             )
           })}
         </ul>
+        </>
       ) : null}
 
       {selectedItem ? (
