@@ -256,3 +256,83 @@ export const getRestaurantRecentReviewsGrouped = async (businessIds, opts = {}) 
     }
     return out
 }
+
+const mapPublicReviewListItem = (row) => {
+    const user = row.userId && typeof row.userId === 'object' ? row.userId : null
+    const order = row.customerOrderId && typeof row.customerOrderId === 'object' ? row.customerOrderId : null
+    return {
+        id: String(row._id),
+        rating: row.rating,
+        comment: String(row.comment || '').trim(),
+        createdAt: row.createdAt,
+        authorLabel: authorLabelFromUser(user),
+        avatarUrl: user?.avatar ? String(user.avatar).trim() || null : null,
+        orderCode: order?.orderCode ? String(order.orderCode) : null,
+        orderPlacedAt: order?.createdAt || null
+    }
+}
+
+/**
+ * Paginated public reviews for a business (menu orders). Caller must ensure the business is publicly listable.
+ * @param {import('mongoose').Types.ObjectId|string} businessId
+ * @param {{ sort?: string, rating?: number|null, page?: number, limit?: number }} [opts]
+ */
+export const listPublicRestaurantReviewsForBusiness = async (businessId, opts = {}) => {
+    const bid = new mongoose.Types.ObjectId(String(businessId))
+    const page = Math.max(1, Number(opts.page) || 1)
+    const limit = Math.min(50, Math.max(1, Number(opts.limit) || 20))
+    const skip = (page - 1) * limit
+    const sortKey = String(opts.sort || 'newest').toLowerCase()
+    const ratingFilter =
+        opts.rating != null && opts.rating !== '' && Number.isFinite(Number(opts.rating))
+            ? Math.min(5, Math.max(1, Math.round(Number(opts.rating))))
+            : null
+
+    const listMatch = { businessId: bid }
+    if (ratingFilter != null) {
+        listMatch.rating = ratingFilter
+    }
+
+    const sort =
+        sortKey === 'highest'
+            ? { rating: -1, createdAt: -1 }
+            : sortKey === 'lowest'
+              ? { rating: 1, createdAt: -1 }
+              : { createdAt: -1 }
+
+    const [agg] = await RestaurantOrderReview.aggregate([
+        { $match: { businessId: bid } },
+        {
+            $group: {
+                _id: '$businessId',
+                averageRating: { $avg: '$rating' },
+                reviewCount: { $sum: 1 }
+            }
+        }
+    ])
+
+    const averageRating = agg?.reviewCount ? roundRating(agg.averageRating) : null
+    const reviewCount = agg?.reviewCount ? Number(agg.reviewCount) : 0
+
+    const [filteredTotal, rows] = await Promise.all([
+        RestaurantOrderReview.countDocuments(listMatch),
+        RestaurantOrderReview.find(listMatch)
+            .sort(sort)
+            .skip(skip)
+            .limit(limit)
+            .populate('userId', 'name avatar')
+            .populate('customerOrderId', 'orderCode createdAt')
+            .lean()
+    ])
+
+    return {
+        summary: {
+            averageRating,
+            reviewCount
+        },
+        page,
+        limit,
+        total: filteredTotal,
+        reviews: rows.map((r) => mapPublicReviewListItem(r))
+    }
+}

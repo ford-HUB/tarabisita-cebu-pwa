@@ -67,3 +67,15 @@ export const createTouristCustomerOrderCheckoutSchema = zod.object({
         )
     })
 })
+
+export const listPublicRestaurantReviewsSchema = zod.object({
+    params: zod.object({
+        businessId: zod.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid business id')
+    }),
+    query: zod.object({
+        sort: zod.enum(['newest', 'highest', 'lowest']).optional().default('newest'),
+        rating: zod.coerce.number().int().min(1).max(5).optional(),
+        page: zod.coerce.number().int().min(1).optional().default(1),
+        limit: zod.coerce.number().int().min(1).max(50).optional().default(20)
+    })
+})

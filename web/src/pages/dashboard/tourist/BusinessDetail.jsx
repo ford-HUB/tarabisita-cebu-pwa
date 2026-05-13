@@ -28,6 +28,7 @@ import {
 import { postStoreMessagingLinkToken } from '../../../services/tourist/store-messaging.service.js'
 import { useTouristCartItemStore } from '../../../store/tourist/tourist-cart-item.store.js'
 import TouristDestinationMapPanel from '../../../components/tourist/explore/modals/TouristDestinationMapPanel.jsx'
+import RestaurantGuestReviewsModal from '../../../components/tourist/explore/modals/RestaurantGuestReviewsModal.jsx'
 import TouristStayPackageDetailModal from '../../../components/tourist/explore/modals/TouristStayPackageDetailModal.jsx'
 import { pickCartItemDetailsFromMenuItem } from '../../../shared/utils/tourist-cart-item-details.utils.js'
 import { hasValidMapCoordinates } from '../../../shared/utils/mapboxStaticMap.utils.js'
@@ -177,6 +178,7 @@ const BusinessDetail = () => {
   const cartItems = useTouristCartItemStore((s) => s.items)
   const setItemQty = useTouristCartItemStore((s) => s.setItemQty)
   const removeItem = useTouristCartItemStore((s) => s.removeItem)
+  const setActiveCheckoutBusinessId = useTouristCartItemStore((s) => s.setActiveCheckoutBusinessId)
 
   const [business, setBusiness] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -186,6 +188,7 @@ const BusinessDetail = () => {
   const [errorMessage, setErrorMessage] = useState('')
   const [stickyTopOffset, setStickyTopOffset] = useState(0)
   const [isMapModalOpen, setIsMapModalOpen] = useState(false)
+  const [isGuestReviewsOpen, setIsGuestReviewsOpen] = useState(false)
   const [selectedPackageId, setSelectedPackageId] = useState('')
   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false)
 
@@ -194,6 +197,7 @@ const BusinessDetail = () => {
     setMenuSearchTerm('')
     setSelectedPackageId('')
     setIsPackageModalOpen(false)
+    useTouristCartItemStore.getState().clearActiveCheckoutBusinessId()
   }, [businessId])
 
   useEffect(() => {
@@ -301,7 +305,6 @@ const BusinessDetail = () => {
   const ratingCount = Number(reviewSum?.reviewCount || 0)
   const hasReviews = Number.isFinite(ratingAvg) && ratingCount > 0
   const ratingDisplay = hasReviews ? formatRating(ratingAvg) : null
-  const recentGuestReviews = Array.isArray(reviewSum?.recentReviews) ? reviewSum.recentReviews : []
   const sidebarStickyTop = stickyTopOffset + 8
   const destination = hasValidMapCoordinates(business?.businessLocation)
     ? { lat: business.businessLocation.lat, lng: business.businessLocation.lng }
@@ -428,16 +431,35 @@ const BusinessDetail = () => {
                 <p className="text-xs text-[#8a8a8a]">{categoryLabel}</p>
                 <h1 className="truncate text-3xl font-semibold leading-tight text-[#1f1f1f]">{businessName}</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#555]">
-                  <span className="inline-flex items-center gap-1">
-                    <FiStar className="h-3.5 w-3.5 text-[#f59f0b]" aria-hidden />
-                    {hasReviews ? (
-                      <>
-                        {ratingDisplay} out of 5 · {ratingCount} review{ratingCount === 1 ? '' : 's'}
-                      </>
-                    ) : (
-                      <>New on Tara Bisita — reviews appear after guests pay online</>
-                    )}
-                  </span>
+                  {!isStayBusiness ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsGuestReviewsOpen(true)}
+                      className="inline-flex max-w-full items-center gap-1 rounded-md text-left text-[#555] underline decoration-[#ccc] decoration-1 underline-offset-2 transition hover:bg-[#f7f7f7] hover:text-[#222]"
+                    >
+                      <FiStar className="h-3.5 w-3.5 shrink-0 text-[#f59f0b]" aria-hidden />
+                      <span>
+                        {hasReviews ? (
+                          <>
+                            Reviews · {ratingDisplay} ★ · {ratingCount} review{ratingCount === 1 ? '' : 's'}
+                          </>
+                        ) : (
+                          <>View reviews — guests can leave feedback after online orders</>
+                        )}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      <FiStar className="h-3.5 w-3.5 text-[#f59f0b]" aria-hidden />
+                      {hasReviews ? (
+                        <>
+                          {ratingDisplay} out of 5 · {ratingCount} review{ratingCount === 1 ? '' : 's'}
+                        </>
+                      ) : (
+                        <>New on Tara Bisita — reviews appear after guests pay online</>
+                      )}
+                    </span>
+                  )}
                   <span className="inline-flex items-center gap-1">
                     <FiInfo className="h-3.5 w-3.5" aria-hidden />
                     More Info
@@ -479,32 +501,6 @@ const BusinessDetail = () => {
             </a>
           </div>
         </div>
-
-        {!isStayBusiness && recentGuestReviews.length > 0 ? (
-          <div className="border-b border-[#efefef] px-4 py-5 md:px-5">
-            <h3 className="text-lg font-semibold text-[#1f1f1f]">Guest reviews</h3>
-            <p className="mt-1 text-xs text-[#666]">From customers who completed an online order.</p>
-            <ul className="mt-4 list-none space-y-3 p-0">
-              {recentGuestReviews.map((r) => (
-                <li key={String(r.id)} className="rounded-xl border border-[#ececec] bg-[#fafafa] px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-[#9b5a2c]">{String(r.authorLabel || 'Guest')}</span>
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#1f1f1f]">
-                      <FiStar className="h-3.5 w-3.5 text-[#f59f0b]" aria-hidden />
-                      {Number(r.rating).toFixed(1)} / 5
-                    </span>
-                  </div>
-                  {r.comment ? <p className="mt-2 text-sm leading-relaxed text-[#3d3d3d]">{String(r.comment)}</p> : null}
-                  {r.createdAt ? (
-                    <p className="mt-2 text-[10px] text-[#888]">
-                      {new Date(r.createdAt).toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
 
         {isStayBusiness ? (
           <div className="border-b border-[#efefef] px-4 py-4 md:px-5">
@@ -721,7 +717,12 @@ const BusinessDetail = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => navigate(touristCheckoutHref)}
+                    onClick={() => {
+                      const id = business?._id ? String(business._id) : ''
+                      if (!id) return
+                      setActiveCheckoutBusinessId(id)
+                      navigate(touristCheckoutHref)
+                    }}
                     disabled={!cartCount}
                     className="mt-3 w-full rounded-md bg-[#e0e0e0] px-4 py-2.5 text-sm font-semibold text-[#4a4a4a] transition enabled:bg-[#222] enabled:text-white enabled:hover:bg-black disabled:cursor-not-allowed"
                   >
@@ -737,6 +738,14 @@ const BusinessDetail = () => {
           </div>
         )}
       </div>
+      {isGuestReviewsOpen ? (
+        <RestaurantGuestReviewsModal
+          key={String(business._id)}
+          onClose={() => setIsGuestReviewsOpen(false)}
+          businessId={String(business._id)}
+          businessName={businessName}
+        />
+      ) : null}
       <StoreLocationModal
         isOpen={isMapModalOpen}
         onClose={() => setIsMapModalOpen(false)}

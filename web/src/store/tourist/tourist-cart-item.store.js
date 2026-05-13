@@ -31,6 +31,27 @@ const resolveCatalogItemId = (payload) =>
 
 const MAX_ITEM_NOTES = 500
 
+/** Persists which restaurant checkout is for (multi-store cart + refresh on checkout). */
+const CHECKOUT_BUSINESS_STORAGE_KEY = 'tb_tourist_checkout_business_id'
+
+const readCheckoutBusinessIdFromStorage = () => {
+  try {
+    const v = sessionStorage.getItem(CHECKOUT_BUSINESS_STORAGE_KEY)
+    return v && String(v).trim() ? String(v).trim() : null
+  } catch {
+    return null
+  }
+}
+
+const writeCheckoutBusinessIdToStorage = (id) => {
+  try {
+    if (id) sessionStorage.setItem(CHECKOUT_BUSINESS_STORAGE_KEY, String(id))
+    else sessionStorage.removeItem(CHECKOUT_BUSINESS_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Cap length only; do not trim (trim on submit / display-only) so spaces survive while typing and sync. */
 const clampItemNotes = (v) => String(v ?? '').slice(0, MAX_ITEM_NOTES)
 
@@ -47,8 +68,27 @@ export const groupCartItemsByBusiness = (list) => {
 
 export const useTouristCartItemStore = create((set, get) => ({
   items: [],
+  /** When set, menu checkout only considers rows for this `businessId` (see `useTouristRestaurantCheckout`). */
+  activeCheckoutBusinessId: null,
   /** Item keys the user explicitly unchecked (default: every item is selected). */
   deselectedItemKeys: {},
+
+  setActiveCheckoutBusinessId: (businessId) => {
+    const v = businessId != null && String(businessId).trim() ? String(businessId).trim() : null
+    writeCheckoutBusinessIdToStorage(v)
+    set({ activeCheckoutBusinessId: v })
+  },
+
+  clearActiveCheckoutBusinessId: () => {
+    writeCheckoutBusinessIdToStorage(null)
+    set({ activeCheckoutBusinessId: null })
+  },
+
+  /** Call when opening checkout so scope survives reload mid-flow. */
+  rehydrateActiveCheckoutBusinessIdFromStorage: () => {
+    const v = readCheckoutBusinessIdFromStorage()
+    set({ activeCheckoutBusinessId: v })
+  },
 
   isItemSelected: (key) => !get().deselectedItemKeys[String(key)],
 
@@ -136,7 +176,10 @@ export const useTouristCartItemStore = create((set, get) => ({
     })
   },
 
-  clear: () => set({ items: [], deselectedItemKeys: {} }),
+  clear: () => {
+    writeCheckoutBusinessIdToStorage(null)
+    set({ items: [], deselectedItemKeys: {}, activeCheckoutBusinessId: null })
+  },
 
   /** Remove specific cart items (e.g. after a successful partial checkout). */
   removeItemsByKeys: (keys) => {

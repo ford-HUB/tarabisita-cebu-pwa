@@ -10,6 +10,13 @@ export const fetchPublicBusinessById = async (businessId) => {
   return response
 }
 
+/** @param {Record<string, string|number|undefined>} [params] sort, rating, page, limit */
+export const fetchPublicBusinessRestaurantReviews = async (businessId, params = {}) => {
+  const id = encodeURIComponent(String(businessId || '').trim())
+  const response = await apiInstance.get(`business/public/${id}/restaurant-reviews`, { params })
+  return response
+}
+
 export const recordPublicBusinessView = async (businessId) => {
   const response = await apiInstance.post(`business/public/${businessId}/view`)
   return response
