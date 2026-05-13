@@ -25,6 +25,13 @@ const authorLabelFromUser = (user) => {
     return first.length > 24 ? `${first.slice(0, 24)}…` : first
 }
 
+/** Full display name for marketing surfaces (e.g. landing testimonials). */
+const authorDisplayNameFromUser = (user) => {
+    const name = String(user?.name || '').trim()
+    if (!name) return 'Verified diner'
+    return name.length > 72 ? `${name.slice(0, 71)}…` : name
+}
+
 const snippet = (text, max = 180) => {
     const s = String(text || '').trim().replace(/\s+/g, ' ')
     if (s.length <= max) return s
@@ -370,6 +377,7 @@ export const listPublicLandingRestaurantReviews = async (businessObjectIds, opts
             comment: snippet(String(r.comment || ''), 240),
             createdAt: r.createdAt,
             authorLabel: authorLabelFromUser(user),
+            authorName: authorDisplayNameFromUser(user),
             avatarUrl: user?.avatar ? String(user.avatar).trim() || null : null,
             businessId: String(biz._id),
             businessName: String(biz.name || 'Restaurant').trim() || 'Restaurant'

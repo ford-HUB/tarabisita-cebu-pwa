@@ -44,6 +44,49 @@ export const pickSpotlightHeroBusinesses = (businesses, { max = 8 } = {}) => {
   return out
 }
 
+/**
+ * Ranks public catalog businesses for marketing (e.g. landing): diners with reviews first, then profile views.
+ * @param {unknown[]} businesses
+ * @param {{ limit?: number }} [opts]
+ */
+export const rankPublicBusinessesByRatings = (businesses, { limit = 10 } = {}) => {
+  const list = Array.isArray(businesses) ? businesses : []
+  if (!list.length) return []
+
+  const rated = []
+  const unrated = []
+  for (const b of list) {
+    const cnt = Number(b?.restaurantReviewSummary?.reviewCount || 0)
+    if (cnt > 0) rated.push(b)
+    else unrated.push(b)
+  }
+
+  const sortRated = (a, b) => {
+    const aAvg = Number(a?.restaurantReviewSummary?.averageRating ?? 0)
+    const bAvg = Number(b?.restaurantReviewSummary?.averageRating ?? 0)
+    if (Number.isFinite(bAvg) && Number.isFinite(aAvg) && bAvg !== aAvg) return bAvg - aAvg
+    const ac = Number(a?.restaurantReviewSummary?.reviewCount || 0)
+    const bc = Number(b?.restaurantReviewSummary?.reviewCount || 0)
+    if (bc !== ac) return bc - ac
+    return (Number(b?.publicProfileViewCount) || 0) - (Number(a?.publicProfileViewCount) || 0)
+  }
+
+  const sortUnrated = (a, b) =>
+    (Number(b?.publicProfileViewCount) || 0) - (Number(a?.publicProfileViewCount) || 0)
+
+  const combined = [...rated.sort(sortRated), ...unrated.sort(sortUnrated)]
+  const seen = new Set()
+  const out = []
+  for (const b of combined) {
+    const id = String(b?._id ?? '')
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push(b)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
 export const buildExploreRows = (businesses) => {
   if (!businesses?.length) return []
 

@@ -127,17 +127,12 @@ const LandingHeroSection = (props) => {
               <>
                 <div className="flex flex-wrap gap-3">
                   <a
-                    href="#why-choose"
+                    href="#popular-places"
                     className="rounded-full border border-[#ffdfbe] bg-white/92 px-5 py-3 text-center text-sm font-semibold text-[#3d352d] transition hover:border-[#c66b2b] hover:text-[#c66b2b] sm:min-w-[9.5rem]"
                   >
                     Explore Cebu
                   </a>
-                  <a
-                    href="#feature-restaurants"
-                    className="rounded-full border border-[#ffdfbe] bg-white/92 px-5 py-3 text-center text-sm font-semibold text-[#3d352d] transition hover:border-[#c66b2b] hover:text-[#c66b2b] sm:min-w-[9.5rem]"
-                  >
-                    Discover Restaurants
-                  </a>
+                
                   <Link
                     to="/register"
                     className="rounded-full bg-[#ff7a1a] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#eb6c12] sm:min-w-[9.5rem]"
@@ -145,12 +140,7 @@ const LandingHeroSection = (props) => {
                     Start Your Journey
                   </Link>
                 </div>
-                <p className="text-sm text-[#ffedd8]">
-                  Already have an account?{' '}
-                  <Link to="/login" className="font-semibold text-white underline decoration-[#ffd4a8] underline-offset-2 hover:decoration-white">
-                    Sign in
-                  </Link>
-                </p>
+                
               </>
             )}
           </div>

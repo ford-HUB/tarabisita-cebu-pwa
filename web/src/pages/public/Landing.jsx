@@ -3,6 +3,7 @@ import LandingHeroSection from '../../components/public/LandingHeroSection.jsx'
 import LandingWhyChooseSection from '../../components/public/LandingWhyChooseSection.jsx'
 import LandingHowItWorksSection from '../../components/public/LandingHowItWorksSection.jsx'
 import LandingTestimonialsSection from '../../components/public/LandingTestimonialsSection.jsx'
+import LandingPopularPlacesSection from '../../components/public/LandingPopularPlacesSection.jsx'
 
 const MotionDiv = motion.div
 const MotionArticle = motion.article
@@ -18,6 +19,7 @@ const Landing = () => {
   return (
     <div className="bg-[#f8f5f0] text-[#1f1f1f]">
       <LandingHeroSection ctaVariant="marketing" />
+
 
       <section className="mx-auto w-full max-w-6xl px-6 py-16 lg:px-10">
         <MotionDiv {...fadeUp} className="mb-8 text-center">
@@ -57,6 +59,9 @@ const Landing = () => {
           ))}
         </div>
       </section>
+
+      <LandingPopularPlacesSection />
+      
       <LandingWhyChooseSection />
 
       <LandingHowItWorksSection />

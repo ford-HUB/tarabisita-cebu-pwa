@@ -21,7 +21,7 @@ const LandingTestimonialsSection = () => {
       aria-labelledby="testimonials-heading"
     >
       <div className="mx-auto w-full max-w-6xl px-6 lg:px-10">
-        <MotionDiv {...fadeUp} className="mx-auto mb-12 max-w-2xl text-center">
+        <MotionDiv {...fadeUp} className="mx-auto mb-10 max-w-2xl text-center md:mb-12">
           <p className="text-xs font-semibold tracking-[0.2em] text-[#b86a2a] uppercase">Community voices</p>
           <h2 id="testimonials-heading" className="mt-3 text-3xl font-semibold text-[#231d18] md:text-4xl">
             What diners are saying

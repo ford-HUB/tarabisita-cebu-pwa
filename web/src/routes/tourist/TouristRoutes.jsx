@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import TouristLayout from '../../components/layout/tourist/TouristLayout'
-import { touristExploreHref, touristHomeHref, touristOrdersHref } from '../../components/layout/tourist/touristLayout.constants'
+import { touristHomeHref, touristOrdersHref } from '../../components/layout/tourist/touristLayout.constants'
 import Home from '../../pages/dashboard/tourist/Home'
 import TouristHomeHub from '../../pages/dashboard/tourist/TouristHomeHub'
 import History from '../../pages/dashboard/tourist/History'
@@ -10,6 +10,7 @@ import RestaurantCart from '../../pages/dashboard/tourist/RestaurantCart'
 import RestaurantCheckout from '../../pages/dashboard/tourist/RestaurantCheckout'
 import BusinessDetail from '../../pages/dashboard/tourist/BusinessDetail'
 import StayBooking from '../../pages/dashboard/tourist/StayBooking'
+import TouristSearchResults from '../../pages/dashboard/tourist/TouristSearchResults.jsx'
 import { ProtectedRoute } from '../ProtectedRoute'
 
 export const TouristRoutes = [
@@ -36,6 +37,10 @@ export const TouristRoutes = [
       {
         path: 'explore/cart',
         element: <RestaurantCart />
+      },
+      {
+        path: 'explore/search',
+        element: <TouristSearchResults />
       },
       {
         path: 'explore',

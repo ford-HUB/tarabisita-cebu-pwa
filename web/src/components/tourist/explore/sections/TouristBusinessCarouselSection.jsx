@@ -11,7 +11,8 @@ const thumb = (business) => business?.banner || business?.coverImage || business
  *   onOpen: (business: unknown) => void,
  *   subtitle?: string,
  *   seeAllTo?: string,
- *   seeAllLabel?: string
+ *   seeAllLabel?: string,
+ *   headerAlign?: 'left' | 'center'
  * }} props
  */
 const TouristBusinessCarouselSection = ({
@@ -20,19 +21,46 @@ const TouristBusinessCarouselSection = ({
   onOpen,
   subtitle,
   seeAllTo,
-  seeAllLabel = 'See all'
+  seeAllLabel = 'See all',
+  headerAlign = 'left'
 }) => {
   if (!items?.length) return null
 
   const showHeaderRow = Boolean(subtitle || seeAllTo)
+  const centered = headerAlign === 'center'
 
   return (
     <section aria-label={title} className="scroll-mt-4">
       {showHeaderRow ? (
-        <div className="mb-2.5 flex flex-wrap items-end justify-between gap-3 md:mb-3">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold tracking-tight text-[#1f1f1f] md:text-xl">{title}</h2>
-            {subtitle ? <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[#6b5f54]">{subtitle}</p> : null}
+        <div
+          className={[
+            'mb-2.5 flex flex-wrap gap-3 md:mb-3',
+            seeAllTo ? 'items-end justify-between' : centered ? 'flex-col items-center text-center' : 'items-end justify-between'
+          ].join(' ')}
+        >
+          <div className={['min-w-0', centered && !seeAllTo ? 'mx-auto max-w-2xl' : ''].filter(Boolean).join(' ')}>
+            <h2
+              className={[
+                'text-base font-semibold tracking-tight text-[#1f1f1f] md:text-xl',
+                centered ? 'text-center' : ''
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              {title}
+            </h2>
+            {subtitle ? (
+              <p
+                className={[
+                  'mt-1 max-w-2xl text-sm leading-relaxed text-[#6b5f54]',
+                  centered ? 'mx-auto text-center' : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                {subtitle}
+              </p>
+            ) : null}
           </div>
           {seeAllTo ? (
             <Link
@@ -44,7 +72,16 @@ const TouristBusinessCarouselSection = ({
           ) : null}
         </div>
       ) : (
-        <h2 className="mb-2.5 text-base font-semibold tracking-tight text-[#1f1f1f] md:mb-3 md:text-xl">{title}</h2>
+        <h2
+          className={[
+            'mb-2.5 text-base font-semibold tracking-tight text-[#1f1f1f] md:mb-3 md:text-xl',
+            centered ? 'text-center' : ''
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          {title}
+        </h2>
       )}
       <div
         className={

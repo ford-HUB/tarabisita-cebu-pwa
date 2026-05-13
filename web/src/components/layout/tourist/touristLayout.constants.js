@@ -13,6 +13,16 @@ export const getAvatarFallback = (name) => {
 /** Signed paths for `ProtectedRoute` (requires `rk` query). */
 export const touristHomeHref = `/${toEncryptedRoute('tourist/home')}`
 export const touristExploreHref = `/${toEncryptedRoute('tourist/explore')}`
+
+/** Menu item search (catalog). Query is appended with `&q=` because the path already includes `?rk=`. */
+export const touristSearchHref = `/${toEncryptedRoute('tourist/explore/search')}`
+
+/** @param {string} [query] */
+export const buildTouristSearchHref = (query = '') => {
+  const q = String(query || '').trim()
+  if (!q) return touristSearchHref
+  return `${touristSearchHref}&q=${encodeURIComponent(q)}`
+}
 export const buildTouristExploreBusinessDetailHref = (businessId) => {
   const id = String(businessId || '').trim()
   if (!id) return touristExploreHref
