@@ -84,6 +84,7 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
         : Array.isArray(item.images) && item.images.length
           ? String(item.images[0]).trim()
           : ''
+    const listingType = String(item?.listingType || '').trim().toUpperCase()
     return {
       businessId: String(item.businessId),
       businessName: item.businessName,
@@ -92,6 +93,7 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
       unitPrice: Number(item.price) || 0,
       image: img,
       qty: clampModalQty(modalQty),
+      ...(listingType ? { listingType } : {}),
       ...pickCartItemDetailsFromMenuItem(item)
     }
   }, [item, modalQty, galleryImages, heroIndex])
