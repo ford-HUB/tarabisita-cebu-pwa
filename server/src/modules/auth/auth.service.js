@@ -32,7 +32,7 @@ export const getSignupEmailVerifiedFromCodes = async (userId) => {
     const record = await VerificationCode.findOne({
         userId,
         used: true,
-        purpose: { $ne: 'EMAIL_CHANGE' }
+        purpose: { $nin: ['EMAIL_CHANGE', 'SUPPORT_EMAIL'] }
     })
         .sort({ updatedAt: -1 })
         .select('updatedAt createdAt')
@@ -44,6 +44,17 @@ export const getSignupEmailVerifiedFromCodes = async (userId) => {
 
     const verifiedAt = record.updatedAt || record.createdAt || new Date()
     return { verified: true, verifiedAt }
+}
+
+export const normalizeLoginEmail = (email) => String(email || '').trim().toLowerCase()
+
+/** Query user by primary or support email (normalized). Returns null if input is empty. */
+export const findUserByLoginIdentifier = (emailRaw) => {
+    const email = normalizeLoginEmail(emailRaw)
+    if (!email) return null
+    return User.findOne({
+        $or: [{ email }, { supportEmail: email }]
+    })
 }
 
 export const resolveUserEmailVerification = async (user) => {
@@ -136,8 +147,11 @@ export const registerUserAccount = async ({
     businessContact,
     businessCategory
 }) => {
-    const existingUser = await User.findOne({ email })
-        .select('_id isEmailVerified emailVerifiedAt')
+    const normEmail = normalizeLoginEmail(email)
+    const existingUser = await User.findOne({
+        $or: [{ email: normEmail }, { supportEmail: normEmail }]
+    })
+        .select('_id isEmailVerified emailVerifiedAt email supportEmail')
         .session(session)
 
     const genSalt = await bcrypt.genSalt(10)
@@ -145,6 +159,13 @@ export const registerUserAccount = async ({
     const role = await ensureRole({ session, accountType })
 
     if (existingUser) {
+        const matchedPrimary = normalizeLoginEmail(existingUser.email) === normEmail
+        const matchedSupportOnly =
+            !matchedPrimary && normalizeLoginEmail(existingUser.supportEmail) === normEmail
+        if (matchedSupportOnly) {
+            throw createDuplicateEmailError()
+        }
+
         const verification = await resolveUserEmailVerification(existingUser)
         if (verification.isEmailVerified) {
             throw createDuplicateEmailError()
@@ -155,6 +176,7 @@ export const registerUserAccount = async ({
             {
                 $set: {
                     name,
+                    email: normEmail,
                     password: hashedPassword,
                     roleId: role._id,
                     isEmailVerified: false,
@@ -186,7 +208,7 @@ export const registerUserAccount = async ({
 
     const newUser = new User({
         name,
-        email,
+        email: normEmail,
         password: hashedPassword,
         roleId: role._id
     })

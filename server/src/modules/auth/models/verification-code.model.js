@@ -27,10 +27,10 @@ const verificationSchema = new mongoose.Schema({
         required: true
     },
 
-    /** `EMAIL_CHANGE`: code is emailed to `pendingEmail`; user confirms to update login email. */
+    /** `EMAIL_CHANGE`: login email. `SUPPORT_EMAIL`: alternate sign-in email (tourist). */
     purpose: {
         type: String,
-        enum: ['DEFAULT', 'EMAIL_CHANGE'],
+        enum: ['DEFAULT', 'EMAIL_CHANGE', 'SUPPORT_EMAIL'],
         default: 'DEFAULT'
     },
 

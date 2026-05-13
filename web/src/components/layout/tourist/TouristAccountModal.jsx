@@ -6,6 +6,7 @@ import { useAuth } from '../../../hooks/useAuth.hook'
 import { useAuthStore } from '../../../store/auth/auth.store'
 import {
   patchTouristProfile,
+  patchTouristSupportEmailClear,
   postTouristUploadAvatar,
   postTouristChangePassword,
   postTouristEmailChangeConfirm,
@@ -13,6 +14,7 @@ import {
   postTouristEmailChangeResend
 } from '../../../services/tourist/tourist-account.service.js'
 import { getAvatarFallback, touristHistoryHref } from './touristLayout.constants'
+import TouristSupportEmailModal from './TouristSupportEmailModal.jsx'
 
 const MAX_AVATAR_FILE_BYTES = 5 * 1024 * 1024
 
@@ -37,6 +39,10 @@ const TouristAccountModal = ({ isOpen, onClose, initialView = 'menu', onLogout }
   const [emailBusy, setEmailBusy] = useState(false)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState('')
+  const [supportEmailFlowOpen, setSupportEmailFlowOpen] = useState(false)
+  const [supportRemoveSubmitting, setSupportRemoveSubmitting] = useState(false)
+  const [supportRemoveError, setSupportRemoveError] = useState('')
+  const [supportRemoveMessage, setSupportRemoveMessage] = useState('')
 
   const profileDefaults = useMemo(
     () => ({
@@ -58,7 +64,10 @@ const TouristAccountModal = ({ isOpen, onClose, initialView = 'menu', onLogout }
   const [passwordSubmitting, setPasswordSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      setSupportEmailFlowOpen(false)
+      return
+    }
     setView(initialView === 'settings' ? 'settings' : 'menu')
     setProfileSaved('')
     setProfileError('')
@@ -70,6 +79,10 @@ const TouristAccountModal = ({ isOpen, onClose, initialView = 'menu', onLogout }
     setEmailCode('')
     setEmailSessionToken(null)
     setAvatarError('')
+    setSupportEmailFlowOpen(false)
+    setSupportRemoveError('')
+    setSupportRemoveMessage('')
+    setSupportRemoveSubmitting(false)
     reset(profileDefaults)
   }, [isOpen, initialView, profileDefaults, reset])
 
@@ -247,14 +260,36 @@ const TouristAccountModal = ({ isOpen, onClose, initialView = 'menu', onLogout }
     }
   }
 
+  const onRemoveSupportEmail = async () => {
+    setSupportRemoveError('')
+    setSupportRemoveMessage('')
+    if (!user?.supportEmail) return
+    setSupportRemoveSubmitting(true)
+    try {
+      const res = await patchTouristSupportEmailClear()
+      const next = res?.data?.user
+      if (next) {
+        setUser(next)
+      } else {
+        await checkUser({ silent: true })
+      }
+      setSupportRemoveMessage('Support email removed.')
+    } catch (err) {
+      setSupportRemoveError(getErrorMessage(err, 'Could not remove support email.'))
+    } finally {
+      setSupportRemoveSubmitting(false)
+    }
+  }
+
   return (
-    <div
-      role="presentation"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose?.()
-      }}
-    >
+    <>
+      <div
+        role="presentation"
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onClose?.()
+        }}
+      >
       <div
         role="dialog"
         aria-modal="true"
@@ -533,11 +568,52 @@ const TouristAccountModal = ({ isOpen, onClose, initialView = 'menu', onLogout }
                 {emailError ? <p className="text-sm text-[#b42318]">{emailError}</p> : null}
                 {emailMessage ? <p className="text-sm text-[#027a48]">{emailMessage}</p> : null}
               </section>
+
+              <section className="space-y-3">
+                <h3 className="text-sm font-semibold text-[#2f2f2f]">Support email</h3>
+                <p className="text-xs text-[#6d645d]">
+                  Use a separate verified address to sign in with the same password. You can have one support email per
+                  account.
+                </p>
+                {user?.supportEmail ? (
+                  <p className="text-xs text-[#5a534c]">
+                    Current: <span className="font-medium">{user.supportEmail}</span>
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setSupportEmailFlowOpen(true)}
+                  className="rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#eb6c12]"
+                >
+                  {user?.supportEmail ? 'Change support email' : 'Add support email'}
+                </button>
+                {user?.supportEmail ? (
+                  <div className="space-y-2 border-t border-[#f0e8de] pt-3">
+                    {supportRemoveError ? <p className="text-sm text-[#b42318]">{supportRemoveError}</p> : null}
+                    {supportRemoveMessage ? <p className="text-sm text-[#027a48]">{supportRemoveMessage}</p> : null}
+                    <button
+                      type="button"
+                      disabled={supportRemoveSubmitting}
+                      onClick={() => void onRemoveSupportEmail()}
+                      className="rounded-full border border-[#e7dfd5] bg-white px-4 py-2 text-sm font-semibold text-[#1f1f1f] shadow-sm transition hover:bg-[#f7f3ed] disabled:opacity-60"
+                    >
+                      {supportRemoveSubmitting ? 'Removing…' : 'Remove support email'}
+                    </button>
+                  </div>
+                ) : null}
+              </section>
             </div>
           )}
         </div>
       </div>
-    </div>
+      </div>
+
+      <TouristSupportEmailModal
+        isOpen={supportEmailFlowOpen}
+        onClose={() => setSupportEmailFlowOpen(false)}
+        afterVerified={() => onClose?.()}
+      />
+    </>
   )
 }
 

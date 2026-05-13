@@ -69,6 +69,11 @@ const ManageUsersActionsModal = ({
                 </h2>
                 <p className="mt-1 truncate text-sm font-medium text-[#9b5a2c]">{user.name || '—'}</p>
                 <p className="truncate text-xs text-[#6d645d]">{user.email || 'No email'}</p>
+                {user.supportEmail ? (
+                  <p className="mt-0.5 truncate text-xs text-[#6d645d]" title={user.supportEmail}>
+                    Support email: <span className="font-medium text-[#5a534c]">{user.supportEmail}</span>
+                  </p>
+                ) : null}
               </div>
             </div>
             <button

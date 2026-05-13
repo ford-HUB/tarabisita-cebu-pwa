@@ -29,3 +29,23 @@ export const postTouristEmailChangeConfirm = async (body) => {
   const response = await apiInstance.post('tourist/account/email-change/confirm', body)
   return response
 }
+
+export const postTouristSupportEmailVerificationRequest = async (body) => {
+  const response = await apiInstance.post('tourist/account/support-email/verification/request', body)
+  return response
+}
+
+export const postTouristSupportEmailVerificationResend = async (body) => {
+  const response = await apiInstance.post('tourist/account/support-email/verification/resend', body)
+  return response
+}
+
+export const postTouristSupportEmailVerificationConfirm = async (body) => {
+  const response = await apiInstance.post('tourist/account/support-email/verification/confirm', body)
+  return response
+}
+
+export const patchTouristSupportEmailClear = async () => {
+  const response = await apiInstance.patch('tourist/account/support-email', { supportEmail: '' })
+  return response
+}
