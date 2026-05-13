@@ -53,7 +53,7 @@ const buildListFilter = async ({ search, role, whitelisted }) => {
   const q = String(search || '').trim()
   if (q) {
     const rx = new RegExp(escapeRegex(q), 'i')
-    conditions.push({ $or: [{ name: rx }, { email: rx }] })
+    conditions.push({ $or: [{ name: rx }, { email: rx }, { supportEmail: rx }] })
   }
 
   if (conditions.length === 0) return {}
@@ -92,6 +92,7 @@ export const listAdminUsers = async (req, res) => {
       id: u._id.toString(),
       name: u.name,
       email: u.email,
+      supportEmail: u.supportEmail || null,
       avatar: u.avatar || null,
       role: u.roleId?.name || '',
       whitelisted: u.whitelisted !== false,

@@ -44,6 +44,31 @@ export const resendTouristEmailChangeSchema = zod.object({
     })
 })
 
+export const requestTouristSupportEmailVerificationSchema = zod.object({
+    body: zod.object({
+        supportEmail: zod.string().email('Invalid email')
+    })
+})
+
+export const confirmTouristSupportEmailVerificationSchema = zod.object({
+    body: zod.object({
+        sessionToken: zod.string().min(1, 'Session token is required'),
+        code: zod.string().min(1, 'Verification code is required')
+    })
+})
+
+export const resendTouristSupportEmailVerificationSchema = zod.object({
+    body: zod.object({
+        sessionToken: zod.string().min(1, 'Session token is required')
+    })
+})
+
+export const clearTouristSupportEmailSchema = zod.object({
+    body: zod.object({
+        supportEmail: zod.literal('')
+    })
+})
+
 export const uploadTouristAvatarImageSchema = zod.object({
     body: zod.object({
         avatarImage: zod

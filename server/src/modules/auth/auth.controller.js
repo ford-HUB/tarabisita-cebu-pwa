@@ -4,7 +4,7 @@ import User from './models/user.model.js'
 import { generateAccessToken } from '../../shared/utils/generateJwt.js'
 import { generateToken, generateResetToken, generateSessionToken } from '../../shared/utils/generateToken.js'
 import { templateReader } from '../../shared/utils/templateReaderExtractor.js'
-import { registerUserAccount, resolveUserEmailVerification, sendMailer } from './auth.service.js'
+import { registerUserAccount, resolveUserEmailVerification, sendMailer, findUserByLoginIdentifier } from './auth.service.js'
 import VerificationCode from './models/verification-code.model.js'
 import ResetPasswordModel from './models/reset-password.model.js'
 import Business from '../business/models/business.model.js'
@@ -82,7 +82,7 @@ export const register = async (req, res) => {
 
         return res.status(201).json({ message: "User registered successfully" })
     } catch (error) {
-        if (error?.statusCode === 409 || (error?.code === 11000 && error?.keyPattern?.email)) {
+        if (error?.statusCode === 409 || (error?.code === 11000 && (error?.keyPattern?.email || error?.keyPattern?.supportEmail))) {
             return res.status(409).json({ message: "Email is already registered" })
         }
         return res.status(500).json({ message: error.message })
@@ -95,7 +95,8 @@ export const login = async (req, res) => {
     try {
         const { email, password } = req.validatedData.body
 
-        const user = await User.findOne({ email }).populate('roleId')
+        const q = findUserByLoginIdentifier(email)
+        const user = q ? await q.populate('roleId') : null
 
         if (!user) {
             return res.status(404).json({ message: "Invalid Credentials" })
@@ -115,27 +116,31 @@ export const login = async (req, res) => {
             return res.status(401).json({ message: "Invalid password" })
         }
 
-        let { isEmailVerified, emailVerifiedAt } = await resolveUserEmailVerification(user)
+        const isAdminLogin = user.roleId?.name === 'ADMIN'
 
-        if (!user.isEmailVerified && isEmailVerified) {
-            await User.updateOne(
-                { _id: user._id },
-                { $set: { isEmailVerified: true, emailVerifiedAt } }
-            )
-        }
+        if (!isAdminLogin) {
+            let { isEmailVerified, emailVerifiedAt } = await resolveUserEmailVerification(user)
 
-        if (!isEmailVerified) {
-            await createBusinessAuthActivityLog({
-                req,
-                user,
-                action: 'LOGIN_FAILED',
-                status: 'FAILED',
-                description: 'Login blocked: email is not verified.',
-                failureReason: 'EMAIL_NOT_VERIFIED'
-            })
-            return res.status(403).json({
-                message: 'Verify your email before signing in.'
-            })
+            if (!user.isEmailVerified && isEmailVerified) {
+                await User.updateOne(
+                    { _id: user._id },
+                    { $set: { isEmailVerified: true, emailVerifiedAt } }
+                )
+            }
+
+            if (!isEmailVerified) {
+                await createBusinessAuthActivityLog({
+                    req,
+                    user,
+                    action: 'LOGIN_FAILED',
+                    status: 'FAILED',
+                    description: 'Login blocked: email is not verified.',
+                    failureReason: 'EMAIL_NOT_VERIFIED'
+                })
+                return res.status(403).json({
+                    message: 'Verify your email before signing in.'
+                })
+            }
         }
 
         if (user.whitelisted === false) {
@@ -165,6 +170,7 @@ export const login = async (req, res) => {
                 user: {
                     name: user.name,
                     email: user.email,
+                    supportEmail: user.supportEmail || null,
                     role: user.roleId.name,
                     avatar: user.avatar || null
                 }
@@ -197,7 +203,8 @@ export const sendVerificationCode = async (req, res) => {
         const { email } = req.validatedData.body
 
         console.log(email)
-        const user = await User.findOne({ email })
+        const q = findUserByLoginIdentifier(email)
+        const user = q ? await q : null
         if (!user) {
             return res.status(404).json({ message: "User not found" })
         }
@@ -301,7 +308,8 @@ export const resendVerificationCode = async (req, res) => {
 export const sendRequestedResetPassword = async (req, res) => {
     try {
         const { email } = req.validatedData.body
-        const user = await User.findOne({ email })
+        const q = findUserByLoginIdentifier(email)
+        const user = q ? await q : null
         if (!user) {
             return res.status(404).json({ message: "User not found" })
         }
@@ -356,9 +364,10 @@ export const resetPassword = async (req, res) => {
 export const internalEmailChecker = async (req, res) => {
     try {
         const { email } = req.validatedData.body
-        const user = await User.findOne({ email })
-            .select('_id isEmailVerified emailVerifiedAt roleId')
-            .populate('roleId', 'name')
+        const q = findUserByLoginIdentifier(email)
+        const user = q
+            ? await q.select('_id isEmailVerified emailVerifiedAt roleId').populate('roleId', 'name')
+            : null
         if (!user) {
             return res.status(404).json({
                 message: "System cannot find your email existance",
@@ -419,6 +428,7 @@ export const checkUser = async (req, res) => {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
+                supportEmail: user.supportEmail || null,
                 role: user.roleId.name,
                 avatar: user.avatar || null,
                 businessVerificationStatus,
