@@ -46,7 +46,7 @@ const StoreMessages = () => {
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr] lg:items-start">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
         <OrderSnapshotPanel snapshot={session?.orderSnapshot || null} />
         <MessagingThreadSection
           suggestedQuickReplies={getTouristStoreDefaultQuickReplies(session?.orderSnapshot?.orderType)}

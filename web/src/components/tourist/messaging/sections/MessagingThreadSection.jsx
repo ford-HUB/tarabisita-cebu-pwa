@@ -87,7 +87,7 @@ const MessagingThreadSection = ({
   }
 
   return (
-    <div className="flex min-h-[420px] flex-col rounded-2xl border border-[#e7dfd5] bg-white shadow-sm">
+    <div className="flex min-h-[420px] min-w-0 flex-col rounded-2xl border border-[#e7dfd5] bg-white shadow-sm">
       <div className="border-b border-[#f0e8de] px-4 py-3 md:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-[#eadfce] bg-[#f0e8de]">
@@ -112,7 +112,10 @@ const MessagingThreadSection = ({
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-4 md:p-5" style={{ maxHeight: 'min(55vh, 420px)' }}>
+      <div
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-y-auto p-4 md:p-5"
+        style={{ maxHeight: 'min(55vh, 420px)' }}
+      >
         {!messages.length ? (
           <p className="text-center text-sm text-[#9f9387]">
             {emptyThreadHint || 'Say hello — the other party will see your message here.'}

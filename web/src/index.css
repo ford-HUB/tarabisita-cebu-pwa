@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Clip stray horizontal overflow from `100vw` / `w-screen` when a vertical scrollbar is present. */
+html {
+  overflow-x: clip;
+}
+
 html,
 body,
 #root {
