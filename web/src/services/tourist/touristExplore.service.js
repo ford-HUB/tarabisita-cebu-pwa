@@ -17,6 +17,14 @@ export const fetchPublicBusinessRestaurantReviews = async (businessId, params = 
   return response
 }
 
+/** Public landing testimonials: recent reviews across verified, subscribed businesses. */
+export const fetchPublicLandingRestaurantReviews = async ({ limit } = {}) => {
+  const params = {}
+  if (limit != null) params.limit = limit
+  const response = await apiInstance.get('business/public/landing-restaurant-reviews', { params })
+  return response
+}
+
 export const recordPublicBusinessView = async (businessId) => {
   const response = await apiInstance.post(`business/public/${businessId}/view`)
   return response

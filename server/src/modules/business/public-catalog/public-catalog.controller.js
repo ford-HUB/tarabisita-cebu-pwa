@@ -12,6 +12,7 @@ import {
     getRestaurantRecentReviewsGrouped,
     getRestaurantReviewPublicSummary,
     getRestaurantReviewStatsMapForBusinessIds,
+    listPublicLandingRestaurantReviews,
     listPublicRestaurantReviewsForBusiness
 } from '../../tourist/restaurant-order-reviews/restaurant-order-reviews.service.js'
 
@@ -153,6 +154,19 @@ export const postTouristCustomerOrder = async (req, res) => {
             })
         }
         return res.status(500).json({ message: error.message || 'Could not place order.' })
+    }
+}
+
+export const getPublicLandingRestaurantReviews = async (req, res) => {
+    try {
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
+        const { limit } = req.validatedData.query
+        const businesses = await Business.find({ verificationStatus: 'VERIFIED' }).select('_id subscription').lean()
+        const ids = businesses.filter(hasActivePaidSubscription).map((b) => b._id)
+        const data = await listPublicLandingRestaurantReviews(ids, { limit })
+        return res.status(200).json({ data })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
     }
 }
 
