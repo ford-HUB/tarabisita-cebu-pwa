@@ -9,17 +9,24 @@ import {
     getPublicBusinesses,
     recordPublicBusinessView,
     getPublicBusinessRestaurantReviews,
+    getPublicLandingRestaurantReviews,
     getBusinessById
 } from './public-catalog.controller.js'
 import {
     createTouristCustomerOrderSchema,
     createTouristCustomerOrderCheckoutSchema,
-    listPublicRestaurantReviewsSchema
+    listPublicRestaurantReviewsSchema,
+    listPublicLandingRestaurantReviewsSchema
 } from './public-catalog.validator.js'
 
 const publicCatalogRoutes = express.Router()
 
 publicCatalogRoutes.get('/public', getPublicBusinesses)
+publicCatalogRoutes.get(
+    '/public/landing-restaurant-reviews',
+    validateRequest(listPublicLandingRestaurantReviewsSchema),
+    getPublicLandingRestaurantReviews
+)
 publicCatalogRoutes.get('/public/menu-feed', guard(['TOURIST']), getPublicMenuFeed)
 publicCatalogRoutes.post(
     '/public/:businessId/customer-order',

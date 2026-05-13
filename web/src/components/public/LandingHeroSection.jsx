@@ -1,41 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
-import {
-  FiCoffee,
-  FiSun,
-  FiFlag,
-  FiHome,
-  FiShoppingBag,
-  FiMoon,
-  FiCompass
-} from 'react-icons/fi'
-import { CEBU_VIBE_CATEGORIES } from '../../shared/constants/cebuVibeDiscovery.constants.js'
 
 const MotionDiv = motion.div
 
 const HERO_VIDEO_URL =
   'https://videos.pexels.com/video-files/36472453/15465549_2560_1440_60fps.mp4'
 const HERO_POSTER_URL = '/travel-view.jpg'
-
-const iconForVibeCategory = (id) => {
-  switch (id) {
-    case 'restaurant':
-      return FiCoffee
-    case 'beach':
-      return FiSun
-    case 'heritage':
-      return FiFlag
-    case 'hotel':
-      return FiHome
-    case 'market':
-      return FiShoppingBag
-    case 'nightlife':
-      return FiMoon
-    default:
-      return FiCompass
-  }
-}
 
 /**
  * @param {{
@@ -47,14 +18,12 @@ const iconForVibeCategory = (id) => {
  *   onFeaturedCategorySelect?: (categoryId: string) => void
  * }} props
  */
-const LandingHeroSection = ({
-  ctaVariant = 'marketing',
-  userName = '',
-  exploreHref = '/',
-  ordersHref = '/',
-  featuredCategoryId = null,
-  onFeaturedCategorySelect
-}) => {
+const LandingHeroSection = (props) => {
+  const {
+    ctaVariant = 'marketing',
+    userName = '',
+    exploreHref = '/'
+  } = props
   const isTourist = ctaVariant === 'tourist'
   const firstName = String(userName || '').trim().split(/\s+/)[0] || 'Explorer'
   const [videoRevealed, setVideoRevealed] = useState(false)
@@ -132,15 +101,15 @@ const LandingHeroSection = ({
               </>
             )}
           </h1>
-          <p className="max-w-xl text-base leading-7 text-[#ffe9d0] md:text-lg">
+          <p className="max-w-2xl text-base leading-7 text-[#ffe9d0] md:text-lg">
             {isTourist
               ? 'Pick a vibe, browse verified partners, and plan your day—from food halls to heritage walks and island shores.'
-              : 'Tara Bisita connects customers with trusted food spots and tourism experiences, while giving small businesses tools to manage menus, orders, insights, and billing.'}
+              : 'Discover the best places, restaurants, hotels, nightlife, and tourist destinations in Cebu — all in one platform. Plan your trip, explore local experiences, order food, book services, and connect with trusted local businesses easily.'}
           </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-col gap-3">
             {isTourist ? (
-              <>
+              <div className="flex flex-wrap gap-3">
                 <a
                   href="#vibe-discovery"
                   className="rounded-full bg-[#ff7a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#eb6c12]"
@@ -153,22 +122,35 @@ const LandingHeroSection = ({
                 >
                   Browse all partners
                 </Link>
-                
-              </>
+              </div>
             ) : (
               <>
-                <Link
-                  to="/register"
-                  className="rounded-full bg-[#ff7a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#eb6c12]"
-                >
-                  Create your account
-                </Link>
-                <Link
-                  to="/login"
-                  className="rounded-full border border-[#ffdfbe] bg-white/92 px-6 py-3 text-sm font-semibold text-[#3d352d] transition hover:border-[#c66b2b] hover:text-[#c66b2b]"
-                >
-                  Sign in
-                </Link>
+                <div className="flex flex-wrap gap-3">
+                  <a
+                    href="#why-choose"
+                    className="rounded-full border border-[#ffdfbe] bg-white/92 px-5 py-3 text-center text-sm font-semibold text-[#3d352d] transition hover:border-[#c66b2b] hover:text-[#c66b2b] sm:min-w-[9.5rem]"
+                  >
+                    Explore Cebu
+                  </a>
+                  <a
+                    href="#feature-restaurants"
+                    className="rounded-full border border-[#ffdfbe] bg-white/92 px-5 py-3 text-center text-sm font-semibold text-[#3d352d] transition hover:border-[#c66b2b] hover:text-[#c66b2b] sm:min-w-[9.5rem]"
+                  >
+                    Discover Restaurants
+                  </a>
+                  <Link
+                    to="/register"
+                    className="rounded-full bg-[#ff7a1a] px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-[#eb6c12] sm:min-w-[9.5rem]"
+                  >
+                    Start Your Journey
+                  </Link>
+                </div>
+                <p className="text-sm text-[#ffedd8]">
+                  Already have an account?{' '}
+                  <Link to="/login" className="font-semibold text-white underline decoration-[#ffd4a8] underline-offset-2 hover:decoration-white">
+                    Sign in
+                  </Link>
+                </p>
               </>
             )}
           </div>

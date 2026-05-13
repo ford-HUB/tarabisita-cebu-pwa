@@ -79,3 +79,9 @@ export const listPublicRestaurantReviewsSchema = zod.object({
         limit: zod.coerce.number().int().min(1).max(50).optional().default(20)
     })
 })
+
+export const listPublicLandingRestaurantReviewsSchema = zod.object({
+    query: zod.object({
+        limit: zod.coerce.number().int().min(1).max(24).optional().default(12)
+    })
+})

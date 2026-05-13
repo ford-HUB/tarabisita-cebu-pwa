@@ -336,3 +336,65 @@ export const listPublicRestaurantReviewsForBusiness = async (businessId, opts = 
         reviews: rows.map((r) => mapPublicReviewListItem(r))
     }
 }
+
+/**
+ * Recent restaurant order reviews across many businesses (marketing landing).
+ * De-duplicates per business so the carousel shows variety.
+ * @param {import('mongoose').Types.ObjectId[]} businessObjectIds — caller-filtered public businesses
+ * @param {{ limit?: number }} [opts]
+ */
+export const listPublicLandingRestaurantReviews = async (businessObjectIds, opts = {}) => {
+    const limit = Math.min(24, Math.max(1, Number(opts.limit) || 12))
+    const ids = (Array.isArray(businessObjectIds) ? businessObjectIds : [])
+        .map((id) => (id && mongoose.Types.ObjectId.isValid(String(id)) ? new mongoose.Types.ObjectId(String(id)) : null))
+        .filter(Boolean)
+    if (!ids.length) {
+        return { reviews: [] }
+    }
+
+    const rows = await RestaurantOrderReview.find({ businessId: { $in: ids } })
+        .sort({ createdAt: -1 })
+        .limit(160)
+        .populate('userId', 'name avatar')
+        .populate('businessId', 'name')
+        .lean()
+
+    const mapped = []
+    for (const r of rows) {
+        const biz = r.businessId && typeof r.businessId === 'object' ? r.businessId : null
+        if (!biz?._id) continue
+        const user = r.userId && typeof r.userId === 'object' ? r.userId : null
+        mapped.push({
+            id: String(r._id),
+            rating: r.rating,
+            comment: snippet(String(r.comment || ''), 240),
+            createdAt: r.createdAt,
+            authorLabel: authorLabelFromUser(user),
+            avatarUrl: user?.avatar ? String(user.avatar).trim() || null : null,
+            businessId: String(biz._id),
+            businessName: String(biz.name || 'Restaurant').trim() || 'Restaurant'
+        })
+    }
+
+    const score = (m) => (m.comment.length >= 12 ? 1000 : 0) + (Number(m.rating) >= 4 ? 100 : 0)
+    mapped.sort((a, b) => score(b) - score(a) || new Date(b.createdAt) - new Date(a.createdAt))
+
+    const out = []
+    const perBusiness = new Map()
+    for (const item of mapped) {
+        const n = perBusiness.get(item.businessId) || 0
+        if (n >= 2) continue
+        perBusiness.set(item.businessId, n + 1)
+        out.push(item)
+        if (out.length >= limit) break
+    }
+    if (out.length < limit) {
+        for (const item of mapped) {
+            if (out.some((o) => o.id === item.id)) continue
+            out.push(item)
+            if (out.length >= limit) break
+        }
+    }
+
+    return { reviews: out.slice(0, limit) }
+}
