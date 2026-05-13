@@ -12,9 +12,9 @@ const RestaurantCart = () => {
     toggleItemSelected,
     goExplore,
     proceedFromCart,
-    startCheckoutForBusinessId,
     isProceedingFromCart,
-    multiStoreInSavedCart
+    multiStoreInSavedCart,
+    selectedSpansMultipleStores
   } = useTouristRestaurantCheckout({ variant: 'cart' })
 
   if (!groups.length) {
@@ -39,7 +39,7 @@ const RestaurantCart = () => {
         <h1 className="text-xl font-semibold text-[#1f1f1f] md:text-2xl">Cart</h1>
         <p className="mt-1 text-sm text-[#5b5b5b]">
           Items are grouped by restaurant. Online checkout is <span className="font-medium text-[#1f1f1f]">one restaurant at a time</span>
-          — use the checkout button under each store.
+          — select what you want, then use <span className="font-medium text-[#1f1f1f]">Proceed to checkout</span> below.
         </p>
         {multiStoreInSavedCart ? (
           <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-[#7a4e12]">
@@ -48,61 +48,52 @@ const RestaurantCart = () => {
         ) : null}
       </div>
 
-      {multiStoreInSavedCart ? (
-        <div className="space-y-8">
-          {groups.map((g) => (
-            <div key={String(g.businessId)} className="space-y-3">
-              <TouristCheckoutCartSection
-                groups={[g]}
-                formatPhp={formatPhp}
-                setItemQty={setItemQty}
-                removeItem={removeItem}
-                isItemSelected={isItemSelected}
-                toggleItemSelected={toggleItemSelected}
-              />
-              <button
-                type="button"
-                onClick={() => startCheckoutForBusinessId(g.businessId)}
-                className="w-full rounded-full bg-[#1f1f1f] px-6 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-black sm:w-auto"
-              >
-                Check out · {g.businessName}
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <TouristCheckoutCartSection
-          groups={groups}
-          formatPhp={formatPhp}
-          setItemQty={setItemQty}
-          removeItem={removeItem}
-          isItemSelected={isItemSelected}
-          toggleItemSelected={toggleItemSelected}
-        />
-      )}
+      <TouristCheckoutCartSection
+        groups={groups}
+        formatPhp={formatPhp}
+        setItemQty={setItemQty}
+        removeItem={removeItem}
+        isItemSelected={isItemSelected}
+        toggleItemSelected={toggleItemSelected}
+      />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
-        <button
-          type="button"
-          onClick={goExplore}
-          className="rounded-full border border-[#e7dfd5] bg-white px-5 py-2.5 text-sm font-semibold text-[#1f1f1f] transition hover:border-[#d4c4b6]"
-        >
-          Continue shopping
-        </button>
-        {!multiStoreInSavedCart && selectedCount > 0 ? (
+      <div className="space-y-2 border-t border-[#f0e8de] pt-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
-            onClick={() => void proceedFromCart()}
-            disabled={isProceedingFromCart}
-            className="inline-flex items-center justify-center rounded-full bg-[#1f1f1f] px-6 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-70"
+            onClick={goExplore}
+            className="w-full rounded-full border border-[#e7dfd5] bg-white px-5 py-2.5 text-sm font-semibold text-[#1f1f1f] transition hover:border-[#d4c4b6] sm:w-auto"
           >
-            {isProceedingFromCart ? 'Loading…' : 'Proceed to checkout'}
+            Continue shopping
           </button>
-        ) : null}
-        {!multiStoreInSavedCart && selectedCount === 0 ? (
-          <span className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-[#ece3d9] px-6 py-2.5 text-center text-sm font-semibold text-[#6b6b6b]">
-            Select at least one item
-          </span>
+          {selectedCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => void proceedFromCart()}
+              disabled={isProceedingFromCart || selectedSpansMultipleStores}
+              title={
+                selectedSpansMultipleStores
+                  ? 'Select items from one restaurant only — checkout is one store at a time.'
+                  : undefined
+              }
+              className="inline-flex w-full items-center justify-center rounded-full bg-[#1f1f1f] px-6 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {isProceedingFromCart ? 'Loading…' : 'Proceed to checkout'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-full bg-[#ece3d9] px-6 py-2.5 text-center text-sm font-semibold text-[#6b6b6b] sm:w-auto"
+            >
+              Select at least one item
+            </button>
+          )}
+        </div>
+        {selectedCount > 0 && selectedSpansMultipleStores ? (
+          <p className="text-right text-xs text-[#7a4e12] sm:text-sm">
+            You have items from more than one store selected. Uncheck items from other restaurants to continue — checkout is one partner at a time.
+          </p>
         ) : null}
       </div>
     </div>

@@ -1,28 +1,14 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { FiSend } from 'react-icons/fi'
+import { formatChatTime } from '../../../business/messaging/utils/formatChatTime.js'
+import { DEFAULT_QUICK_REPLIES } from '../../../../shared/constants/touristStoreMessaging.constants.js'
 
 const bubbleRow = (mine) =>
   mine
     ? 'ml-auto max-w-[85%] rounded-2xl bg-[#ff7a1a] px-3 py-2 text-white shadow-sm'
     : 'inline-block w-max max-w-full rounded-2xl border border-[#e7dfd5] bg-white px-3 py-2 text-[#1f1f1f] shadow-sm'
 
-/**
- * @param {{
- *   businessName?: string,
- *   businessStoreImage?: string,
- *   threadTitle?: string,
- *   touristSenderLabel?: string,
- *   businessSenderLabel?: string,
- *   messages: { id: string, body: string, senderRole: string, senderUserId: string, createdAt?: string }[],
- *   currentUserId: string | null,
- *   onSend: (text: string) => void,
- *   isConnected: boolean,
- *   isLoading: boolean,
- *   errorMessage: string | null,
- *   emptyThreadHint?: string,
- *   inputId?: string
- * }} props
- */
+
 const MessagingThreadSection = ({
   businessName = '',
   businessStoreImage = '',
@@ -36,9 +22,32 @@ const MessagingThreadSection = ({
   isLoading,
   errorMessage,
   emptyThreadHint,
-  inputId = 'store-message-input'
+  inputId = 'store-message-input',
+  suggestedQuickReplies
 }) => {
   const [draft, setDraft] = useState('')
+
+  const quickReplies = useMemo(() => {
+    const raw = Array.isArray(suggestedQuickReplies) ? suggestedQuickReplies : DEFAULT_QUICK_REPLIES
+    const seen = new Set()
+    return raw
+      .filter((s) => typeof s === 'string')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && !seen.has(s) && seen.add(s))
+  }, [suggestedQuickReplies])
+
+  const visibleQuickReplies = useMemo(
+    () => quickReplies.filter((phrase) => !draft.includes(phrase)),
+    [draft, quickReplies]
+  )
+
+  const insertQuickReply = useCallback((phrase) => {
+    setDraft((prev) => {
+      if (prev.includes(phrase)) return prev
+      const tail = prev.replace(/\s+$/, '')
+      return tail ? `${tail} ${phrase}` : phrase
+    })
+  }, [])
 
   const submit = useCallback(() => {
     const t = draft.trim()
@@ -112,6 +121,7 @@ const MessagingThreadSection = ({
         {messages.map((m) => {
           const mine = currentUserId && String(m.senderUserId) === String(currentUserId)
           const label = labelForSender(m)
+          const time = formatChatTime(m.createdAt)
 
           if (mine) {
             return (
@@ -120,6 +130,9 @@ const MessagingThreadSection = ({
                 <div className={bubbleRow(true)}>
                   <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed">{m.body}</p>
                 </div>
+                {time ? (
+                  <p className="px-1 text-right text-[10px] tabular-nums text-[#9f9387]">{time}</p>
+                ) : null}
               </div>
             )
           }
@@ -144,6 +157,9 @@ const MessagingThreadSection = ({
                 <div className={bubbleRow(false)}>
                   <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed">{m.body}</p>
                 </div>
+                {time ? (
+                  <p className="px-1 text-[10px] tabular-nums text-[#9f9387]">{time}</p>
+                ) : null}
               </div>
             </div>
           )
@@ -151,34 +167,54 @@ const MessagingThreadSection = ({
       </div>
 
       <div className="border-t border-[#f0e8de] p-3 md:p-4">
-        <div className="flex items-end gap-2">
-          <label className="sr-only" htmlFor={inputId}>
-            Message
-          </label>
-          <textarea
-            id={inputId}
-            rows={2}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                submit()
-              }
-            }}
-            placeholder={isConnected ? 'Write a message…' : 'Waiting for connection…'}
-            disabled={!isConnected}
-            className="min-h-[44px] flex-1 resize-none rounded-xl border border-[#e7dfd5] bg-[#fffaf6] px-3 py-2 text-sm text-[#1f1f1f] outline-none ring-0 transition placeholder:text-[#9f9387] focus:border-[#d4c4b4] disabled:opacity-60"
-          />
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!isConnected || !draft.trim()}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ff7a1a] text-white shadow-sm transition hover:bg-[#eb6c12] disabled:cursor-not-allowed disabled:opacity-50"
-            title="Send"
-          >
-            <FiSend className="h-5 w-5" aria-hidden />
-          </button>
+        <div className="relative">
+          {isConnected && visibleQuickReplies.length > 0 ? (
+            <div
+              className="pointer-events-none absolute bottom-full left-0 right-0 z-10 mb-1 flex flex-wrap gap-1.5"
+              role="group"
+              aria-label="Suggested messages"
+            >
+              {visibleQuickReplies.map((phrase) => (
+                <button
+                  key={phrase}
+                  type="button"
+                  onClick={() => insertQuickReply(phrase)}
+                  className="pointer-events-auto max-w-full rounded-full border border-[#e7dfd5] bg-white px-3 py-1.5 text-left text-xs font-medium leading-snug text-[#3f3a35] shadow-sm transition hover:border-[#ff7a1a]/50 hover:bg-[#fff5ed] hover:text-[#1f1f1f]"
+                >
+                  <span className="line-clamp-2">{phrase}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="flex items-end gap-2">
+            <label className="sr-only" htmlFor={inputId}>
+              Message
+            </label>
+            <textarea
+              id={inputId}
+              rows={2}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  submit()
+                }
+              }}
+              placeholder={isConnected ? 'Write a message…' : 'Waiting for connection…'}
+              disabled={!isConnected}
+              className="min-h-[44px] flex-1 resize-none rounded-xl border border-[#e7dfd5] bg-[#fffaf6] px-3 py-2 text-sm text-[#1f1f1f] outline-none ring-0 transition placeholder:text-[#9f9387] focus:border-[#d4c4b4] disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!isConnected || !draft.trim()}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#ff7a1a] text-white shadow-sm transition hover:bg-[#eb6c12] disabled:cursor-not-allowed disabled:opacity-50"
+              title="Send"
+            >
+              <FiSend className="h-5 w-5" aria-hidden />
+            </button>
+          </div>
         </div>
       </div>
     </div>
