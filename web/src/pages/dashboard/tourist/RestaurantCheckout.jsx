@@ -46,8 +46,8 @@ const RestaurantCheckout = () => {
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm">
           <h1 className="text-lg font-semibold text-[#1f1f1f]">Choose one restaurant</h1>
           <p className="mt-2 text-sm text-[#5b5b5b]">
-            Your saved cart has items from more than one restaurant. Open your cart and use{' '}
-            <span className="font-medium">Check out · [restaurant name]</span> for the store you want to pay first.
+            Your saved cart has items from more than one restaurant. Open your cart, select items from one partner, then tap{' '}
+            <span className="font-medium">Proceed to checkout</span>.
           </p>
           <Link
             to={touristCartHref}

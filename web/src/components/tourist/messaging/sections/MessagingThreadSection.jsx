@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { FiSend } from 'react-icons/fi'
+import { formatChatTime } from '../../../business/messaging/utils/formatChatTime.js'
 import { DEFAULT_QUICK_REPLIES } from '../../../../shared/constants/touristStoreMessaging.constants.js'
 
 const bubbleRow = (mine) =>
@@ -120,6 +121,7 @@ const MessagingThreadSection = ({
         {messages.map((m) => {
           const mine = currentUserId && String(m.senderUserId) === String(currentUserId)
           const label = labelForSender(m)
+          const time = formatChatTime(m.createdAt)
 
           if (mine) {
             return (
@@ -128,6 +130,9 @@ const MessagingThreadSection = ({
                 <div className={bubbleRow(true)}>
                   <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed">{m.body}</p>
                 </div>
+                {time ? (
+                  <p className="px-1 text-right text-[10px] tabular-nums text-[#9f9387]">{time}</p>
+                ) : null}
               </div>
             )
           }
@@ -152,6 +157,9 @@ const MessagingThreadSection = ({
                 <div className={bubbleRow(false)}>
                   <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed">{m.body}</p>
                 </div>
+                {time ? (
+                  <p className="px-1 text-[10px] tabular-nums text-[#9f9387]">{time}</p>
+                ) : null}
               </div>
             </div>
           )

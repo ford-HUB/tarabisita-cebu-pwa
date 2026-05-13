@@ -141,6 +141,13 @@ export const useTouristRestaurantCheckout = (options = {}) => {
 
   const groupsForCheckout = useMemo(() => groupCartItemsByBusiness(selectedItems), [selectedItems])
 
+  const selectedSpansMultipleStores = useMemo(() => {
+    const ids = new Set(
+      selectedItems.map((it) => String(it.businessId || '').trim()).filter(Boolean)
+    )
+    return ids.size > 1
+  }, [selectedItems])
+
   const cartTotal = useMemo(
     () => checkoutWorkingItems.reduce((sum, it) => sum + (Number(it.unitPrice) || 0) * it.qty, 0),
     [checkoutWorkingItems]
@@ -346,7 +353,7 @@ export const useTouristRestaurantCheckout = (options = {}) => {
     }
     if (batches.length > 1) {
       toast.error(
-        'Online prepayment supports one restaurant per checkout. Open your cart and use “Check out this restaurant” for each store.'
+        'Online prepayment supports one restaurant per checkout. Open your cart, select items from one store, then use Proceed to checkout.'
       )
       return
     }
@@ -391,16 +398,6 @@ export const useTouristRestaurantCheckout = (options = {}) => {
     navigate(touristCartHref)
   }, [navigate])
 
-  const startCheckoutForBusinessId = useCallback(
-    (businessId) => {
-      const id = String(businessId || '').trim()
-      if (!id) return
-      setActiveCheckoutBusinessId(id)
-      navigate(touristCheckoutHref)
-    },
-    [navigate, setActiveCheckoutBusinessId]
-  )
-
   /** Restaurant prepayment checkout vs. stay booking details (resort/hotel), based on the selected store. */
   const proceedFromCart = useCallback(async () => {
     if (proceedFromCartLockRef.current) return
@@ -412,7 +409,7 @@ export const useTouristRestaurantCheckout = (options = {}) => {
     }
     const batches = groupCartItemsByBusiness(selectedList).filter((g) => g.items.length)
     if (batches.length > 1) {
-      toast.error('Choose one restaurant below and use “Check out this restaurant”.')
+      toast.error('Select items from one restaurant only, then tap Proceed to checkout.')
       return
     }
     const batch = batches[0]
@@ -494,8 +491,8 @@ export const useTouristRestaurantCheckout = (options = {}) => {
     goExplore,
     goCart,
     proceedFromCart,
-    startCheckoutForBusinessId,
     isProceedingFromCart,
+    selectedSpansMultipleStores,
     checkoutBlockedMultiStore,
     effectiveCheckoutBusinessId,
     otherStoresSummary,
