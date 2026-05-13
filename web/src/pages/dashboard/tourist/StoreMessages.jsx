@@ -5,6 +5,7 @@ import { useAuth } from '../../../hooks/useAuth.hook'
 import MessagingHubSection from '../../../components/tourist/messaging/sections/MessagingHubSection'
 import MessagingThreadSection from '../../../components/tourist/messaging/sections/MessagingThreadSection'
 import OrderSnapshotPanel from '../../../components/tourist/messaging/sections/OrderSnapshotPanel'
+import { getTouristStoreDefaultQuickReplies } from '../../../shared/constants/touristStoreMessaging.constants.js'
 
 const StoreMessages = () => {
   const [searchParams] = useSearchParams()
@@ -48,6 +49,7 @@ const StoreMessages = () => {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_1fr] lg:items-start">
         <OrderSnapshotPanel snapshot={session?.orderSnapshot || null} />
         <MessagingThreadSection
+          suggestedQuickReplies={getTouristStoreDefaultQuickReplies(session?.orderSnapshot?.orderType)}
           businessName={session?.businessName || ''}
           businessStoreImage={
             typeof session?.businessStoreImage === 'string' && session.businessStoreImage.trim()
