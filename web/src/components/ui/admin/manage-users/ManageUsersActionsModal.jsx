@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
-import { FiMail, FiTrash2, FiX } from 'react-icons/fi'
+import { FiInfo, FiMail, FiTrash2, FiX } from 'react-icons/fi'
+import { AnimatePresence, motion } from 'motion/react'
 import { formatDate } from '../request-approval/utils'
+
+const ReviewDetailsMotionPanel = motion.div
 import ManageUsersWhitelistToggle from './ManageUsersWhitelistToggle'
 import ManageUsersComposeEmailModal from './ManageUsersComposeEmailModal'
 import ManageUsersAvatar from './ManageUsersAvatar'
+import ManageUsersReviewDetailsPanel from './ManageUsersReviewDetailsPanel'
+import { useAdminManageUsersStore } from '../../../../store/admin/manageUsers.store'
 
 const ManageUsersActionsModal = ({
   user,
@@ -15,21 +20,34 @@ const ManageUsersActionsModal = ({
   onDeleteUser
 }) => {
   const [isComposeOpen, setIsComposeOpen] = useState(false)
+  const [isReviewDetailsOpen, setIsReviewDetailsOpen] = useState(false)
+
+  const fetchUserDetails = useAdminManageUsersStore((s) => s.fetchUserDetails)
 
   useEffect(() => {
-    if (!user) setIsComposeOpen(false)
-  }, [user?.id])
+    return () => {
+      useAdminManageUsersStore.getState().clearUserDetails()
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) return undefined
     const onKey = (e) => {
       if (e.key !== 'Escape') return
-      if (isComposeOpen) setIsComposeOpen(false)
-      else onClose()
+      if (isComposeOpen) {
+        setIsComposeOpen(false)
+        return
+      }
+      if (isReviewDetailsOpen) {
+        setIsReviewDetailsOpen(false)
+        useAdminManageUsersStore.getState().clearUserDetails()
+        return
+      }
+      onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [user, onClose, isComposeOpen])
+  }, [user, onClose, isComposeOpen, isReviewDetailsOpen])
 
   if (!user) return null
 
@@ -38,16 +56,42 @@ const ManageUsersActionsModal = ({
   const whitelistDisabled = isSelf
   const deleteDisabled = isSelf || isAdminRole
 
+  const closeReviewDetails = () => {
+    setIsReviewDetailsOpen(false)
+    useAdminManageUsersStore.getState().clearUserDetails()
+  }
+
+  const closeAll = () => {
+    setIsComposeOpen(false)
+    setIsReviewDetailsOpen(false)
+    useAdminManageUsersStore.getState().clearUserDetails()
+    onClose()
+  }
+
+  const onBackdropMouseDown = (e) => {
+    if (e.target !== e.currentTarget) return
+    if (isComposeOpen) {
+      setIsComposeOpen(false)
+      return
+    }
+    if (isReviewDetailsOpen) {
+      closeReviewDetails()
+      return
+    }
+    closeAll()
+  }
+
+  const openReviewDetails = () => {
+    setIsComposeOpen(false)
+    setIsReviewDetailsOpen(true)
+    void fetchUserDetails(user.id)
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-5"
       role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) {
-          setIsComposeOpen(false)
-          onClose()
-        }
-      }}
+      onMouseDown={onBackdropMouseDown}
     >
       <div
         className="flex max-h-[min(92vh,calc(100vh-24px))] w-full max-w-5xl flex-col items-stretch justify-center gap-4 overflow-y-auto lg:flex-row lg:items-start lg:justify-center"
@@ -69,6 +113,14 @@ const ManageUsersActionsModal = ({
                 </h2>
                 <p className="mt-1 truncate text-sm font-medium text-[#9b5a2c]">{user.name || '—'}</p>
                 <p className="truncate text-xs text-[#6d645d]">{user.email || 'No email'}</p>
+                <button
+                  type="button"
+                  onClick={openReviewDetails}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#9b5a2c] underline decoration-[#e7dfd5] underline-offset-2 transition hover:text-[#824b24] hover:decoration-[#9b5a2c]"
+                >
+                  <FiInfo size={14} aria-hidden className="shrink-0" />
+                  Review details
+                </button>
                 {user.supportEmail ? (
                   <p className="mt-0.5 truncate text-xs text-[#6d645d]" title={user.supportEmail}>
                     Support email: <span className="font-medium text-[#5a534c]">{user.supportEmail}</span>
@@ -78,10 +130,7 @@ const ManageUsersActionsModal = ({
             </div>
             <button
               type="button"
-              onClick={() => {
-                setIsComposeOpen(false)
-                onClose()
-              }}
+              onClick={closeAll}
               className="shrink-0 rounded-lg border border-[#ece3d9] p-2 text-[#6d645d] transition hover:bg-[#f7f3ed]"
               aria-label="Close"
             >
@@ -114,7 +163,10 @@ const ManageUsersActionsModal = ({
             {user.email ? (
               <button
                 type="button"
-                onClick={() => setIsComposeOpen(true)}
+                onClick={() => {
+                  closeReviewDetails()
+                  setIsComposeOpen(true)
+                }}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#e7dfd5] bg-white px-4 py-3 text-sm font-medium text-[#9b5a2c] transition hover:bg-[#f7f3ed]"
               >
                 <FiMail size={16} aria-hidden />
@@ -143,16 +195,28 @@ const ManageUsersActionsModal = ({
           <div className="border-t border-[#f0e7dd] px-5 py-3">
             <button
               type="button"
-              onClick={() => {
-                setIsComposeOpen(false)
-                onClose()
-              }}
+              onClick={closeAll}
               className="w-full rounded-xl border border-[#e1d4c5] py-2.5 text-sm font-medium text-[#5f5f5f] transition hover:bg-[#f7f3ed]"
             >
               Close
             </button>
           </div>
         </div>
+
+        <AnimatePresence mode="popLayout">
+          {isReviewDetailsOpen ? (
+            <ReviewDetailsMotionPanel
+              key="review-details"
+              initial={{ opacity: 0, x: 28 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 28 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+              className="w-full max-w-md shrink-0 max-lg:flex max-lg:justify-center"
+            >
+              <ManageUsersReviewDetailsPanel userId={user.id} summaryUser={user} onClose={closeReviewDetails} />
+            </ReviewDetailsMotionPanel>
+          ) : null}
+        </AnimatePresence>
 
         {isComposeOpen && user.email ? (
           <ManageUsersComposeEmailModal user={user} onClose={() => setIsComposeOpen(false)} />

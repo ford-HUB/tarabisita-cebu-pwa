@@ -7,6 +7,7 @@ import BusinessSubscription from '../../business/billing/models/business-subscri
 import VerificationCode from '../../auth/models/verification-code.model.js'
 import ResetPassword from '../../auth/models/reset-password.model.js'
 import { sendMailerWithAttachments } from '../../auth/auth.service.js'
+import { getAdminUserActivityCountsByUserId } from './manage-users.service.js'
 
 const escapeHtml = (s) =>
   String(s || '')
@@ -106,6 +107,35 @@ export const listAdminUsers = async (req, res) => {
       limit,
       totalPages
     })
+  } catch (error) {
+    return res.status(500).json({ message: error.message })
+  }
+}
+
+export const getAdminUserDetails = async (req, res) => {
+  try {
+    const { userId } = req.validatedData.params
+    const u = await User.findById(userId).populate('roleId', 'name').select('-password').lean()
+    if (!u) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+    const activity = await getAdminUserActivityCountsByUserId(userId)
+    const data = {
+      id: u._id.toString(),
+      name: u.name,
+      email: u.email,
+      supportEmail: u.supportEmail || null,
+      isEmailVerified: Boolean(u.isEmailVerified),
+      emailVerifiedAt: u.emailVerifiedAt || null,
+      avatar: u.avatar || null,
+      role: u.roleId?.name || '',
+      whitelisted: u.whitelisted !== false,
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt || null,
+      totalOrdersBookings: activity.totalOrdersBookings,
+      reviewCount: activity.reviewCount
+    }
+    return res.status(200).json({ data })
   } catch (error) {
     return res.status(500).json({ message: error.message })
   }

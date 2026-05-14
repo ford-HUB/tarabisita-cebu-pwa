@@ -5,6 +5,12 @@ export const getAdminUsers = async (params) => {
   return response
 }
 
+export const getAdminUserDetails = async (userId) => {
+  const id = encodeURIComponent(String(userId || '').trim())
+  const response = await apiInstance.get(`admin/manage-users/users/${id}`)
+  return response
+}
+
 export const patchAdminUserWhitelist = async (userId, whitelisted) => {
   const response = await apiInstance.patch(`admin/manage-users/${userId}/whitelist`, { whitelisted })
   return response
