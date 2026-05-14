@@ -1,5 +1,6 @@
 import { TransactionsPageHeading, TransactionsPanelSection } from '../../../components/ui/admin/transactions'
 import { useAdminTransactions } from '../../../hooks/useAdminTransactions.hook'
+import { useAdminTransactionsStore } from '../../../store/admin/transactions.store'
 
 const Transactions = () => {
   const {
@@ -19,6 +20,10 @@ const Transactions = () => {
     visibleCount,
     totalLoaded
   } = useAdminTransactions()
+
+  const openPaymentReview = (paymentId) => {
+    useAdminTransactionsStore.getState().openPaymentReview(paymentId)
+  }
 
   return (
     <div className="w-full space-y-5">
@@ -42,6 +47,7 @@ const Transactions = () => {
         allVisibleSelected={allVisibleSelected}
         visibleCount={visibleCount}
         totalLoaded={totalLoaded}
+        onOpenPaymentReview={openPaymentReview}
       />
     </div>
   )

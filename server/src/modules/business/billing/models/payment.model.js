@@ -27,7 +27,7 @@ const paymentSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ['PENDING', 'PAID', 'FAILED', 'CANCELLED'],
+            enum: ['PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REJECTED'],
             default: 'PENDING',
             index: true
         },
@@ -61,7 +61,17 @@ const paymentSchema = new mongoose.Schema(
             default: null
         },
         paidAt: { type: Date, default: null },
-        notes: { type: String, default: '' }
+        notes: { type: String, default: '' },
+        /** Optional bank-transfer / manual proof image URL (absolute or app-relative). */
+        proofReceiptUrl: { type: String, default: '' },
+        /** Admin decline note (optional). */
+        declineReason: { type: String, default: '' },
+        adminReviewedAt: { type: Date, default: null },
+        adminReviewedByUserId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        }
     },
     { timestamps: true }
 )

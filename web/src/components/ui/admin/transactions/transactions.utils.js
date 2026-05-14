@@ -117,7 +117,7 @@ export const sortTransactionRows = (rows, { key, dir }) => {
   list.sort((left, right) => {
     let va = left[key]
     let vb = right[key]
-    if (key === 'createdAt' || key === 'paidAt' || key === 'subscriptionEndsAt') {
+    if (key === 'createdAt' || key === 'paidAt' || key === 'subscriptionEndsAt' || key === 'updatedAt') {
       va = va ? new Date(va).getTime() : 0
       vb = vb ? new Date(vb).getTime() : 0
     }

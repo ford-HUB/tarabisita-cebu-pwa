@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
-import { getAdminPlanSubscriptionTransactions } from '../../services/admin/businessOperations.service'
+import {
+  getAdminPlanSubscriptionTransactions,
+  getAdminPlanSubscriptionPaymentDetail,
+  postAdminPlanSubscriptionPaymentApprove,
+  postAdminPlanSubscriptionPaymentReject
+} from '../../services/admin/businessOperations.service'
 
 const mapRow = (item) => ({
   id: item?.id || '',
@@ -15,15 +20,24 @@ const mapRow = (item) => ({
   status: item?.status || 'PENDING',
   paidAt: item?.paidAt,
   createdAt: item?.createdAt,
+  updatedAt: item?.updatedAt,
   subscriptionEndsAt: item?.subscriptionEndsAt
 })
 
-export const useAdminTransactionsStore = create((set) => ({
+export const useAdminTransactionsStore = create((set, get) => ({
   rawRows: [],
   isLoading: true,
+  lastPeriod: '7',
+  lastPaymentStatus: 'ALL',
   sortKey: 'createdAt',
   sortDir: 'desc',
   selectedIds: new Set(),
+
+  reviewPaymentId: null,
+  paymentDetail: null,
+  paymentDetailLoading: false,
+  paymentDetailError: null,
+  paymentActionBusy: false,
 
   setRawRows: (updater) =>
     set((s) => ({
@@ -51,8 +65,42 @@ export const useAdminTransactionsStore = create((set) => ({
       return { sortKey: key, sortDir: 'asc' }
     }),
 
+  openPaymentReview: (paymentId) => {
+    set({
+      reviewPaymentId: paymentId,
+      paymentDetail: null,
+      paymentDetailError: null,
+      paymentDetailLoading: true
+    })
+    void get().loadPaymentDetail(paymentId)
+  },
+
+  closePaymentReview: () =>
+    set({
+      reviewPaymentId: null,
+      paymentDetail: null,
+      paymentDetailError: null,
+      paymentDetailLoading: false,
+      paymentActionBusy: false
+    }),
+
+  loadPaymentDetail: async (paymentId) => {
+    const id = String(paymentId || '').trim()
+    if (!id) return
+    set({ paymentDetailLoading: true, paymentDetailError: null })
+    try {
+      const response = await getAdminPlanSubscriptionPaymentDetail(id)
+      const data = response?.data?.data ?? null
+      set({ paymentDetail: data, paymentDetailLoading: false })
+    } catch (error) {
+      const message = error?.response?.data?.message || 'Failed to load payment.'
+      toast.error(message)
+      set({ paymentDetail: null, paymentDetailLoading: false, paymentDetailError: message })
+    }
+  },
+
   fetchTransactions: async ({ period, paymentStatus }) => {
-    set({ isLoading: true })
+    set({ isLoading: true, lastPeriod: period, lastPaymentStatus: paymentStatus })
     try {
       const response = await getAdminPlanSubscriptionTransactions({
         days: period,
@@ -63,6 +111,40 @@ export const useAdminTransactionsStore = create((set) => ({
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to load transactions.')
       set({ rawRows: [], isLoading: false })
+    }
+  },
+
+  approvePaymentReview: async () => {
+    const id = get().reviewPaymentId
+    if (!id) return
+    set({ paymentActionBusy: true })
+    try {
+      await postAdminPlanSubscriptionPaymentApprove(id)
+      toast.success('Payment approved. The business owner was notified by email.')
+      get().closePaymentReview()
+      const { lastPeriod, lastPaymentStatus } = get()
+      await get().fetchTransactions({ period: lastPeriod, paymentStatus: lastPaymentStatus })
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Could not approve payment.')
+    } finally {
+      set({ paymentActionBusy: false })
+    }
+  },
+
+  rejectPaymentReview: async (reason) => {
+    const id = get().reviewPaymentId
+    if (!id) return
+    set({ paymentActionBusy: true })
+    try {
+      await postAdminPlanSubscriptionPaymentReject(id, { reason: String(reason || '').trim() })
+      toast.success('Payment declined. The business owner was notified by email.')
+      get().closePaymentReview()
+      const { lastPeriod, lastPaymentStatus } = get()
+      await get().fetchTransactions({ period: lastPeriod, paymentStatus: lastPaymentStatus })
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Could not decline payment.')
+    } finally {
+      set({ paymentActionBusy: false })
     }
   }
 }))

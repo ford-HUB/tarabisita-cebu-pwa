@@ -1,4 +1,5 @@
 import TransactionsCardHeaderSection from '../TransactionsCardHeaderSection'
+import TransactionsPaymentReviewModal from '../TransactionsPaymentReviewModal'
 import TransactionsTableFooterSection from '../TransactionsTableFooterSection'
 import TransactionsTableSection from '../TransactionsTableSection'
 import TransactionsToolbarSection from '../TransactionsToolbarSection'
@@ -24,7 +25,8 @@ const TransactionsPanelSection = ({
   onToggleAllVisible,
   allVisibleSelected,
   visibleCount,
-  totalLoaded
+  totalLoaded,
+  onOpenPaymentReview
 }) => (
   <section className="w-full overflow-hidden rounded-2xl border border-[#e7dfd5] bg-white shadow-sm">
     <TransactionsCardHeaderSection
@@ -44,8 +46,10 @@ const TransactionsPanelSection = ({
       onToggleRow={onToggleRow}
       onToggleAllVisible={onToggleAllVisible}
       allVisibleSelected={allVisibleSelected}
+      onOpenPaymentReview={onOpenPaymentReview}
     />
     <TransactionsTableFooterSection visibleCount={visibleCount} totalLoaded={totalLoaded} />
+    <TransactionsPaymentReviewModal />
   </section>
 )
 

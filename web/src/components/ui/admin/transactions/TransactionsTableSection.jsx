@@ -28,7 +28,8 @@ const TransactionsTableSection = ({
   selectedIds,
   onToggleRow,
   onToggleAllVisible,
-  allVisibleSelected
+  allVisibleSelected,
+  onOpenPaymentReview
 }) => (
   <div className="overflow-x-auto">
     <table className="min-w-full text-sm">
@@ -149,8 +150,10 @@ const TransactionsTableSection = ({
                 <td className="px-3 py-3 text-right md:px-5">
                   <button
                     type="button"
+                    onClick={() => onOpenPaymentReview?.(row.id)}
                     className="inline-flex rounded-lg border border-[#e7dfd5] p-1.5 text-[#6f655b] transition hover:bg-[#f5eee4]"
-                    title="More actions"
+                    title="Review payment"
+                    aria-label={`Review payment ${row.orderId}`}
                   >
                     <FiMoreHorizontal size={18} aria-hidden />
                   </button>
