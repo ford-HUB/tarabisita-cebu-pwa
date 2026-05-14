@@ -11,6 +11,7 @@ import {
   touristOrdersHref,
   touristShellContentClass
 } from './touristLayout.constants'
+import TouristAccountModal from './TouristAccountModal.jsx'
 
 const navLinkClass = ({ isActive }) =>
   [
@@ -29,7 +30,15 @@ const exploreOwnedNavPaths = new Set([
 const exploreNavIsActive = ({ isActive }, pathSeg) =>
   isActive && !exploreOwnedNavPaths.has(pathSeg)
 
-const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallback }) => {
+const TouristTopbar = ({
+  accountOpen = false,
+  accountInitialView = 'menu',
+  onToggleAccount,
+  onCloseAccount,
+  onLogout,
+  avatarUrl,
+  avatarFallback
+}) => {
   const location = useLocation()
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false)
 
@@ -46,7 +55,7 @@ const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallb
   const messagesActive = pathSeg === 'tourist/messages' && isSignedRouteValid('tourist/messages', routeKey)
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#e7dfd5] bg-[#f8f5f0]/95 backdrop-blur-md">
+    <header className="sticky top-0 z-30 overflow-visible border-b border-[#e7dfd5] bg-[#f8f5f0]/95 backdrop-blur-md">
       <div
         className={`${touristShellContentClass} flex min-w-0 items-center gap-3 py-3 md:gap-6`}
       >
@@ -107,24 +116,35 @@ const TouristTopbar = ({ onToggleAccount, onCloseAccount, avatarUrl, avatarFallb
             </Link>
           </nav>
 
-          <button
-            type="button"
-            onClick={() => onToggleAccount?.()}
-            className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-[#ff7a1a] font-semibold text-white shadow-sm transition hover:bg-[#eb6c12]"
-            aria-haspopup="dialog"
-            aria-label="Account menu"
-          >
-            {avatarUrl && !avatarLoadFailed ? (
-              <img
-                src={avatarUrl}
-                alt=""
-                className="h-full w-full object-cover"
-                onError={() => setAvatarLoadFailed(true)}
-              />
-            ) : (
-              avatarFallback
-            )}
-          </button>
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => onToggleAccount?.()}
+              className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full font-semibold text-white shadow-sm transition hover:bg-[#eb6c12] ${
+                accountOpen ? 'ring-2 ring-[#9b5a2c] ring-offset-2 ring-offset-[#f8f5f0] bg-[#eb6c12]' : 'bg-[#ff7a1a]'
+              }`}
+              aria-haspopup="dialog"
+              aria-expanded={accountOpen}
+              aria-label="Account menu"
+            >
+              {avatarUrl && !avatarLoadFailed ? (
+                <img
+                  src={avatarUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={() => setAvatarLoadFailed(true)}
+                />
+              ) : (
+                avatarFallback
+              )}
+            </button>
+            <TouristAccountModal
+              isOpen={accountOpen}
+              initialView={accountInitialView}
+              onClose={onCloseAccount}
+              onLogout={onLogout}
+            />
+          </div>
         </div>
       </div>
     </header>

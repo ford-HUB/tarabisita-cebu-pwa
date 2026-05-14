@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { FiChevronDown, FiImage } from 'react-icons/fi'
 import TouristCartItemMeta from '../TouristCartItemMeta.jsx'
+import { isTouristCartFoodListing } from '../../../../shared/utils/tourist-cart-item-details.utils.js'
 
 const ItemDetails = ({ item, formatPhp }) => (
   <div className="mt-2 space-y-1.5 border-t border-[#ece3d9] pt-2 text-xs text-[#5b5b5b]">
@@ -8,10 +9,12 @@ const ItemDetails = ({ item, formatPhp }) => (
       <span>Unit price</span>
       <span className="font-medium text-[#1f1f1f]">{formatPhp(item.unitPrice)}</span>
     </div>
-    <div className="flex justify-between gap-3">
-      <span>Quantity</span>
-      <span className="font-medium text-[#1f1f1f]">{item.qty}</span>
-    </div>
+    {isTouristCartFoodListing(item) ? (
+      <div className="flex justify-between gap-3">
+        <span>Quantity</span>
+        <span className="font-medium text-[#1f1f1f]">{item.qty}</span>
+      </div>
+    ) : null}
     <div className="flex justify-between gap-3 border-t border-dashed border-[#e7dfd5] pt-1.5 font-semibold text-[#1f1f1f]">
       <span>Subtotal</span>
       <span className="text-[#ff7a1a]">{formatPhp(item.unitPrice * item.qty)}</span>
@@ -65,6 +68,7 @@ const TouristCheckoutCartSection = ({
               {g.items.map((item) => {
                 const isOpen = openKeys.has(item.key)
                 const checked = isItemSelected(item.key)
+                const showQty = isTouristCartFoodListing(item)
                 return (
                   <li
                     key={item.key}
@@ -121,18 +125,22 @@ const TouristCheckoutCartSection = ({
                       </div>
 
                       <div className="flex shrink-0 flex-col items-end gap-2">
-                        <label className="sr-only" htmlFor={`qty-${item.key}`}>
-                          Quantity for {item.name}
-                        </label>
-                        <input
-                          id={`qty-${item.key}`}
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={item.qty}
-                          onChange={(e) => setItemQty(item.key, e.target.value)}
-                          className="w-16 rounded-lg border border-[#e7dfd5] bg-white px-2 py-1.5 text-center text-sm font-medium text-[#1f1f1f] outline-none focus:border-[#ff7a1a] focus:ring-2 focus:ring-[#ff7a1a]/25"
-                        />
+                        {showQty ? (
+                          <>
+                            <label className="sr-only" htmlFor={`qty-${item.key}`}>
+                              Quantity for {item.name}
+                            </label>
+                            <input
+                              id={`qty-${item.key}`}
+                              type="number"
+                              min={1}
+                              max={99}
+                              value={item.qty}
+                              onChange={(e) => setItemQty(item.key, e.target.value)}
+                              className="w-16 rounded-lg border border-[#e7dfd5] bg-white px-2 py-1.5 text-center text-sm font-medium text-[#1f1f1f] outline-none focus:border-[#ff7a1a] focus:ring-2 focus:ring-[#ff7a1a]/25"
+                            />
+                          </>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => removeItem(item.key)}

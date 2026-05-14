@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiArrowLeft, FiX } from 'react-icons/fi'
+import { useAuth } from '../../../hooks/useAuth.hook'
 import { useAuthStore } from '../../../store/auth/auth.store'
 import {
   postTouristSupportEmailVerificationConfirm,
@@ -12,10 +13,27 @@ import { touristHomeHref } from './touristLayout.constants'
 const getErrorMessage = (error, fallback) =>
   error?.response?.data?.message || error?.message || fallback
 
-const TouristSupportEmailModal = ({ isOpen, onClose, afterVerified }) => {
+/** Same shape check as register (avoid spamming mail-checker while typing). */
+const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
+
+const EMAIL_CHECK_DEBOUNCE_MS = 450
+
+const verifiedTakenForSupport = (accountRole) => {
+  if (accountRole === 'BUSINESS') {
+    return 'This address is already used on a business account. Sign in with it or choose a different email.'
+  }
+  if (accountRole === 'TOURIST') {
+    return 'This address is already used on a tourist account. Sign in with it or choose a different email.'
+  }
+  return 'This address is already linked to an account. Sign in with it or choose a different email.'
+}
+
+const TouristSupportEmailModal = ({ isOpen, onClose, afterVerified, redirectAfterVerify = true }) => {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const setUser = useAuthStore((s) => s.setUser)
   const checkUser = useAuthStore((s) => s.checkUser)
+  const mailChecker = useAuthStore((s) => s.mailChecker)
 
   const [step, setStep] = useState('email')
   const [supportEmail, setSupportEmail] = useState('')
@@ -24,6 +42,120 @@ const TouristSupportEmailModal = ({ isOpen, onClose, afterVerified }) => {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [emailStatus, setEmailStatus] = useState({
+    state: 'idle',
+    exists: false,
+    isEmailVerified: false,
+    accountRole: null,
+    message: ''
+  })
+  const latestEmailCheckIdRef = useRef(0)
+
+  const primaryNorm = String(user?.email || '').trim().toLowerCase()
+  const currentSupportNorm = String(user?.supportEmail || '').trim().toLowerCase()
+
+  const handleEmailCheck = useCallback(
+    async (rawEmail) => {
+      const nextEmail = String(rawEmail || '').trim().toLowerCase()
+      if (!nextEmail) {
+        setEmailStatus({
+          state: 'idle',
+          exists: false,
+          isEmailVerified: false,
+          accountRole: null,
+          message: ''
+        })
+        return
+      }
+
+      if (nextEmail === primaryNorm) {
+        setEmailStatus({
+          state: 'blocked',
+          exists: false,
+          isEmailVerified: false,
+          accountRole: null,
+          message: 'Support email must be different from your sign-in email.'
+        })
+        return
+      }
+
+      if (currentSupportNorm && nextEmail === currentSupportNorm) {
+        setEmailStatus({
+          state: 'blocked',
+          exists: false,
+          isEmailVerified: false,
+          accountRole: null,
+          message: 'That is already your support email.'
+        })
+        return
+      }
+
+      const checkId = latestEmailCheckIdRef.current + 1
+      latestEmailCheckIdRef.current = checkId
+      setEmailStatus((previous) => ({
+        ...previous,
+        state: 'checking',
+        message: '',
+        exists: false,
+        isEmailVerified: false,
+        accountRole: null
+      }))
+
+      try {
+        const response = await mailChecker({ email: nextEmail })
+        if (latestEmailCheckIdRef.current !== checkId) return
+
+        const properties = response?.data?.properties || {}
+        const exists = Boolean(properties.exists)
+        const isEmailVerified = Boolean(properties.isEmailVerified)
+        const accountRole = properties.accountRole ? String(properties.accountRole) : null
+
+        if (exists) {
+          setEmailStatus({
+            state: 'ok',
+            exists: true,
+            isEmailVerified,
+            accountRole,
+            message: isEmailVerified
+              ? verifiedTakenForSupport(accountRole)
+              : 'This address is already on another account (not verified yet). Choose a different email.'
+          })
+          return
+        }
+
+        setEmailStatus({
+          state: 'ok',
+          exists: false,
+          isEmailVerified: false,
+          accountRole: null,
+          message: 'This address is available to use as your support email.'
+        })
+      } catch (err) {
+        if (latestEmailCheckIdRef.current !== checkId) return
+
+        const status = err?.response?.status
+        if (status === 404) {
+          setEmailStatus({
+            state: 'not_found',
+            exists: false,
+            isEmailVerified: false,
+            accountRole: null,
+            message: 'This address is available to use as your support email.'
+          })
+          return
+        }
+
+        setEmailStatus({
+          state: 'error',
+          exists: false,
+          isEmailVerified: false,
+          accountRole: null,
+          message: 'Unable to check email right now. Please try again.'
+        })
+      }
+    },
+    [mailChecker, primaryNorm, currentSupportNorm]
+  )
 
   useEffect(() => {
     if (!isOpen) return
@@ -34,9 +166,62 @@ const TouristSupportEmailModal = ({ isOpen, onClose, afterVerified }) => {
     setBusy(false)
     setError('')
     setMessage('')
+    setEmailStatus({
+      state: 'idle',
+      exists: false,
+      isEmailVerified: false,
+      accountRole: null,
+      message: ''
+    })
+    latestEmailCheckIdRef.current += 1
   }, [isOpen])
 
-  if (!isOpen) return null
+  useEffect(() => {
+    if (!isOpen || step !== 'email') return undefined
+
+    const trimmed = String(supportEmail || '').trim()
+    if (!trimmed) {
+      setEmailStatus({
+        state: 'idle',
+        exists: false,
+        isEmailVerified: false,
+        accountRole: null,
+        message: ''
+      })
+      return undefined
+    }
+
+    if (!looksLikeEmail(trimmed)) {
+      setEmailStatus((previous) => ({
+        ...previous,
+        state: 'idle',
+        exists: false,
+        isEmailVerified: false,
+        accountRole: null,
+        message: ''
+      }))
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void handleEmailCheck(trimmed)
+    }, EMAIL_CHECK_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isOpen, step, supportEmail, handleEmailCheck])
+
+  const supportEmailLooksComplete = looksLikeEmail(String(supportEmail || '').trim())
+  const isEmailCheckPending = step === 'email' && supportEmailLooksComplete && emailStatus.state === 'checking'
+  const isSupportEmailBlocked =
+    emailStatus.state === 'blocked' || (emailStatus.state === 'ok' && emailStatus.exists)
+  const hasDefinitiveAvailableCheck =
+    (emailStatus.state === 'ok' && !emailStatus.exists) || emailStatus.state === 'not_found'
+  const canContinueEmailStep =
+    supportEmailLooksComplete &&
+    !isEmailCheckPending &&
+    !isSupportEmailBlocked &&
+    emailStatus.state !== 'error' &&
+    hasDefinitiveAvailableCheck
 
   const onRequestCode = async () => {
     setError('')
@@ -88,13 +273,17 @@ const TouristSupportEmailModal = ({ isOpen, onClose, afterVerified }) => {
       }
       afterVerified?.()
       onClose?.()
-      navigate(touristHomeHref, { replace: true })
+      if (redirectAfterVerify) {
+        navigate(touristHomeHref, { replace: true })
+      }
     } catch (err) {
       setError(getErrorMessage(err, 'Could not verify code.'))
     } finally {
       setBusy(false)
     }
   }
+
+  if (!isOpen) return null
 
   return (
     <div
@@ -163,12 +352,31 @@ const TouristSupportEmailModal = ({ isOpen, onClose, afterVerified }) => {
                   onChange={(e) => setSupportEmail(e.target.value)}
                   disabled={busy}
                 />
+                {(emailStatus.state === 'checking' || emailStatus.message) && (
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className={`mt-1 block text-xs ${
+                      emailStatus.state === 'error' ||
+                      emailStatus.state === 'blocked' ||
+                      (emailStatus.state === 'ok' && emailStatus.exists && emailStatus.isEmailVerified)
+                        ? 'text-[#b42318]'
+                        : emailStatus.state === 'ok' && emailStatus.exists && !emailStatus.isEmailVerified
+                          ? 'text-[#6d645d]'
+                          : emailStatus.state === 'checking'
+                            ? 'text-[#6d645d]'
+                            : 'text-[#027a48]'
+                    }`}
+                  >
+                    {emailStatus.state === 'checking' ? 'Checking email...' : emailStatus.message}
+                  </span>
+                )}
               </div>
               {error ? <p className="text-sm text-[#b42318]">{error}</p> : null}
               <button
                 type="button"
                 onClick={() => void onRequestCode()}
-                disabled={busy || !supportEmail.trim()}
+                disabled={busy || !canContinueEmailStep}
                 className="rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#eb6c12] disabled:opacity-60"
               >
                 {busy ? 'Sending…' : 'Continue'}

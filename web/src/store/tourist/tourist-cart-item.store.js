@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
-import { pickCartItemDetailsFromPayload } from '../../shared/utils/tourist-cart-item-details.utils.js'
+import {
+  isTouristCartStayListing,
+  pickCartItemDetailsFromPayload
+} from '../../shared/utils/tourist-cart-item-details.utils.js'
 
 const itemKey = (businessId, catalogItemId) => `${businessId}:${catalogItemId}`
 
@@ -109,6 +112,11 @@ export const useTouristCartItemStore = create((set, get) => ({
   addItem: (payload, options = {}) => {
     const { silent } = options
     const { businessId, businessName, name, unitPrice, image } = payload
+    const notifyItemAdded = () => {
+      if (silent) return
+      const label = String(name || '').trim()
+      toast.success('Item added', label ? { description: label } : undefined)
+    }
     const catalogItemId = resolveCatalogItemId(payload)
     if (!businessId || !catalogItemId || !name) return
     const key = itemKey(businessId, catalogItemId)
@@ -117,6 +125,14 @@ export const useTouristCartItemStore = create((set, get) => ({
     const prev = get().items
     const idx = prev.findIndex((it) => it.key === key)
     if (idx >= 0) {
+      if (isTouristCartStayListing(payload)) {
+        if (!silent) {
+          toast.message('Already in your cart', {
+            description: 'This stay package is already saved. Remove it from your cart first if you want to change it.'
+          })
+        }
+        return
+      }
       const next = [...prev]
       const merged = Math.min(99, next[idx].qty + qty)
       const incomingNotes = clampItemNotes(payload.itemNotes)
@@ -128,7 +144,7 @@ export const useTouristCartItemStore = create((set, get) => ({
         ...(incomingNotes.trim() ? { itemNotes: incomingNotes } : {})
       }
       set({ items: next })
-      if (!silent) toast.success('Cart updated')
+      notifyItemAdded()
       return
     }
     set({
@@ -149,7 +165,7 @@ export const useTouristCartItemStore = create((set, get) => ({
         }
       ]
     })
-    if (!silent) toast.success('Added to cart')
+    notifyItemAdded()
   },
 
   /** @param {string} key */
