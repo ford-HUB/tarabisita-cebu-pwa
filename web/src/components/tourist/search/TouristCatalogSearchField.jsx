@@ -159,11 +159,11 @@ const TouristCatalogSearchField = (props) => {
                     onSearch(String(row.label || '').trim())
                   }}
                 >
-                  <span
+                  {/* <span
                     className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ${isHero ? 'bg-white/15 text-white/90' : 'bg-[#f5eee4] text-[#9b5a2c]'}`}
                   >
                     Match
-                  </span>
+                  </span> */}
                   <span className="min-w-0 flex-1 truncate text-left">{row.label}</span>
                 </button>
               </li>

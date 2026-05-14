@@ -106,7 +106,7 @@ const LandingHeroSection = (props) => {
                 onChange={setHeroQuery}
                 onSearch={handleHeroCatalogSearch}
                 catalogItems={Array.isArray(menuFeedItems) ? menuFeedItems : []}
-                placeholder="Where to next? (e.g., Moalboal, Lechon)"
+                placeholder="Where to next? (e.g., Ocean View, Lechon)"
                 aria-label="Search catalog"
               />
             </div>
