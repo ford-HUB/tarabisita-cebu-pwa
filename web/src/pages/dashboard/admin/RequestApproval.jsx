@@ -13,6 +13,7 @@ const RequestApproval = () => {
     selectedRequest,
     isApproveModalOpen,
     isDeclineModalOpen,
+    isRevokeModalOpen,
     isLoading,
     isSubmittingAction,
     filteredRequests,
@@ -20,9 +21,11 @@ const RequestApproval = () => {
     setStatusFilter,
     setIsApproveModalOpen,
     setIsDeclineModalOpen,
+    setIsRevokeModalOpen,
     openReviewModal,
     closeAllModals,
-    submitAction
+    submitAction,
+    submitRevoke
   } = useAdminRequestApproval()
 
   return (
@@ -42,6 +45,7 @@ const RequestApproval = () => {
         onClose={closeAllModals}
         onOpenApprove={() => setIsApproveModalOpen(true)}
         onOpenDecline={() => setIsDeclineModalOpen(true)}
+        onOpenRevoke={() => setIsRevokeModalOpen(true)}
       />
 
       <ActionModal
@@ -64,6 +68,19 @@ const RequestApproval = () => {
         isSubmitting={isSubmittingAction}
         onClose={() => setIsDeclineModalOpen(false)}
         onConfirm={(notes) => submitAction(APPROVAL_STATUS.REJECTED, notes)}
+      />
+
+      <ActionModal
+        isOpen={isRevokeModalOpen}
+        title="Cancel business approval"
+        description="Are you sure you want to revoke this business approval? The business partner will lose approved access and may return to pending or restricted status."
+        confirmLabel={isSubmittingAction ? 'Processing…' : 'Confirm cancel approval'}
+        cancelLabel="Keep approval"
+        confirmClassName="bg-amber-600 hover:bg-amber-700"
+        showNotes
+        isSubmitting={isSubmittingAction}
+        onClose={() => setIsRevokeModalOpen(false)}
+        onConfirm={(notes) => submitRevoke(notes)}
       />
     </div>
   )

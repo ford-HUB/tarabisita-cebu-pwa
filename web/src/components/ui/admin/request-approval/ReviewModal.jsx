@@ -6,12 +6,12 @@ import ReviewModalHeader from './ReviewModalHeader'
 import ReviewModalStepNav from './ReviewModalStepNav'
 import { useReviewModal } from '../../../../hooks/useReviewModal.hook'
 
-const ReviewModal = ({ request, onClose, onOpenApprove, onOpenDecline }) => {
+const ReviewModal = ({ request, onClose, onOpenApprove, onOpenDecline, onOpenRevoke }) => {
   const { activeStep, setActiveStep, goPrevious, goNext } = useReviewModal(request?.id)
 
   if (!request) return null
 
-  const actionsDisabled = request.status === APPROVAL_STATUS.VERIFIED
+  const isApproved = request.status === APPROVAL_STATUS.VERIFIED
 
   return (
     <div className="fixed inset-0 z-50 bg-black/45 p-3 md:p-5">
@@ -35,12 +35,13 @@ const ReviewModal = ({ request, onClose, onOpenApprove, onOpenDecline }) => {
 
         <ReviewModalFooter
           activeStep={activeStep}
-          actionsDisabled={actionsDisabled}
+          isApproved={isApproved}
           onPrevious={goPrevious}
           onNext={goNext}
           onClose={onClose}
           onOpenDecline={onOpenDecline}
           onOpenApprove={onOpenApprove}
+          onOpenRevoke={onOpenRevoke}
         />
       </div>
     </div>

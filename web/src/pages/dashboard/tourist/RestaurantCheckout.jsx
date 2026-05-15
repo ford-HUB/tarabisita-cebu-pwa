@@ -140,7 +140,6 @@ const RestaurantCheckout = () => {
       <TouristCheckoutOrderReviewSection
         groups={groupsForCheckout}
         formatPhp={formatPhp}
-        editCartHref={touristCartHref}
         setItemNotes={setItemNotes}
       />
 

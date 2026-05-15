@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Verification Revoked</title>
+</head>
+
+<body
+    style="font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background-color: #ffffff; color: #24292f; margin: 0; padding: 20px;">
+
+    <div style="max-width: 500px; margin: 0 auto; text-align: center;">
+        <h2 style="font-size: 20px; font-weight: 400; margin-bottom: 25px;">
+            Your business approval was revoked
+        </h2>
+
+        <div
+            style="border: 1px solid #d0d7de; border-radius: 6px; padding: 25px 35px; text-align: left; background-color: #ffffff;">
+            <p style="margin: 0 0 15px; font-size: 13px;">Hello,</p>
+
+            <p style="margin: 0 0 15px; font-size: 13px;">
+                The platform approval for <strong>{{businessName}}</strong> has been revoked by an administrator.
+            </p>
+
+            <p style="margin: 0 0 15px; font-size: 13px;">
+                Your business is no longer verified on TaraBisita. Partner-only features and public visibility are
+                restricted until your application is reviewed and approved again.
+            </p>
+
+            {{#if hasNotes}}
+            <p style="margin: 0 0 8px; font-size: 13px; font-weight: 600;">Admin notes:</p>
+            <p style="margin: 0 0 15px; font-size: 13px;">{{notes}}</p>
+            {{/if}}
+
+            <p style="margin: 0; font-size: 13px;">If you have questions, reply to this email or contact support.<br>Thanks,<br>The TaraBisita Team</p>
+        </div>
+
+        <div style="margin-top: 25px; font-size: 12px; color: #6e7781; text-align: left;">
+            <p style="margin: 0;">
+                You're receiving this email because your business verification status was updated.
+            </p>
+        </div>
+    </div>
+
+</body>
+
+</html>

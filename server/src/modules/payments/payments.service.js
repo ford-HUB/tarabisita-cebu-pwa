@@ -1925,6 +1925,16 @@ const buildBusinessApprovalMessage = ({ businessName, notes }) => {
     })
 }
 
+const buildBusinessApprovalRevokedMessage = ({ businessName, notes }) => {
+    const trimmedNotes = typeof notes === 'string' ? notes.trim() : ''
+
+    return templateReader('business-approval-revoked', {
+        businessName: businessName || 'your business',
+        hasNotes: Boolean(trimmedNotes),
+        notes: trimmedNotes
+    })
+}
+
 export const incrementPublicBusinessProfileViewCount = async (businessId) => {
     if (!mongoose.Types.ObjectId.isValid(businessId)) {
         return null
@@ -2050,7 +2060,7 @@ export const getBusinessPartnersForAdmin = async () => {
     })
 }
 
-export const updateBusinessVerificationStatusById = async ({ businessId, status, notes }) => {
+export const updateBusinessVerificationStatusById = async ({ businessId, status, notes, revoke = false }) => {
     if (!allowedVerificationStatuses.includes(status)) {
         throw new Error('INVALID_STATUS')
     }
@@ -2058,6 +2068,17 @@ export const updateBusinessVerificationStatusById = async ({ businessId, status,
     const business = await Business.findById(businessId)
     if (!business) {
         throw new Error('BUSINESS_NOT_FOUND')
+    }
+
+    const previousStatus = business.verificationStatus
+
+    if (revoke) {
+        if (previousStatus !== 'VERIFIED') {
+            throw new Error('REVOKE_NOT_VERIFIED')
+        }
+        if (status !== 'PENDING') {
+            throw new Error('INVALID_REVOKE_STATUS')
+        }
     }
 
     business.verificationStatus = status
@@ -2079,6 +2100,19 @@ export const updateBusinessVerificationStatusById = async ({ businessId, status,
         await sendMailer(
             hydratedBusiness.userId.email,
             '[TaraBisita] Business verification approved',
+            html
+        )
+    }
+
+    if (previousStatus === 'VERIFIED' && status === 'PENDING' && hydratedBusiness?.userId?.email) {
+        const html = buildBusinessApprovalRevokedMessage({
+            businessName: hydratedBusiness.name,
+            notes
+        })
+
+        await sendMailer(
+            hydratedBusiness.userId.email,
+            '[TaraBisita] Business approval revoked',
             html
         )
     }

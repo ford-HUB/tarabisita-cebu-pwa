@@ -1,11 +1,18 @@
 import { Link } from 'react-router-dom'
 import { FiImage } from 'react-icons/fi'
+import { buildTouristExploreBusinessDetailHref } from '../../../layout/tourist/touristLayout.constants.js'
 import TouristCartItemMeta from '../TouristCartItemMeta.jsx'
 
 const MAX_ITEM_NOTES = 500
 
-const TouristCheckoutOrderReviewSection = ({ groups, formatPhp, editCartHref, setItemNotes }) => {
+const TouristCheckoutOrderReviewSection = ({ groups, formatPhp, setItemNotes }) => {
   if (!groups.length) return null
+
+  const primaryGroup = groups[0]
+  const businessHref = primaryGroup?.businessId
+    ? buildTouristExploreBusinessDetailHref(primaryGroup.businessId)
+    : null
+  const businessLabel = primaryGroup?.businessName?.trim() || 'this restaurant'
 
   return (
     <section className="rounded-2xl border border-[#e7dfd5] bg-white p-4 shadow-sm md:p-5" aria-labelledby="checkout-order-review-heading">
@@ -13,16 +20,18 @@ const TouristCheckoutOrderReviewSection = ({ groups, formatPhp, editCartHref, se
         <h2 id="checkout-order-review-heading" className="text-base font-semibold text-[#1f1f1f]">
           Your order
         </h2>
-        <Link
-          to={editCartHref}
-          className="text-sm font-semibold text-[#9b5a2c] underline decoration-[#e7dfd5] underline-offset-2 transition hover:text-[#ff7a1a]"
-        >
-          Edit cart
-        </Link>
+        {businessHref ? (
+          <Link
+            to={businessHref}
+            className="text-sm font-semibold text-[#9b5a2c] underline decoration-[#e7dfd5] underline-offset-2 transition hover:text-[#ff7a1a]"
+          >
+            Edit Cart
+          </Link>
+        ) : null}
       </div>
       <p className="mt-1 text-xs text-[#5b5b5b]">
         Review what you selected. Add optional notes per item (for example spice level or allergies). To change items
-        or quantities, use Edit cart.
+        or quantities, open the restaurant page.
       </p>
 
       <div className="mt-4 space-y-5">

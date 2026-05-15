@@ -12,8 +12,12 @@ export const getAdminBusinessPartners = async () => {
   return response
 }
 
-export const updateBusinessApprovalStatus = async ({ businessId, status, notes = '' }) => {
-  const response = await apiInstance.patch(`business/admin/approval-queue/${businessId}`, { status, notes })
+export const updateBusinessApprovalStatus = async ({ businessId, status, notes = '', revoke = false }) => {
+  const response = await apiInstance.patch(`business/admin/approval-queue/${businessId}`, {
+    status,
+    notes,
+    revoke: Boolean(revoke)
+  })
   return response
 }
 
