@@ -55,7 +55,7 @@ const MessagingHubSection = ({ items, isLoading, errorMessage }) => {
           </div>
           <h2 className="mt-5 text-lg font-semibold text-[#1f1f1f]">No chats yet</h2>
           <p className="mt-2 text-sm text-[#5b5b5b]">
-            Open a chat from one of your orders with &ldquo;Message store&rdquo; to connect with the restaurant here.
+            Use &ldquo;Inquire&rdquo; on a restaurant or resort listing, or &ldquo;Message store&rdquo; from an order, to start a chat here.
           </p>
           <Link
             to={touristOrdersHref}
