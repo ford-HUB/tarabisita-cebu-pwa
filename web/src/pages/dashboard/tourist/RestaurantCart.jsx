@@ -8,6 +8,7 @@ const RestaurantCart = () => {
     formatPhp,
     setItemQty,
     removeItem,
+    editCartItem,
     isItemSelected,
     toggleItemSelected,
     goExplore,
@@ -53,6 +54,7 @@ const RestaurantCart = () => {
         formatPhp={formatPhp}
         setItemQty={setItemQty}
         removeItem={removeItem}
+        onEditItem={editCartItem}
         isItemSelected={isItemSelected}
         toggleItemSelected={toggleItemSelected}
       />

@@ -35,6 +35,7 @@ const TouristCheckoutCartSection = ({
   formatPhp,
   setItemQty,
   removeItem,
+  onEditItem,
   isItemSelected,
   toggleItemSelected
 }) => {
@@ -72,7 +73,32 @@ const TouristCheckoutCartSection = ({
                       checked ? 'border-[#e7dfd5]' : 'border-dashed border-[#d4c4b6] opacity-90'
                     }`}
                   >
+                    <div className="flex items-center justify-end gap-1 pb-2">
+                          {onEditItem ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onEditItem(item)}
+                                className="rounded-lg px-2 py-1 text-xs font-semibold text-[#9b5a2c] transition hover:bg-[#fff4eb] hover:text-[#ff7a1a]"
+                              >
+                                Edit
+                              </button>
+                              <span className="text-[10px] text-[#d4c4b6]" aria-hidden>
+                                |
+                              </span>
+                            </>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => removeItem(item.key)}
+                            className="rounded-lg px-2 py-1 text-xs font-semibold text-[#b42318] transition hover:bg-[#fee4e2]"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                    
                     <div className="flex gap-3">
+                      
                       <div className="flex shrink-0 flex-col items-center gap-2 pt-1">
                         <input
                           type="checkbox"
@@ -93,6 +119,7 @@ const TouristCheckoutCartSection = ({
                           </div>
                         )}
                       </div>
+                      
 
                       <div className="min-w-0 flex-1">
                         <button
@@ -133,13 +160,7 @@ const TouristCheckoutCartSection = ({
                           onChange={(e) => setItemQty(item.key, e.target.value)}
                           className="w-16 rounded-lg border border-[#e7dfd5] bg-white px-2 py-1.5 text-center text-sm font-medium text-[#1f1f1f] outline-none focus:border-[#ff7a1a] focus:ring-2 focus:ring-[#ff7a1a]/25"
                         />
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.key)}
-                          className="rounded-lg px-2 py-1 text-xs font-semibold text-[#b42318] hover:bg-[#fee4e2]"
-                        >
-                          Remove
-                        </button>
+                        
                         <p className="text-sm font-semibold text-[#ff7a1a]">{formatPhp(item.unitPrice * item.qty)}</p>
                       </div>
                     </div>

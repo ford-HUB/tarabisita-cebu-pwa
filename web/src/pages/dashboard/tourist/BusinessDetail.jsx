@@ -30,6 +30,8 @@ import { useTouristCartItemStore } from '../../../store/tourist/tourist-cart-ite
 import TouristDestinationMapPanel from '../../../components/tourist/explore/modals/TouristDestinationMapPanel.jsx'
 import RestaurantGuestReviewsModal from '../../../components/tourist/explore/modals/RestaurantGuestReviewsModal.jsx'
 import TouristStayPackageDetailModal from '../../../components/tourist/explore/modals/TouristStayPackageDetailModal.jsx'
+import TouristMenuItemDetailModal from '../../../components/tourist/explore/modals/TouristMenuItemDetailModal.jsx'
+import { useTouristBusinessCartEditDeepLink } from '../../../hooks/useTouristBusinessCartEditDeepLink.hook.js'
 import { pickCartItemDetailsFromMenuItem } from '../../../shared/utils/tourist-cart-item-details.utils.js'
 import { hasValidMapCoordinates } from '../../../shared/utils/mapboxStaticMap.utils.js'
 import { googleDirectionsUrl, googleSearchAddressUrl } from '../../../shared/utils/touristMapLinks.utils.js'
@@ -175,6 +177,7 @@ const BusinessDetail = () => {
   const { businessId } = useParams()
   const navigate = useNavigate()
   const addItem = useTouristCartItemStore((s) => s.addItem)
+  const updateItem = useTouristCartItemStore((s) => s.updateItem)
   const cartItems = useTouristCartItemStore((s) => s.items)
   const setItemQty = useTouristCartItemStore((s) => s.setItemQty)
   const removeItem = useTouristCartItemStore((s) => s.removeItem)
@@ -191,14 +194,33 @@ const BusinessDetail = () => {
   const [isGuestReviewsOpen, setIsGuestReviewsOpen] = useState(false)
   const [selectedPackageId, setSelectedPackageId] = useState('')
   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false)
+  const [selectedMenuItem, setSelectedMenuItem] = useState(null)
+  const [editCartKey, setEditCartKey] = useState(null)
+  const [highlightMenuItemId, setHighlightMenuItemId] = useState(null)
 
   useEffect(() => {
     setSelectedCategory('All')
     setMenuSearchTerm('')
     setSelectedPackageId('')
     setIsPackageModalOpen(false)
+    setSelectedMenuItem(null)
+    setEditCartKey(null)
+    setHighlightMenuItemId(null)
     useTouristCartItemStore.getState().clearActiveCheckoutBusinessId()
   }, [businessId])
+
+  useEffect(() => {
+    if (!highlightMenuItemId) return undefined
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`menu-item-${highlightMenuItemId}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 350)
+    const clearHighlight = window.setTimeout(() => setHighlightMenuItemId(null), 4000)
+    return () => {
+      window.clearTimeout(timer)
+      window.clearTimeout(clearHighlight)
+    }
+  }, [highlightMenuItemId])
 
   useEffect(() => {
     const updateStickyOffset = () => {
@@ -254,6 +276,19 @@ const BusinessDetail = () => {
     () => categoryMatchesLabel(business?.category, 'Resort') || categoryMatchesLabel(business?.category, 'Hotel'),
     [business?.category]
   )
+
+  useTouristBusinessCartEditDeepLink({
+    businessId: business?._id ? String(business._id) : '',
+    businessName: business?.name || '',
+    menuItems,
+    isStayBusiness,
+    setSelectedMenuItem,
+    setEditCartKey,
+    setHighlightMenuItemId,
+    setIsPackageModalOpen,
+    setSelectedPackageId
+  })
+
   const categories = useMemo(() => {
     const dynamic = getMenuCategories(menuItems)
     const total = dynamic.reduce((sum, entry) => sum + entry.count, 0)
@@ -390,17 +425,26 @@ const BusinessDetail = () => {
     const image = Array.isArray(selectedPackageWithBusiness.images) && selectedPackageWithBusiness.images.length
       ? selectedPackageWithBusiness.images[0]
       : ''
-    addItem({
+    const editingRow = editCartKey
+      ? useTouristCartItemStore.getState().items.find((it) => it.key === editCartKey)
+      : null
+    const payload = {
       businessId: selectedPackageWithBusiness.businessId,
       businessName: selectedPackageWithBusiness.businessName,
       catalogItemId: String(selectedPackageWithBusiness.id || ''),
       name: selectedPackageWithBusiness.name || 'Stay package',
       unitPrice: Number(selectedPackageWithBusiness.price) || 0,
       image,
-      qty: 1,
+      qty: Math.min(99, Math.max(1, Number(editingRow?.qty) || 1)),
       listingType: 'STAY',
       ...pickCartItemDetailsFromMenuItem(selectedPackageWithBusiness)
-    })
+    }
+    if (editCartKey) {
+      updateItem(editCartKey, payload)
+      setEditCartKey(null)
+    } else {
+      addItem(payload)
+    }
     setIsPackageModalOpen(false)
   }
 
@@ -536,11 +580,17 @@ const BusinessDetail = () => {
                     const id = String(item?.id || '')
                     const image = Array.isArray(item.images) && item.images.length ? item.images[0] : ''
                     const isSelected = String(selectedPackage?.id || '') === id
+                    const isHighlighted = String(highlightMenuItemId || '') === id
                     return (
                       <article
                         key={id}
+                        id={`menu-item-${id}`}
                         className={`overflow-hidden rounded-xl border bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition ${
-                          isSelected ? 'border-[#222] ring-1 ring-[#222]/10' : 'border-[#e9e9e9]'
+                          isHighlighted
+                            ? 'border-[#ff7a1a] ring-2 ring-[#ff7a1a]/35'
+                            : isSelected
+                              ? 'border-[#222] ring-1 ring-[#222]/10'
+                              : 'border-[#e9e9e9]'
                         }`}
                       >
                         <button
@@ -587,10 +637,16 @@ const BusinessDetail = () => {
                   <div className="grid gap-3 md:grid-cols-2">
                     {group.rows.map((item) => {
                       const image = Array.isArray(item.images) && item.images.length ? item.images[0] : ''
+                      const isHighlighted = String(highlightMenuItemId || '') === String(item.id)
                       return (
                         <article
                           key={item.id}
-                          className="relative overflow-hidden rounded-xl border border-[#e9e9e9] bg-white p-3 pr-11 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                          id={`menu-item-${item.id}`}
+                          className={`relative overflow-hidden rounded-xl border bg-white p-3 pr-11 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition ${
+                            isHighlighted
+                              ? 'border-[#ff7a1a] ring-2 ring-[#ff7a1a]/35'
+                              : 'border-[#e9e9e9]'
+                          }`}
                         >
                           <div className="flex gap-3">
                             <div className="min-w-0 flex-1">
@@ -607,19 +663,14 @@ const BusinessDetail = () => {
                           <button
                             type="button"
                             onClick={() =>
-                              addItem({
+                              setSelectedMenuItem({
+                                ...item,
                                 businessId: String(business._id),
-                                businessName: business.name,
-                                catalogItemId: String(item.id),
-                                name: item.name,
-                                unitPrice: Number(item.price) || 0,
-                                image,
-                                qty: 1,
-                                ...pickCartItemDetailsFromMenuItem(item)
+                                businessName: business.name
                               })
                             }
                             className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfdfdf] bg-white text-[#232323] shadow-sm transition hover:bg-[#f6f6f6]"
-                            aria-label={`Add ${item.name} to cart`}
+                            aria-label={`View ${item.name} details`}
                           >
                             <FiPlus className="h-4 w-4" aria-hidden />
                           </button>
@@ -746,9 +797,20 @@ const BusinessDetail = () => {
       <TouristStayPackageDetailModal
         open={isStayBusiness && isPackageModalOpen}
         item={selectedPackageWithBusiness}
-        onClose={() => setIsPackageModalOpen(false)}
+        onClose={() => {
+          setIsPackageModalOpen(false)
+          setEditCartKey(null)
+        }}
         onAddToCart={handleAddSelectedPackageToCart}
         onBookNow={handleBookSelectedPackage}
+      />
+      <TouristMenuItemDetailModal
+        item={selectedMenuItem}
+        editCartKey={editCartKey}
+        onClose={() => {
+          setSelectedMenuItem(null)
+          setEditCartKey(null)
+        }}
       />
     </div>
   )

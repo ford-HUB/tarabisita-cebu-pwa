@@ -15,9 +15,11 @@ const formatPricePhp = (n) => {
 
 const clampModalQty = (n) => Math.min(99, Math.max(1, Math.round(Number(n)) || 1))
 
-const TouristMenuItemDetailModal = ({ item, onClose }) => {
+const TouristMenuItemDetailModal = ({ item, onClose, editCartKey = null }) => {
   useBodyScrollLock(Boolean(item))
   const addItem = useTouristCartItemStore((s) => s.addItem)
+  const updateItem = useTouristCartItemStore((s) => s.updateItem)
+  const isEditing = Boolean(editCartKey)
   const [business, setBusiness] = useState(null)
   const [businessLoading, setBusinessLoading] = useState(true)
   const [businessError, setBusinessError] = useState(null)
@@ -31,9 +33,10 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
   }, [item?.images])
 
   useEffect(() => {
-    setModalQty(1)
+    const initial = Number(item?._initialCartQty)
+    setModalQty(isEditing && Number.isFinite(initial) && initial >= 1 ? clampModalQty(initial) : 1)
     setHeroIndex(0)
-  }, [item?.businessId, item?.id])
+  }, [item?.businessId, item?.id, editCartKey, isEditing, item?._initialCartQty])
 
   useEffect(() => {
     if (!item?.businessId) return
@@ -107,7 +110,13 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
 
   const handleAddToCart = () => {
     const payload = cartPayload()
-    if (payload) addItem(payload)
+    if (!payload) return
+    if (isEditing) {
+      updateItem(String(editCartKey), payload)
+      onClose?.()
+      return
+    }
+    addItem(payload)
   }
 
   return (
@@ -353,7 +362,7 @@ const TouristMenuItemDetailModal = ({ item, onClose }) => {
                 onClick={handleAddToCart}
                 className="inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-[#e7dfd5] bg-white px-3 text-xs font-semibold leading-tight text-[#9b5a2c] transition hover:border-[#ff7a1a] hover:text-[#ff7a1a] sm:px-3.5 sm:text-[13px]"
               >
-                Add to cart
+                {isEditing ? 'Update cart' : 'Add to cart'}
               </button>
             ) : null}
             <button

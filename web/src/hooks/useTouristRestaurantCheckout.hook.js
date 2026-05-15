@@ -12,6 +12,8 @@ import { groupCartItemsByBusiness, useTouristCartItemStore } from '../store/tour
 import { getTouristMenuOrderCheckoutStatus, postTouristCustomerOrderCheckout } from '../services/tourist/touristCustomerOrder.service.js'
 import { putTouristCartItems } from '../services/tourist/tourist-cart-item.service.js'
 import {
+  buildTouristExploreBusinessEditCartHref,
+  TOURIST_CART_EDIT_KEY_STORAGE,
   touristCartHref,
   touristCheckoutHref,
   touristExploreHref,
@@ -394,6 +396,24 @@ export const useTouristRestaurantCheckout = (options = {}) => {
     navigate(touristExploreHref)
   }, [navigate])
 
+  const editCartItem = useCallback(
+    (item) => {
+      const businessId = String(item?.businessId || '').trim()
+      const catalogItemId = String(item?.catalogItemId || '').trim()
+      if (!businessId || !catalogItemId) {
+        toast.error('This item cannot be edited right now.')
+        return
+      }
+      try {
+        sessionStorage.setItem(TOURIST_CART_EDIT_KEY_STORAGE, String(item.key))
+      } catch {
+        /* ignore */
+      }
+      navigate(buildTouristExploreBusinessEditCartHref(businessId, catalogItemId, item.key))
+    },
+    [navigate]
+  )
+
   const goCart = useCallback(() => {
     navigate(touristCartHref)
   }, [navigate])
@@ -486,6 +506,7 @@ export const useTouristRestaurantCheckout = (options = {}) => {
     setItemQty,
     setItemNotes,
     removeItem,
+    editCartItem,
     isItemSelected,
     toggleItemSelected,
     goExplore,
