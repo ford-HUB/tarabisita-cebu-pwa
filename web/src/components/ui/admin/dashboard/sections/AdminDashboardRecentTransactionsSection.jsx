@@ -1,16 +1,4 @@
-const statusChipClass = (status) => {
-  const normalized = String(status || '').toUpperCase()
-  if (normalized === 'PAID' || normalized === 'SUCCEEDED' || normalized === 'SUCCESSFUL') {
-    return 'bg-[#dcfce7] text-[#166534]'
-  }
-  if (normalized === 'PENDING') {
-    return 'bg-[#fef3c7] text-[#92400e]'
-  }
-  if (normalized === 'FAILED') {
-    return 'bg-[#fee2e2] text-[#991b1b]'
-  }
-  return 'bg-[#f3f4f6] text-[#374151]'
-}
+import { getTransactionStatusPresentation } from '../../transactions/transactions.constants'
 
 const AdminDashboardRecentTransactionsSection = ({ rows, formatCurrency, formatDate }) => (
   <article className="rounded-2xl border border-[#ece3d9] bg-white p-5 shadow-sm">
@@ -36,19 +24,21 @@ const AdminDashboardRecentTransactionsSection = ({ rows, formatCurrency, formatD
               </td>
             </tr>
           ) : (
-            rows.map((row) => (
+            rows.map((row) => {
+              const statusUi = getTransactionStatusPresentation(row.status)
+              return (
               <tr key={row.id || row.orderId} className="border-t border-[#f1e8de] text-[#2f2f2f]">
                 <td className="px-3 py-2.5">{row.businessName || '—'}</td>
                 <td className="px-3 py-2.5">{row.planId || '—'}</td>
                 <td className="px-3 py-2.5">{formatCurrency(row.amount)}</td>
                 <td className="px-3 py-2.5">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusChipClass(row.status)}`}>
-                    {row.status || 'UNKNOWN'}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusUi.tone}`}>
+                    {statusUi.label}
                   </span>
                 </td>
                 <td className="px-3 py-2.5">{formatDate(row.createdAt)}</td>
               </tr>
-            ))
+            )})
           )}
         </tbody>
       </table>

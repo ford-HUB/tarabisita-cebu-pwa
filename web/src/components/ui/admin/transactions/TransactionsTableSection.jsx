@@ -1,7 +1,7 @@
-import { FiChevronDown, FiChevronUp, FiMoreHorizontal } from 'react-icons/fi'
+import { FiChevronDown, FiChevronUp, FiEye } from 'react-icons/fi'
 import { formatDate } from '../request-approval/utils'
 import { formatBillingPeso } from '../../../../shared/utils/billingDisplay.utils'
-import { paymentStatusPresentation } from './transactions.constants'
+import { getTransactionStatusPresentation } from './transactions.constants'
 
 const SortHint = ({ active, dir }) => {
   if (!active) {
@@ -110,10 +110,7 @@ const TransactionsTableSection = ({
           </tr>
         ) : (
           rows.map((row) => {
-            const ui = paymentStatusPresentation[row.status] || {
-              label: row.status,
-              tone: 'bg-[#f5f5f4] text-[#44403c]'
-            }
+            const ui = getTransactionStatusPresentation(row.status)
             const checked = selectedIds.has(row.id)
             return (
               <tr key={row.id} className="border-t border-[#f1e8de] text-[#1f1f1f]">
@@ -151,11 +148,11 @@ const TransactionsTableSection = ({
                   <button
                     type="button"
                     onClick={() => onOpenPaymentReview?.(row.id)}
-                    className="inline-flex rounded-lg border border-[#e7dfd5] p-1.5 text-[#6f655b] transition hover:bg-[#f5eee4]"
-                    title="Review payment"
-                    aria-label={`Review payment ${row.orderId}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#e7dfd5] bg-white px-3 py-1.5 text-sm font-semibold text-[#9b5a2c] transition hover:border-[#ff7a1a] hover:bg-[#fff7ed] hover:text-[#c66b2b]"
+                    aria-label={`Review transaction ${row.orderId}`}
                   >
-                    <FiMoreHorizontal size={18} aria-hidden />
+                    <FiEye size={16} aria-hidden />
+                    Review
                   </button>
                 </td>
               </tr>

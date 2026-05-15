@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useId, useState } from 'react'
-import { FiAlertCircle, FiCheck, FiImage, FiRefreshCw, FiX, FiXCircle } from 'react-icons/fi'
-import { AnimatePresence, motion } from 'motion/react'
+import { useCallback, useEffect } from 'react'
+import { FiAlertCircle, FiImage, FiRefreshCw, FiX } from 'react-icons/fi'
 import { useShallow } from 'zustand/react/shallow'
 import { formatDate } from '../request-approval/utils'
 import { formatBillingPeso } from '../../../../shared/utils/billingDisplay.utils'
-import { paymentStatusPresentation } from './transactions.constants'
+import { getTransactionStatusPresentation } from './transactions.constants'
 import { useAdminTransactionsStore } from '../../../../store/admin/transactions.store'
-
-const ConfirmMotionCard = motion.div
 
 const formatDateTime = (value) => {
   if (!value) return '—'
@@ -43,214 +40,39 @@ const Row = ({ label, value }) => (
   </div>
 )
 
-const PaymentReviewActions = ({ d, paymentDetailLoading, paymentActionBusy, onRequestAcceptConfirm, onRequestDeclineConfirm }) => {
-  const isPending = d?.status === 'PENDING'
-  if (!isPending || !d) return null
-
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-      <button
-        type="button"
-        disabled={paymentActionBusy || paymentDetailLoading || !d}
-        onClick={onRequestAcceptConfirm}
-        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
-      >
-        <FiCheck size={18} aria-hidden />
-        Accept payment
-      </button>
-      <button
-        type="button"
-        disabled={paymentActionBusy || paymentDetailLoading || !d}
-        onClick={onRequestDeclineConfirm}
-        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-none"
-      >
-        <FiXCircle size={18} aria-hidden />
-        Decline
-      </button>
-    </div>
-  )
-}
-
-/** Stacked above the payment review card (z-60). */
-const PaymentActionConfirmDialog = ({
-  kind,
-  declineReasonDraft,
-  onDeclineReasonChange,
-  onCancel,
-  onConfirmAccept,
-  onConfirmDecline,
-  busy,
-  reasonFieldId
-}) => {
-  if (!kind) return null
-
-  const isAccept = kind === 'accept'
-
-  return (
-    <div
-      className="absolute inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 sm:p-6"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target !== e.currentTarget || busy) return
-        onCancel()
-      }}
-    >
-      <AnimatePresence mode="wait">
-        <ConfirmMotionCard
-          key={kind}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="payment-confirm-title"
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-          className={`w-full max-w-md rounded-2xl border bg-white p-5 shadow-2xl sm:p-6 ${
-            isAccept ? 'border-emerald-200/90 ring-1 ring-emerald-100/80' : 'border-red-200/90 ring-1 ring-red-100/80'
-          }`}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div
-            className={`mb-3 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
-              isAccept ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'
-            }`}
-          >
-            {isAccept ? 'Approve payment' : 'Reject payment'}
-          </div>
-          <h2 id="payment-confirm-title" className="text-lg font-semibold text-[#1f1f1f]">
-            {isAccept ? 'Confirm payment approval' : 'Confirm payment rejection'}
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-[#5f5f5f]">
-            {isAccept
-              ? 'Are you sure you want to accept and approve this payment transaction?'
-              : 'Are you sure you want to decline this payment transaction?'}
-          </p>
-
-          {!isAccept ? (
-            <div className="mt-4">
-              <label className="block text-xs font-medium text-[#6f655b]" htmlFor={reasonFieldId}>
-                Reason for decline (optional)
-              </label>
-              <textarea
-                id={reasonFieldId}
-                rows={3}
-                value={declineReasonDraft}
-                onChange={(e) => onDeclineReasonChange(e.target.value)}
-                maxLength={2000}
-                disabled={busy}
-                placeholder="Explain why this payment is being declined…"
-                className="mt-2 w-full resize-y rounded-xl border border-[#e7dfd5] bg-[#fcfaf7] px-3 py-2 text-sm text-[#1f1f1f] outline-none focus:border-[#ff7a1a] disabled:opacity-60"
-              />
-            </div>
-          ) : null}
-
-          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onCancel}
-              className="w-full rounded-xl border border-[#e1d4c5] px-4 py-2.5 text-sm font-semibold text-[#5f5f5f] transition hover:bg-[#f7f3ed] disabled:opacity-50 sm:w-auto"
-            >
-              Cancel
-            </button>
-            {isAccept ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onConfirmAccept}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              >
-                <FiCheck size={18} aria-hidden />
-                {busy ? 'Processing…' : 'Confirm accept'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={onConfirmDecline}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              >
-                <FiXCircle size={18} aria-hidden />
-                {busy ? 'Processing…' : 'Confirm decline'}
-              </button>
-            )}
-          </div>
-        </ConfirmMotionCard>
-      </AnimatePresence>
-    </div>
-  )
-}
-
 /** Isolated state per `reviewPaymentId` via parent `key` — avoids reset effects when switching rows. */
 const TransactionsPaymentReviewModalInner = () => {
-  const confirmReasonId = useId()
-  const [confirmDialog, setConfirmDialog] = useState(null)
-  const [declineReasonDraft, setDeclineReasonDraft] = useState('')
-
-  const {
-    reviewPaymentId,
-    paymentDetail,
-    paymentDetailLoading,
-    paymentDetailError,
-    paymentActionBusy,
-    closePaymentReview,
-    approvePaymentReview,
-    rejectPaymentReview,
-    loadPaymentDetail
-  } = useAdminTransactionsStore(
-    useShallow((s) => ({
-      reviewPaymentId: s.reviewPaymentId,
-      paymentDetail: s.paymentDetail,
-      paymentDetailLoading: s.paymentDetailLoading,
-      paymentDetailError: s.paymentDetailError,
-      paymentActionBusy: s.paymentActionBusy,
-      closePaymentReview: s.closePaymentReview,
-      approvePaymentReview: s.approvePaymentReview,
-      rejectPaymentReview: s.rejectPaymentReview,
-      loadPaymentDetail: s.loadPaymentDetail
-    }))
-  )
-
-  const clearConfirm = useCallback(() => {
-    setConfirmDialog(null)
-    setDeclineReasonDraft('')
-  }, [])
+  const { reviewPaymentId, paymentDetail, paymentDetailLoading, paymentDetailError, closePaymentReview, loadPaymentDetail } =
+    useAdminTransactionsStore(
+      useShallow((s) => ({
+        reviewPaymentId: s.reviewPaymentId,
+        paymentDetail: s.paymentDetail,
+        paymentDetailLoading: s.paymentDetailLoading,
+        paymentDetailError: s.paymentDetailError,
+        closePaymentReview: s.closePaymentReview,
+        loadPaymentDetail: s.loadPaymentDetail
+      }))
+    )
 
   useEffect(() => {
     if (!reviewPaymentId) return undefined
     const onKey = (e) => {
-      if (e.key !== 'Escape') return
-      if (paymentActionBusy) return
-      if (confirmDialog) {
-        clearConfirm()
-        return
-      }
-      closePaymentReview()
+      if (e.key === 'Escape') closePaymentReview()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [reviewPaymentId, paymentActionBusy, confirmDialog, clearConfirm, closePaymentReview])
+  }, [reviewPaymentId, closePaymentReview])
 
   const onBackdrop = useCallback(
     (e) => {
-      if (e.target !== e.currentTarget || paymentActionBusy) return
-      if (confirmDialog) return
+      if (e.target !== e.currentTarget) return
       closePaymentReview()
     },
-    [closePaymentReview, paymentActionBusy, confirmDialog]
+    [closePaymentReview]
   )
 
-  const handleConfirmAccept = useCallback(() => {
-    void approvePaymentReview()
-  }, [approvePaymentReview])
-
-  const handleConfirmDecline = useCallback(() => {
-    void rejectPaymentReview(declineReasonDraft)
-  }, [declineReasonDraft, rejectPaymentReview])
-
   const d = paymentDetail
-  const statusUi = d?.status ? paymentStatusPresentation[d.status] || { label: d.status, tone: 'bg-[#f5f5f4] text-[#44403c]' } : null
-  const isPending = d?.status === 'PENDING'
+  const statusUi = d?.status ? getTransactionStatusPresentation(d.status) : null
   const receiptSrc = d?.proofReceiptUrl ? resolveReceiptSrc(d.proofReceiptUrl) : ''
 
   return (
@@ -259,159 +81,137 @@ const TransactionsPaymentReviewModalInner = () => {
       role="presentation"
       onMouseDown={onBackdrop}
     >
-      <div className="relative flex max-h-[min(92vh,calc(100vh-24px))] w-full max-w-2xl flex-col">
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="admin-payment-review-title"
-          className="flex max-h-[min(92vh,calc(100vh-24px))] w-full flex-col overflow-hidden rounded-2xl border border-[#ece3d9] bg-white shadow-xl"
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#f0e7dd] px-5 py-4">
-            <div className="min-w-0">
-              <h2 id="admin-payment-review-title" className="text-lg font-semibold text-[#1f1f1f]">
-                Payment review
-              </h2>
-              <p className="mt-1 font-mono text-xs text-[#6f655b]">{d?.orderId || reviewPaymentId}</p>
-              {statusUi ? (
-                <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusUi.tone}`}>
-                  {statusUi.label}
-                </span>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              disabled={paymentActionBusy}
-              onClick={confirmDialog ? clearConfirm : closePaymentReview}
-              className="shrink-0 rounded-lg border border-[#ece3d9] p-2 text-[#6d645d] transition hover:bg-[#f7f3ed] disabled:opacity-50"
-              aria-label={confirmDialog ? 'Close confirmation' : 'Close'}
-            >
-              <FiX size={18} />
-            </button>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
-            {paymentDetailLoading ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-14 text-sm text-[#6f655b]">
-                <span
-                  className="inline-block h-9 w-9 animate-spin rounded-full border-2 border-[#e7dfd5] border-t-[#9b5a2c]"
-                  aria-hidden
-                />
-                Loading payment details…
-              </div>
-            ) : paymentDetailError ? (
-              <div className="space-y-4 rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-4">
-                <div className="flex gap-2 text-sm text-amber-950">
-                  <FiAlertCircle className="mt-0.5 shrink-0" size={18} aria-hidden />
-                  <p>{paymentDetailError}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void loadPaymentDetail(reviewPaymentId)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#e7dfd5] bg-white px-4 py-2.5 text-sm font-medium text-[#9b5a2c] transition hover:bg-[#f7f3ed]"
-                >
-                  <FiRefreshCw size={16} aria-hidden />
-                  Try again
-                </button>
-              </div>
-            ) : d ? (
-              <div className="space-y-4">
-                <Section title="Transaction details">
-                  <Row label="Plan" value={d.planId || '—'} />
-                  <Row label="Billing period (months)" value={d.months != null ? String(d.months) : '—'} />
-                  <Row label="Amount" value={formatBillingPeso(d.amount)} />
-                  <Row label="Currency" value={d.currency || 'PHP'} />
-                  <Row label="Reference" value={d.requestReferenceNumber || '—'} />
-                  <Row label="Checkout / session id" value={d.checkoutSessionId || '—'} />
-                  <Row label="Provider payment id" value={d.xenditPaymentId || '—'} />
-                  <Row label="Created" value={formatDateTime(d.createdAt)} />
-                  <Row label="Updated" value={formatDateTime(d.updatedAt)} />
-                  <Row label="Paid at" value={d.paidAt ? formatDateTime(d.paidAt) : '—'} />
-                  <Row label="Subscription status" value={d.subscriptionStatus || '—'} />
-                  <Row label="Subscription ends" value={d.subscriptionEndsAt ? formatDate(d.subscriptionEndsAt) : '—'} />
-                  {d.notes ? <Row label="Notes" value={d.notes} /> : null}
-                  {d.declineReason ? <Row label="Decline reason (recorded)" value={d.declineReason} /> : null}
-                  {d.adminReviewedAt ? (
-                    <Row label="Reviewed at" value={formatDateTime(d.adminReviewedAt)} />
-                  ) : null}
-                  {d.adminReviewedByName ? <Row label="Reviewed by" value={d.adminReviewedByName} /> : null}
-                </Section>
-
-                <Section title="Restaurant / business">
-                  <Row label="Business name" value={d.business?.name} />
-                  <Row label="Phone" value={d.business?.phone} />
-                  <Row label="Address" value={d.business?.address} />
-                  <Row label="Website" value={d.business?.website} />
-                </Section>
-
-                <Section title="Account owner">
-                  <Row label="Name" value={d.owner?.name} />
-                  <Row label="Email" value={d.owner?.email} />
-                </Section>
-
-                <Section title="Proof of payment">
-                  {receiptSrc ? (
-                    <div className="overflow-hidden rounded-lg border border-[#e7dfd5] bg-white">
-                      <a
-                        href={receiptSrc}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 border-b border-[#f0e7dd] px-3 py-2 text-xs font-medium text-[#9b5a2c] hover:underline"
-                      >
-                        <FiImage size={14} aria-hidden />
-                        Open full size
-                      </a>
-                      <img
-                        src={receiptSrc}
-                        alt="Payment receipt"
-                        className="max-h-[min(50vh,22rem)] w-full object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none'
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <p className="text-sm text-[#6f655b]">No receipt image was uploaded for this transaction.</p>
-                  )}
-                </Section>
-              </div>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-transaction-detail-title"
+        className="flex max-h-[min(92vh,calc(100vh-24px))] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[#ece3d9] bg-white shadow-xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#f0e7dd] px-5 py-4">
+          <div className="min-w-0">
+            <h2 id="admin-transaction-detail-title" className="text-lg font-semibold text-[#1f1f1f]">
+              Transaction details
+            </h2>
+            <p className="mt-1 font-mono text-xs text-[#6f655b]">{d?.orderId || reviewPaymentId}</p>
+            {statusUi ? (
+              <span
+                className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusUi.tone}`}
+                aria-label={`Status: ${statusUi.label}`}
+              >
+                {statusUi.label}
+              </span>
             ) : null}
           </div>
-
-          <div className="shrink-0 space-y-3 border-t border-[#f0e7dd] px-5 py-4">
-            {isPending && d ? (
-              <PaymentReviewActions
-                d={d}
-                paymentDetailLoading={paymentDetailLoading}
-                paymentActionBusy={paymentActionBusy || Boolean(confirmDialog)}
-                onRequestAcceptConfirm={() => setConfirmDialog('accept')}
-                onRequestDeclineConfirm={() => {
-                  setDeclineReasonDraft('')
-                  setConfirmDialog('decline')
-                }}
-              />
-            ) : null}
-            <button
-              type="button"
-              disabled={paymentActionBusy}
-              onClick={closePaymentReview}
-              className="w-full rounded-xl border border-[#e1d4c5] py-2.5 text-sm font-medium text-[#5f5f5f] transition hover:bg-[#f7f3ed] disabled:opacity-50"
-            >
-              Close
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={closePaymentReview}
+            className="shrink-0 rounded-lg border border-[#ece3d9] p-2 text-[#6d645d] transition hover:bg-[#f7f3ed]"
+            aria-label="Close"
+          >
+            <FiX size={18} />
+          </button>
         </div>
 
-        <PaymentActionConfirmDialog
-          kind={confirmDialog}
-          declineReasonDraft={declineReasonDraft}
-          onDeclineReasonChange={setDeclineReasonDraft}
-          onCancel={clearConfirm}
-          onConfirmAccept={handleConfirmAccept}
-          onConfirmDecline={handleConfirmDecline}
-          busy={paymentActionBusy}
-          reasonFieldId={confirmReasonId}
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+          <p className="mb-4 rounded-xl border border-[#e7dfd5] bg-[#fcfaf7] px-3 py-2.5 text-xs leading-relaxed text-[#6f655b]">
+            Payment and subscription status are updated automatically by the system. This view is read-only.
+          </p>
+
+          {paymentDetailLoading ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-14 text-sm text-[#6f655b]">
+              <span
+                className="inline-block h-9 w-9 animate-spin rounded-full border-2 border-[#e7dfd5] border-t-[#9b5a2c]"
+                aria-hidden
+              />
+              Loading transaction details…
+            </div>
+          ) : paymentDetailError ? (
+            <div className="space-y-4 rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-4">
+              <div className="flex gap-2 text-sm text-amber-950">
+                <FiAlertCircle className="mt-0.5 shrink-0" size={18} aria-hidden />
+                <p>{paymentDetailError}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadPaymentDetail(reviewPaymentId)}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#e7dfd5] bg-white px-4 py-2.5 text-sm font-medium text-[#9b5a2c] transition hover:bg-[#f7f3ed]"
+              >
+                <FiRefreshCw size={16} aria-hidden />
+                Try again
+              </button>
+            </div>
+          ) : d ? (
+            <div className="space-y-4">
+              <Section title="Transaction details">
+                <Row label="Plan" value={d.planId || '—'} />
+                <Row label="Billing period (months)" value={d.months != null ? String(d.months) : '—'} />
+                <Row label="Amount" value={formatBillingPeso(d.amount)} />
+                <Row label="Currency" value={d.currency || 'PHP'} />
+                <Row label="Reference" value={d.requestReferenceNumber || '—'} />
+                <Row label="Checkout / session id" value={d.checkoutSessionId || '—'} />
+                <Row label="Provider payment id" value={d.xenditPaymentId || '—'} />
+                <Row label="Created" value={formatDateTime(d.createdAt)} />
+                <Row label="Updated" value={formatDateTime(d.updatedAt)} />
+                <Row label="Paid at" value={d.paidAt ? formatDateTime(d.paidAt) : '—'} />
+                <Row label="Subscription status" value={d.subscriptionStatus || '—'} />
+                <Row label="Subscription ends" value={d.subscriptionEndsAt ? formatDate(d.subscriptionEndsAt) : '—'} />
+                {d.notes ? <Row label="Notes" value={d.notes} /> : null}
+                {d.declineReason ? <Row label="Decline reason (recorded)" value={d.declineReason} /> : null}
+                {d.adminReviewedAt ? <Row label="Reviewed at" value={formatDateTime(d.adminReviewedAt)} /> : null}
+                {d.adminReviewedByName ? <Row label="Reviewed by" value={d.adminReviewedByName} /> : null}
+              </Section>
+
+              <Section title="Restaurant / business">
+                <Row label="Business name" value={d.business?.name} />
+                <Row label="Phone" value={d.business?.phone} />
+                <Row label="Address" value={d.business?.address} />
+                <Row label="Website" value={d.business?.website} />
+              </Section>
+
+              <Section title="Account owner">
+                <Row label="Name" value={d.owner?.name} />
+                <Row label="Email" value={d.owner?.email} />
+              </Section>
+
+              <Section title="Proof of payment">
+                {receiptSrc ? (
+                  <div className="overflow-hidden rounded-lg border border-[#e7dfd5] bg-white">
+                    <a
+                      href={receiptSrc}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 border-b border-[#f0e7dd] px-3 py-2 text-xs font-medium text-[#9b5a2c] hover:underline"
+                    >
+                      <FiImage size={14} aria-hidden />
+                      Open full size
+                    </a>
+                    <img
+                      src={receiptSrc}
+                      alt="Payment receipt"
+                      className="max-h-[min(50vh,22rem)] w-full object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#6f655b]">No receipt image was uploaded for this transaction.</p>
+                )}
+              </Section>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="shrink-0 border-t border-[#f0e7dd] px-5 py-4">
+          <button
+            type="button"
+            onClick={closePaymentReview}
+            className="w-full rounded-xl border border-[#e1d4c5] py-2.5 text-sm font-medium text-[#5f5f5f] transition hover:bg-[#f7f3ed]"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   )
