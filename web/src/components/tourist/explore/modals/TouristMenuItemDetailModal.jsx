@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { touristCartHref } from '../../../layout/tourist/touristLayout.constants.js'
 import { FiChevronLeft, FiChevronRight, FiMinus, FiPlus } from 'react-icons/fi'
 import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock.hook.js'
 import { fetchPublicBusinessById } from '../../../../services/tourist/touristExplore.service.js'
 import { hasValidMapCoordinates } from '../../../../shared/utils/mapboxStaticMap.utils.js'
 import { useTouristCartItemStore } from '../../../../store/tourist/tourist-cart-item.store.js'
-import { pickCartItemDetailsFromMenuItem } from '../../../../shared/utils/tourist-cart-item-details.utils.js'
+import {
+  isTouristCartStayListing,
+  pickCartItemDetailsFromMenuItem
+} from '../../../../shared/utils/tourist-cart-item-details.utils.js'
 import TouristDestinationMapPanel from './TouristDestinationMapPanel.jsx'
 
 const formatPricePhp = (n) => {
@@ -17,6 +22,7 @@ const clampModalQty = (n) => Math.min(99, Math.max(1, Math.round(Number(n)) || 1
 
 const TouristMenuItemDetailModal = ({ item, onClose, editCartKey = null }) => {
   useBodyScrollLock(Boolean(item))
+  const navigate = useNavigate()
   const addItem = useTouristCartItemStore((s) => s.addItem)
   const updateItem = useTouristCartItemStore((s) => s.updateItem)
   const isEditing = Boolean(editCartKey)
@@ -107,6 +113,7 @@ const TouristMenuItemDetailModal = ({ item, onClose, editCartKey = null }) => {
   const destination =
     hasValidMapCoordinates(loc) ? { lat: loc.lat, lng: loc.lng } : null
   const showAvailable = Boolean(item.isAvailable) && item.stockStatus !== 'OUT_OF_STOCK'
+  const showQtyControls = showAvailable && !isTouristCartStayListing(item)
 
   const handleAddToCart = () => {
     const payload = cartPayload()
@@ -114,6 +121,7 @@ const TouristMenuItemDetailModal = ({ item, onClose, editCartKey = null }) => {
     if (isEditing) {
       updateItem(String(editCartKey), payload)
       onClose?.()
+      navigate(touristCartHref)
       return
     }
     addItem(payload)
@@ -314,9 +322,9 @@ const TouristMenuItemDetailModal = ({ item, onClose, editCartKey = null }) => {
         </div>
 
         <div
-          className={`flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 border-t border-[#efe6dc] bg-[#faf8f5] px-3 py-2.5 sm:gap-2.5 sm:px-4 sm:py-3 ${showAvailable ? 'justify-between' : 'justify-end'}`}
+          className={`flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 border-t border-[#efe6dc] bg-[#faf8f5] px-3 py-2.5 sm:gap-2.5 sm:px-4 sm:py-3 ${showQtyControls ? 'justify-between' : 'justify-end'}`}
         >
-          {showAvailable ? (
+          {showQtyControls ? (
             <div className="flex min-w-0 shrink-0 items-center gap-1.5 overflow-x-auto sm:gap-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <span
                 className="shrink-0 text-[9px] font-semibold uppercase leading-none tracking-wide text-[#a79a8b] sm:text-[10px]"

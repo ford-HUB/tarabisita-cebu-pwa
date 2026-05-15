@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner'
 import {
   buildTouristStoreMessagingHref,
+  touristCartHref,
   touristCheckoutHref,
   touristExploreHref,
   touristStayBookingHref
@@ -442,9 +443,11 @@ const BusinessDetail = () => {
     if (editCartKey) {
       updateItem(editCartKey, payload)
       setEditCartKey(null)
-    } else {
-      addItem(payload)
+      setIsPackageModalOpen(false)
+      navigate(touristCartHref)
+      return
     }
+    addItem(payload)
     setIsPackageModalOpen(false)
   }
 

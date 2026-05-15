@@ -1,3 +1,10 @@
+/** Stay/accommodation lines set `listingType: 'STAY'`; those skip quantity controls (food/menu uses other values or omits this). */
+export const isTouristCartStayListing = (item) =>
+  String(item?.listingType || '').trim().toUpperCase() === 'STAY'
+
+/** @param {Record<string, unknown>} item */
+export const isTouristCartFoodListing = (item) => !isTouristCartStayListing(item)
+
 /** Optional fields copied onto cart items for display (cart + checkout review). */
 export const CART_ITEM_DETAIL_FIELD_KEYS = [
   'description',

@@ -26,6 +26,7 @@ const RestaurantCheckout = () => {
     goExplore,
     goCart,
     setItemNotes,
+    removeItem,
     checkoutBlockedMultiStore,
     otherStoresSummary,
     isXenditMobileCheckoutModalOpen,
@@ -140,7 +141,9 @@ const RestaurantCheckout = () => {
       <TouristCheckoutOrderReviewSection
         groups={groupsForCheckout}
         formatPhp={formatPhp}
+        editCartHref={touristCartHref}
         setItemNotes={setItemNotes}
+        removeItem={removeItem}
       />
 
       <TouristCheckoutBillingSummarySection

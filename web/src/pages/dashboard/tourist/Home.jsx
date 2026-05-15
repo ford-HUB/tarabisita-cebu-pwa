@@ -55,7 +55,7 @@ const Home = () => {
   const navigate = useNavigate()
 
   const userName = user?.name || 'Tourist'
-  const [isExploreRailCollapsed, setIsExploreRailCollapsed] = useState(false)
+  const [isExploreRailCollapsed, setIsExploreRailCollapsed] = useState(true)
   const [selectedMenuItem, setSelectedMenuItem] = useState(null)
   const [stayPackages, setStayPackages] = useState([])
   const [stayPackagesLoading, setStayPackagesLoading] = useState(false)
@@ -330,7 +330,13 @@ const Home = () => {
 
             {categoryFilter !== 'INTENT_STAY'
               ? exploreRows.map((row) => (
-                  <TouristBusinessCarouselSection key={row.id} title={row.title} items={row.items} onOpen={openBusinessPage} />
+                  <TouristBusinessCarouselSection
+                    key={row.id}
+                    title={row.title}
+                    items={row.items}
+                    onOpen={openBusinessPage}
+                    fillAvailableWidth={isExploreRailCollapsed}
+                  />
                 ))
               : null}
           </div>
