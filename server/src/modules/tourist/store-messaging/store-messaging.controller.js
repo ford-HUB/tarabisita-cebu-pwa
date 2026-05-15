@@ -27,7 +27,7 @@ const mapErr = (error) => {
     if (code === 'INQUIRY_MESSAGING_NOT_AVAILABLE') {
         return {
             status: 400,
-            message: 'Direct messaging is only available for resorts and hotels from their listing page.'
+            message: 'Direct messaging from a listing is only available for restaurants, resorts, and hotels.'
         }
     }
     if (code === 'INVALID_MESSAGING_TOKEN' || code === 'MESSAGING_TOKEN_EXPIRED' || code === 'MESSAGING_TOKEN_MISMATCH') {

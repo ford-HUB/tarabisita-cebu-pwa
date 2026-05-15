@@ -40,22 +40,32 @@ const StoreMessages = () => {
   const session = room.session
   const isInquiry =
     session?.conversationKind === 'INQUIRY' || session?.orderSnapshot?.orderType === 'INQUIRY'
+  const inquiryCategorySlug =
+    session?.orderSnapshot?.businessCategorySlug != null
+      ? String(session.orderSnapshot.businessCategorySlug)
+      : ''
+  const isRestaurantInquiry = isInquiry && inquiryCategorySlug === 'restaurant'
 
   return (
     <div className="space-y-6 md:space-y-8">
       <header>
         <h1 className="text-2xl font-semibold text-[#1f1f1f] md:text-3xl">Store messages</h1>
         <p className="mt-1 text-sm text-[#5b5b5b]">
-          {isInquiry
-            ? `You are messaging ${session?.businessName || 'this resort'} — ask about stays, packages, or availability.`
-            : `You are messaging ${session?.businessName || 'the store'} about your order.`}
+          {isRestaurantInquiry
+            ? `You are messaging ${session?.businessName || 'this restaurant'} — ask about the menu, hours, or availability.`
+            : isInquiry
+              ? `You are messaging ${session?.businessName || 'this resort'} — ask about stays, packages, or availability.`
+              : `You are messaging ${session?.businessName || 'the store'} about your order.`}
         </p>
       </header>
 
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
         <OrderSnapshotPanel snapshot={session?.orderSnapshot || null} />
         <MessagingThreadSection
-          suggestedQuickReplies={getTouristStoreDefaultQuickReplies(session?.orderSnapshot?.orderType)}
+          suggestedQuickReplies={getTouristStoreDefaultQuickReplies(
+            session?.orderSnapshot?.orderType,
+            inquiryCategorySlug
+          )}
           businessName={session?.businessName || ''}
           businessStoreImage={
             typeof session?.businessStoreImage === 'string' && session.businessStoreImage.trim()

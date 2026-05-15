@@ -272,6 +272,9 @@ const TouristBusinessDetailModal = ({ business, onClose }) => {
   const img = heroImg(merged)
   const label = categoryDisplayLabel(merged.category)
   const isRestaurant = categoryMatchesLabel(merged.category, 'Restaurant')
+  const isStayBusiness =
+    categoryMatchesLabel(merged.category, 'Resort') || categoryMatchesLabel(merged.category, 'Hotel')
+  const showInquireAction = isRestaurant || isStayBusiness
   const menuItems = Array.isArray(merged.menuItems) ? merged.menuItems : []
   const menuCategories = useMemo(() => {
     const seen = new Set()
@@ -315,8 +318,8 @@ const TouristBusinessDetailModal = ({ business, onClose }) => {
       if (!token) throw new Error('NO_TOKEN')
       navigate(`/${buildTouristStoreMessagingHref(token)}`)
       onClose?.()
-    } catch {
-      toast.error('Could not open message. Please try again.')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not open message. Please try again.')
     } finally {
       setIsOpeningMessage(false)
     }
@@ -368,7 +371,7 @@ const TouristBusinessDetailModal = ({ business, onClose }) => {
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <FiMessageCircle className="h-3.5 w-3.5" aria-hidden />
-                {isOpeningMessage ? 'Opening…' : 'Message'}
+                {isOpeningMessage ? 'Opening…' : showInquireAction ? 'Inquire' : 'Message'}
               </button>
             </div>
           </div>
