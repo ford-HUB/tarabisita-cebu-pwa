@@ -16,13 +16,6 @@ export const filterBusinessesByVibeId = (vibeId, businesses) => {
   switch (vibeId) {
     case 'restaurant':
       return list.filter((b) => categoryMatchesLabel(b?.category, 'Restaurant'))
-    case 'hotel':
-      return list.filter(
-        (b) =>
-          categoryMatchesLabel(b?.category, 'Resort') ||
-          categoryMatchesLabel(b?.category, 'Hotel') ||
-          blob(b).includes('hotel')
-      )
     case 'beach':
       return list.filter((b) => {
         const t = blob(b)

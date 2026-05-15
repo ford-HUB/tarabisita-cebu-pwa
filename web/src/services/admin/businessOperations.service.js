@@ -34,18 +34,6 @@ export const getAdminPlanSubscriptionPaymentDetail = async (paymentId) => {
   return response
 }
 
-export const postAdminPlanSubscriptionPaymentApprove = async (paymentId) => {
-  const id = encodeURIComponent(String(paymentId || '').trim())
-  const response = await apiInstance.post(`admin/transaction/plan-subscription-payments/${id}/approve`)
-  return response
-}
-
-export const postAdminPlanSubscriptionPaymentReject = async (paymentId, body = {}) => {
-  const id = encodeURIComponent(String(paymentId || '').trim())
-  const response = await apiInstance.post(`admin/transaction/plan-subscription-payments/${id}/reject`, body)
-  return response
-}
-
 /** Admin: persist full subscription marketing catalog. */
 export const putManageSubscriptionCatalog = async (payload) => {
   const response = await apiInstance.put('admin/manage-subscription/catalog', payload)

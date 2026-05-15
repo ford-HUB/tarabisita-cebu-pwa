@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { formatBillingDateTime, formatBillingPesoForPdf } from '../../../../shared/utils/billingDisplay.utils'
 import { computeTransactionSummaryMetrics } from './transactions.utils'
+import { normalizeTransactionDisplayStatus } from './transactions.constants'
 
 /** TaraBisita admin / marketing palette (aligned with dashboard UI). */
 const BRAND = {
@@ -265,7 +266,7 @@ export const downloadPlanSubscriptionTransactionsSummaryPdf = async ({
       planCell,
       String(row.email || '—'),
       formatBillingPesoForPdf(row.amount),
-      String(row.status || '—'),
+      normalizeTransactionDisplayStatus(row.status) || '—',
       formatBillingDateTime(row.createdAt)
     ]
   })

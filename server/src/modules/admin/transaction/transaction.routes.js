@@ -3,14 +3,11 @@ import { guard } from '../../../shared/middlewares/guard.js'
 import { validateRequest } from '../../../shared/middlewares/validateRequest.js'
 import {
     getAdminPlanSubscriptionTransactions,
-    getAdminPlanSubscriptionPaymentDetail,
-    postAdminPlanSubscriptionPaymentApprove,
-    postAdminPlanSubscriptionPaymentReject
+    getAdminPlanSubscriptionPaymentDetail
 } from './transaction.controller.js'
 import {
     adminPlanSubscriptionTransactionsQuerySchema,
-    adminPlanSubscriptionPaymentIdParamsSchema,
-    adminPlanSubscriptionPaymentRejectBodySchema
+    adminPlanSubscriptionPaymentIdParamsSchema
 } from './transaction.validator.js'
 
 const transactionRoutes = express.Router()
@@ -27,20 +24,6 @@ transactionRoutes.get(
     guard(['ADMIN']),
     validateRequest(adminPlanSubscriptionPaymentIdParamsSchema),
     getAdminPlanSubscriptionPaymentDetail
-)
-
-transactionRoutes.post(
-    '/plan-subscription-payments/:paymentId/approve',
-    guard(['ADMIN']),
-    validateRequest(adminPlanSubscriptionPaymentIdParamsSchema),
-    postAdminPlanSubscriptionPaymentApprove
-)
-
-transactionRoutes.post(
-    '/plan-subscription-payments/:paymentId/reject',
-    guard(['ADMIN']),
-    validateRequest(adminPlanSubscriptionPaymentRejectBodySchema),
-    postAdminPlanSubscriptionPaymentReject
 )
 
 export default transactionRoutes

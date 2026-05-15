@@ -28,6 +28,8 @@ import {
 } from '../../../services/tourist/touristExplore.service.js'
 import { postStoreMessagingLinkToken } from '../../../services/tourist/store-messaging.service.js'
 import { useTouristCartItemStore } from '../../../store/tourist/tourist-cart-item.store.js'
+import { useGuestCartStore } from '../../../store/guest/guest-cart.store.js'
+import { publicCartHref } from '../../../shared/constants/guestCart.constants.js'
 import TouristDestinationMapPanel from '../../../components/tourist/explore/modals/TouristDestinationMapPanel.jsx'
 import RestaurantGuestReviewsModal from '../../../components/tourist/explore/modals/RestaurantGuestReviewsModal.jsx'
 import TouristStayPackageDetailModal from '../../../components/tourist/explore/modals/TouristStayPackageDetailModal.jsx'
@@ -177,15 +179,28 @@ const StoreLocationModal = ({ isOpen, onClose, businessName, address, destinatio
   )
 }
 
-const BusinessDetail = () => {
+const BusinessDetail = ({ guestBrowse = false }) => {
   const { businessId } = useParams()
   const navigate = useNavigate()
-  const addItem = useTouristCartItemStore((s) => s.addItem)
-  const updateItem = useTouristCartItemStore((s) => s.updateItem)
-  const cartItems = useTouristCartItemStore((s) => s.items)
-  const setItemQty = useTouristCartItemStore((s) => s.setItemQty)
-  const removeItem = useTouristCartItemStore((s) => s.removeItem)
+  const touristAddItem = useTouristCartItemStore((s) => s.addItem)
+  const touristUpdateItem = useTouristCartItemStore((s) => s.updateItem)
+  const touristCartItems = useTouristCartItemStore((s) => s.items)
+  const touristSetItemQty = useTouristCartItemStore((s) => s.setItemQty)
+  const touristRemoveItem = useTouristCartItemStore((s) => s.removeItem)
   const setActiveCheckoutBusinessId = useTouristCartItemStore((s) => s.setActiveCheckoutBusinessId)
+
+  const guestAddItem = useGuestCartStore((s) => s.addItem)
+  const guestUpdateItem = useGuestCartStore((s) => s.updateItem)
+  const guestCartItems = useGuestCartStore((s) => s.items)
+  const guestSetItemQty = useGuestCartStore((s) => s.setItemQty)
+  const guestRemoveItem = useGuestCartStore((s) => s.removeItem)
+
+  const addItem = guestBrowse ? guestAddItem : touristAddItem
+  const updateItem = guestBrowse ? guestUpdateItem : touristUpdateItem
+  const cartItems = guestBrowse ? guestCartItems : touristCartItems
+  const setItemQty = guestBrowse ? guestSetItemQty : touristSetItemQty
+  const removeItem = guestBrowse ? guestRemoveItem : touristRemoveItem
+  const cartHref = guestBrowse ? publicCartHref : touristCartHref
 
   const [business, setBusiness] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -210,8 +225,10 @@ const BusinessDetail = () => {
     setSelectedMenuItem(null)
     setEditCartKey(null)
     setHighlightMenuItemId(null)
-    useTouristCartItemStore.getState().clearActiveCheckoutBusinessId()
-  }, [businessId])
+    if (!guestBrowse) {
+      useTouristCartItemStore.getState().clearActiveCheckoutBusinessId()
+    }
+  }, [businessId, guestBrowse])
 
   useEffect(() => {
     if (!highlightMenuItemId) return undefined
@@ -286,6 +303,7 @@ const BusinessDetail = () => {
     businessName: business?.name || '',
     menuItems,
     isStayBusiness,
+    guestBrowse,
     setSelectedMenuItem,
     setEditCartKey,
     setHighlightMenuItemId,
@@ -358,6 +376,14 @@ const BusinessDetail = () => {
       toast.error('Store details are still loading. Please try again.')
       return
     }
+    if (guestBrowse) {
+      const next = encodeURIComponent(window.location.pathname + window.location.search)
+      toast.message('Sign in to message this partner', {
+        description: 'Log in or create an account to chat with businesses on Tara Bisita.'
+      })
+      navigate(`/login?next=${next}`)
+      return
+    }
     setIsOpeningMessage(true)
     try {
       const res = await postStoreMessagingLinkToken({ businessId: id })
@@ -414,10 +440,10 @@ const BusinessDetail = () => {
         <p className="mt-2 text-sm text-[#b42318]">{errorMessage || 'This listing may have been removed or is no longer public.'}</p>
         <button
           type="button"
-          onClick={() => navigate(touristExploreHref)}
+          onClick={() => navigate(guestBrowse ? '/' : touristExploreHref)}
           className="mt-5 rounded-full bg-[#ff7a1a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#eb6c12]"
         >
-          Back to Explore
+          {guestBrowse ? 'Back to home' : 'Back to Explore'}
         </button>
       </div>
     )
@@ -434,6 +460,14 @@ const BusinessDetail = () => {
   const handleBookSelectedPackage = () => {
     if (!selectedPackageWithBusiness) return
     setIsPackageModalOpen(false)
+    if (guestBrowse) {
+      toast.message('Sign in to complete booking', {
+        description: 'Add this stay to your cart, then sign in at checkout to finish your reservation.'
+      })
+      const next = encodeURIComponent(publicCartHref)
+      navigate(`/login?next=${next}`)
+      return
+    }
     navigate(touristStayBookingHref, {
       state: {
         stayPackage: selectedPackageWithBusiness,
@@ -451,9 +485,8 @@ const BusinessDetail = () => {
     const image = Array.isArray(selectedPackageWithBusiness.images) && selectedPackageWithBusiness.images.length
       ? selectedPackageWithBusiness.images[0]
       : ''
-    const editingRow = editCartKey
-      ? useTouristCartItemStore.getState().items.find((it) => it.key === editCartKey)
-      : null
+    const cartState = guestBrowse ? useGuestCartStore.getState() : useTouristCartItemStore.getState()
+    const editingRow = editCartKey ? cartState.items.find((it) => it.key === editCartKey) : null
     const payload = {
       businessId: selectedPackageWithBusiness.businessId,
       businessName: selectedPackageWithBusiness.businessName,
@@ -469,7 +502,7 @@ const BusinessDetail = () => {
       updateItem(editCartKey, payload)
       setEditCartKey(null)
       setIsPackageModalOpen(false)
-      navigate(touristCartHref)
+      navigate(cartHref)
       return
     }
     addItem(payload)
@@ -481,7 +514,7 @@ const BusinessDetail = () => {
       <div className="mb-3 flex items-center gap-2 text-xs text-[#666]">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(guestBrowse ? '/' : -1)}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[#444] hover:bg-[#f4f4f4]"
         >
           <FiArrowLeft className="h-3.5 w-3.5" aria-hidden />
@@ -786,13 +819,21 @@ const BusinessDetail = () => {
                     onClick={() => {
                       const id = business?._id ? String(business._id) : ''
                       if (!id) return
+                      if (guestBrowse) {
+                        navigate(publicCartHref)
+                        return
+                      }
                       setActiveCheckoutBusinessId(id)
                       navigate(touristCheckoutHref)
                     }}
                     disabled={!cartCount}
                     className="mt-3 w-full rounded-md bg-[#e0e0e0] px-4 py-2.5 text-sm font-semibold text-[#4a4a4a] transition enabled:bg-[#222] enabled:text-white enabled:hover:bg-black disabled:cursor-not-allowed"
                   >
-                    {cartCount ? 'Review payment and address' : 'Add items to continue'}
+                    {cartCount
+                      ? guestBrowse
+                        ? 'Review cart and sign in'
+                        : 'Review payment and address'
+                      : 'Add items to continue'}
                   </button>
                   <p className="mt-2 inline-flex items-center gap-1 text-xs text-[#666]">
                     <FiShoppingCart className="h-3.5 w-3.5" aria-hidden />
@@ -832,6 +873,7 @@ const BusinessDetail = () => {
       <TouristMenuItemDetailModal
         item={selectedMenuItem}
         editCartKey={editCartKey}
+        guestCartMode={guestBrowse}
         onClose={() => {
           setSelectedMenuItem(null)
           setEditCartKey(null)

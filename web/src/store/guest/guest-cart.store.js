@@ -87,6 +87,48 @@ export const useGuestCartStore = create((set, get) => ({
     notifyItemAdded()
   },
 
+  /**
+   * Replace an existing cart row (edit flow — does not merge quantities).
+   * @param {string} key
+   * @param {Record<string, unknown>} payload
+   * @param {{ silent?: boolean }} [options]
+   * @returns {boolean}
+   */
+  updateItem: (key, payload, options = {}) => {
+    const { silent } = options
+    const k = String(key || '').trim()
+    if (!k) return false
+    const prev = get().items
+    const idx = prev.findIndex((it) => it.key === k)
+    if (idx < 0) return false
+
+    const row = prev[idx]
+    const catalogItemId = resolveCatalogItemId(payload) || row.catalogItemId
+    const qty = Math.min(99, Math.max(1, Number(payload.qty) || row.qty || 1))
+    const details = pickCartItemDetailsFromPayload(payload)
+
+    const next = [...prev]
+    next[idx] = {
+      ...row,
+      businessId: String(payload.businessId || row.businessId),
+      businessName: String(payload.businessName || row.businessName || 'Business'),
+      catalogItemId,
+      name: String(payload.name || row.name),
+      unitPrice: Number(payload.unitPrice ?? row.unitPrice) || 0,
+      image: String(payload.image ?? row.image ?? ''),
+      qty,
+      listingType: String(payload.listingType || row.listingType || ''),
+      ...details,
+      itemNotes: String(payload.itemNotes ?? row.itemNotes ?? '').slice(0, 500)
+    }
+    set({ items: next })
+    if (!silent) {
+      const label = String(next[idx].name || '').trim()
+      toast.success('Cart updated', label ? { description: label } : undefined)
+    }
+    return true
+  },
+
   setItemQty: (key, qty) => {
     const q = Math.min(99, Math.max(1, Number(qty) || 1))
     set({

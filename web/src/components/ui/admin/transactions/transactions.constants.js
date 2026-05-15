@@ -8,16 +8,31 @@ export const PERIOD_OPTIONS = [
 export const PAYMENT_STATUS_FILTER = [
   { value: 'ALL', label: 'All statuses' },
   { value: 'PENDING', label: 'Pending' },
-  { value: 'PAID', label: 'Paid' },
-  { value: 'FAILED', label: 'Failed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-  { value: 'REJECTED', label: 'Rejected (admin)' }
+  { value: 'PAID', label: 'Paid / completed' },
+  { value: 'CANCELLED', label: 'Cancelled' }
 ]
 
+/** Read-only labels for transaction rows and detail modal. */
 export const paymentStatusPresentation = {
   PAID: { label: 'Completed', tone: 'bg-[#dcfce7] text-[#166534]' },
-  PENDING: { label: 'Pending review', tone: 'bg-[#ffedd5] text-[#c2410c]' },
+  PENDING: { label: 'Pending', tone: 'bg-[#ffedd5] text-[#c2410c]' },
   FAILED: { label: 'Failed', tone: 'bg-[#fee4e2] text-[#b42318]' },
-  CANCELLED: { label: 'Cancelled', tone: 'bg-[#f5f5f4] text-[#57534e]' },
-  REJECTED: { label: 'Rejected', tone: 'bg-[#fce7f3] text-[#9d174d]' }
+  CANCELLED: { label: 'Cancelled', tone: 'bg-[#f5f5f4] text-[#57534e]' }
+}
+
+/** Legacy DB value `REJECTED` is shown as cancelled in the admin UI. */
+export const normalizeTransactionDisplayStatus = (status) => {
+  const s = String(status || '').trim().toUpperCase()
+  if (s === 'REJECTED') return 'CANCELLED'
+  return s || 'PENDING'
+}
+
+export const getTransactionStatusPresentation = (status) => {
+  const key = normalizeTransactionDisplayStatus(status)
+  return (
+    paymentStatusPresentation[key] || {
+      label: key.charAt(0) + key.slice(1).toLowerCase(),
+      tone: 'bg-[#f5f5f4] text-[#44403c]'
+    }
+  )
 }

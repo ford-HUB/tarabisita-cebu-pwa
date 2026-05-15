@@ -4,7 +4,6 @@ import {
   FiCoffee,
   FiSun,
   FiFlag,
-  FiHome,
   FiShoppingBag,
   FiMoon,
   FiStar,
@@ -26,8 +25,6 @@ const iconFor = (id) => {
       return FiSun
     case 'heritage':
       return FiFlag
-    case 'hotel':
-      return FiHome
     case 'market':
       return FiShoppingBag
     case 'nightlife':
@@ -108,7 +105,7 @@ const TouristVibeDiscoverySection = ({
         ) : null}
       </div>
 
-      <div className="mx-auto mt-8 grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mx-auto mt-8 grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {CEBU_VIBE_CATEGORIES.map((cat) => {
           const Icon = iconFor(cat.id)
           const selected = activeVibe === cat.id

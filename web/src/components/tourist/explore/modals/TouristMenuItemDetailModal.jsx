@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { touristCartHref } from '../../../layout/tourist/touristLayout.constants.js'
+import { publicCartHref } from '../../../../shared/constants/guestCart.constants.js'
 import { useGuestCartStore } from '../../../../store/guest/guest-cart.store.js'
 import { FiChevronLeft, FiChevronRight, FiMinus, FiPlus } from 'react-icons/fi'
 import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock.hook.js'
@@ -30,6 +31,7 @@ const TouristMenuItemDetailModal = ({
   useBodyScrollLock(Boolean(item))
   const navigate = useNavigate()
   const addGuestItem = useGuestCartStore((s) => s.addItem)
+  const updateGuestItem = useGuestCartStore((s) => s.updateItem)
   const addItem = useTouristCartItemStore((s) => s.addItem)
   const updateItem = useTouristCartItemStore((s) => s.updateItem)
   const isEditing = Boolean(editCartKey)
@@ -126,6 +128,12 @@ const TouristMenuItemDetailModal = ({
     const payload = cartPayload()
     if (!payload) return
     if (guestCartMode) {
+      if (isEditing) {
+        updateGuestItem(String(editCartKey), payload)
+        onClose?.()
+        navigate(publicCartHref)
+        return
+      }
       addGuestItem(payload)
       onClose?.()
       return
