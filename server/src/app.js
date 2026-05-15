@@ -9,6 +9,7 @@ import businessRoutes from "./modules/business/business.routes.js"
 import touristRoutes from "./modules/tourist/tourist.routes.js"
 import adminRoutes from "./modules/admin/admin.routes.js"
 import { recordHttpTiming, writeMorganLineToTelemetry } from './shared/utils/systemPerformanceTelemetry.utils.js'
+import { isAllowedClientOrigin } from './shared/utils/clientOrigins.utils.js'
 
 const app = express()
 
@@ -42,23 +43,9 @@ app.use((req, res, next) => {
     next()
 })
 
-const allowedOrigins = [
-    process.env.CLIENT_LOCAL,
-    process.env.CLIENT_PRODUCTION
-].filter(Boolean)
-
-const isAllowedVercelPreviewOrigin = (origin) => {
-    return /^https:\/\/tara-bisita-[a-z0-9-]+\.vercel\.app$/i.test(origin)
-}
-
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin) return callback(null, true)
-
-        const isAllowedOrigin = allowedOrigins.includes(origin) || isAllowedVercelPreviewOrigin(origin)
-
-        if (isAllowedOrigin) return callback(null, true)
-
+        if (isAllowedClientOrigin(origin)) return callback(null, true)
         return callback(new Error('Not allowed by CORS'))
     },
     credentials: true

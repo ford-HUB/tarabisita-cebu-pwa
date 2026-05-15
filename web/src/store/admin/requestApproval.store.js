@@ -83,7 +83,11 @@ export const useAdminRequestApprovalStore = create((set, get) => ({
           isDeclineModalOpen: false
         }
       })
-      toast.success(`Request ${status === APPROVAL_STATUS.VERIFIED ? 'approved' : 'declined'} successfully.`)
+      toast.success(
+        status === APPROVAL_STATUS.VERIFIED
+          ? 'Request approved. The business owner was notified by email.'
+          : 'Request declined. The business owner was notified by email.'
+      )
       return { ok: true }
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to update request.')
@@ -116,7 +120,7 @@ export const useAdminRequestApprovalStore = create((set, get) => ({
           isDeclineModalOpen: false
         }
       })
-      toast.success('Business approval revoked. The partner was notified by email.')
+      toast.success('Business approval cancelled. The business owner was notified by email.')
       return { ok: true }
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to revoke approval.')

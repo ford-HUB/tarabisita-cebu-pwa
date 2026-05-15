@@ -15,12 +15,16 @@ import {
     attachSystemPerformanceSocket,
     emitSystemPerformanceSnapshot
 } from './modules/admin/system-performance/system-performance.socket.js'
+import { isAllowedClientOrigin } from './shared/utils/clientOrigins.utils.js'
 
 const server = http.createServer(app)
 
 const io = new Server(server, {
     cors: {
-        origin: process.env.CLIENT_URL || true,
+        origin: (origin, callback) => {
+            if (isAllowedClientOrigin(origin)) return callback(null, true)
+            return callback(new Error('Not allowed by CORS'))
+        },
         credentials: true
     }
 })

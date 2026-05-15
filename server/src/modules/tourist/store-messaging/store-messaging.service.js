@@ -67,15 +67,23 @@ const extractBusinessCard = (businessDoc) => {
     }
 }
 
+const INQUIRY_BUSINESS_SELECT =
+    'name description address contact_info website socialMedia logo coverImage banner category'
+
 const buildInquirySnapshot = (businessLean) => {
     const card = extractBusinessCard(businessLean)
     const categorySlug = resolveBusinessCategorySlug(businessLean)
+    const businessDescription =
+        businessLean?.description != null ? String(businessLean.description).trim() : ''
+    const businessAddress = businessLean?.address != null ? String(businessLean.address).trim() : ''
     return {
         orderType: 'INQUIRY',
         businessCategorySlug: categorySlug,
         productName: categorySlug === 'restaurant' ? 'Restaurant inquiry' : 'General inquiry',
         productImage: card.businessStoreImage || '',
-        productDetails: '',
+        productDetails: businessDescription,
+        businessDescription,
+        businessAddress,
         orderCode: '',
         itemsCount: null,
         total: '',
@@ -86,6 +94,15 @@ const buildInquirySnapshot = (businessLean) => {
         businessName: card.businessName,
         businessStoreImage: card.businessStoreImage
     }
+}
+
+/** Keep thread metadata but refresh listing details from the live business profile. */
+const overlayFreshInquiryOnSnapshot = (storedSnapshot, businessLean) => {
+    const fresh = buildInquirySnapshot(businessLean)
+    if (!storedSnapshot || typeof storedSnapshot !== 'object') {
+        return fresh
+    }
+    return { ...storedSnapshot, ...fresh }
 }
 
 const buildOrderSnapshot = (orderLean, businessLean) => {
@@ -124,6 +141,46 @@ const mapMessage = (m) => ({
     senderUserId: String(m.senderUserId),
     createdAt: m.createdAt
 })
+
+const buildFirstMessageAutoReplyBody = (businessName, categorySlug) => {
+    const name = businessName?.trim() || 'our team'
+    const slug = String(categorySlug || '').toLowerCase()
+    if (slug === 'restaurant') {
+        return `Hi! This is ${name}. Thanks for reaching out — how can we help you today?`
+    }
+    if (slug === 'resort' || slug === 'hotel') {
+        return `Hi! This is ${name}. Thanks for your message — how may we assist you with your stay or booking?`
+    }
+    return `Hi! This is ${name}. Thanks for your message — how can we help you today?`
+}
+
+/** Auto-reply from the business once, when the tourist sends their first message in a thread. */
+export const maybeAppendFirstTouristMessageAutoReply = async (conv) => {
+    if (!conv?._id) return null
+
+    const touristCount = await StoreMessage.countDocuments({
+        conversationId: conv._id,
+        senderRole: 'TOURIST'
+    })
+    if (touristCount !== 1) return null
+
+    const business = await Business.findById(conv.businessId)
+        .populate('category', 'name')
+        .select('name userId category')
+        .lean()
+    if (!business?.userId) return null
+
+    const categorySlug = resolveBusinessCategorySlug(business)
+    const businessName = business.name != null ? String(business.name).trim() : ''
+    const body = buildFirstMessageAutoReplyBody(businessName, categorySlug)
+
+    return appendStoreMessage({
+        conversationId: conv._id,
+        senderUserId: business.userId,
+        senderRole: 'BUSINESS',
+        body
+    })
+}
 
 export const createStoreMessagingLinkToken = async (touristUserId, { businessId, customerOrderId }) => {
     const uid = String(touristUserId)
@@ -254,7 +311,7 @@ export const resolveTouristMessagingSession = async (touristUserId, messagingTok
     if (payload.kind === 'INQUIRY') {
         const business = await Business.findById(payload.businessId)
             .populate('category', 'name')
-            .select('name contact_info website socialMedia logo coverImage banner category')
+            .select(INQUIRY_BUSINESS_SELECT)
             .lean()
         if (!business) {
             throw new Error('BUSINESS_NOT_FOUND')
@@ -329,15 +386,13 @@ export const resolveTouristMessagingThread = async (touristUserId, conversationI
 
     if (isInquiryConversation(conv)) {
         const business = await Business.findById(conv.businessId)
-            .select('name contact_info website socialMedia logo coverImage banner')
+            .populate('category', 'name')
+            .select(INQUIRY_BUSINESS_SELECT)
             .lean()
         if (!business) {
             throw new Error('BUSINESS_NOT_FOUND')
         }
-        const snapshot =
-            conv.orderSnapshot && typeof conv.orderSnapshot === 'object'
-                ? conv.orderSnapshot
-                : buildInquirySnapshot(business)
+        const snapshot = overlayFreshInquiryOnSnapshot(conv.orderSnapshot, business)
         const messages = await StoreMessage.find({ conversationId: conv._id }).sort({ createdAt: 1 }).lean()
         const card = extractBusinessCard(business)
         return {
@@ -513,12 +568,10 @@ export const resolveBusinessMessagingThread = async (businessUserId, conversatio
 
     if (isInquiryConversation(conv)) {
         const business = await Business.findById(conv.businessId)
-            .select('name contact_info website socialMedia logo coverImage banner')
+            .populate('category', 'name')
+            .select(INQUIRY_BUSINESS_SELECT)
             .lean()
-        const snapshot =
-            conv.orderSnapshot && typeof conv.orderSnapshot === 'object'
-                ? conv.orderSnapshot
-                : buildInquirySnapshot(business)
+        const snapshot = overlayFreshInquiryOnSnapshot(conv.orderSnapshot, business)
         const messages = await StoreMessage.find({ conversationId: conv._id }).sort({ createdAt: 1 }).lean()
         const storeName = business?.name != null ? String(business.name).trim() : ''
         await StoreConversation.updateOne({ _id: conv._id }, { $set: { businessLastReadAt: new Date() } })
