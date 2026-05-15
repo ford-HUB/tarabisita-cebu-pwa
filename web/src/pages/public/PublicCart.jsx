@@ -1,9 +1,11 @@
 import { useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FiArrowLeft } from 'react-icons/fi'
+import { toast } from 'sonner'
 import { useShallow } from 'zustand/react/shallow'
 import TouristCheckoutCartSection from '../../components/tourist/checkout/sections/TouristCheckoutCartSection.jsx'
-import { touristCheckoutHref } from '../../components/layout/tourist/touristLayout.constants.js'
+import { TOURIST_CART_EDIT_KEY_STORAGE, touristCheckoutHref } from '../../components/layout/tourist/touristLayout.constants.js'
+import { buildPublicBusinessEditCartHref } from '../../shared/constants/publicCatalog.constants.js'
 import { setGuestCartCheckoutPending } from '../../shared/utils/guestCartStorage.utils.js'
 import { groupCartItemsByBusiness } from '../../store/tourist/tourist-cart-item.store.js'
 import { useGuestCartStore } from '../../store/guest/guest-cart.store.js'
@@ -54,6 +56,24 @@ const PublicCart = () => {
     const next = encodeURIComponent(touristCheckoutHref)
     navigate(`/login?next=${next}`)
   }
+
+  const editCartItem = useCallback(
+    (item) => {
+      const businessId = String(item?.businessId || '').trim()
+      const catalogItemId = String(item?.catalogItemId || '').trim()
+      if (!businessId || !catalogItemId) {
+        toast.error('This item cannot be edited right now.')
+        return
+      }
+      try {
+        sessionStorage.setItem(TOURIST_CART_EDIT_KEY_STORAGE, String(item.key))
+      } catch {
+        /* ignore */
+      }
+      navigate(buildPublicBusinessEditCartHref(businessId, catalogItemId, item.key))
+    },
+    [navigate]
+  )
 
   if (!groups.length) {
     return (
@@ -107,6 +127,7 @@ const PublicCart = () => {
         removeItem={removeItem}
         isItemSelected={isItemSelected}
         toggleItemSelected={toggleItemSelected}
+        onEditItem={editCartItem}
       />
 
       <div className="space-y-2 border-t border-[#f0e8de] pt-6">

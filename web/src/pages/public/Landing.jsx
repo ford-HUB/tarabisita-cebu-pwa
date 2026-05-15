@@ -1,10 +1,16 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
+import { useShallow } from 'zustand/react/shallow'
 import LandingHeroSection from '../../components/public/LandingHeroSection.jsx'
 import LandingWhyChooseSection from '../../components/public/LandingWhyChooseSection.jsx'
 import LandingHowItWorksSection from '../../components/public/LandingHowItWorksSection.jsx'
 import LandingTestimonialsSection from '../../components/public/LandingTestimonialsSection.jsx'
 import LandingPopularPlacesSection from '../../components/public/LandingPopularPlacesSection.jsx'
+import TouristVibeDiscoverySection from '../../components/tourist/home/TouristVibeDiscoverySection.jsx'
+import { buildPublicBusinessDetailHref } from '../../shared/constants/publicCatalog.constants.js'
+import { recordPublicBusinessView } from '../../services/tourist/touristExplore.service.js'
+import { useTouristExploreStore } from '../../store/tourist/touristExplore.store.js'
 
 const MotionDiv = motion.div
 const MotionArticle = motion.article
@@ -17,18 +23,78 @@ const fadeUp = {
 }
 
 const Landing = () => {
-  const scrollToPopularPlaces = useCallback(() => {
-    document.getElementById('popular-places')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const navigate = useNavigate()
+  const [guestVibe, setGuestVibe] = useState(null)
+  const { businesses, isLoading, errorMessage, loadPublicBusinesses } = useTouristExploreStore(
+    useShallow((s) => ({
+      businesses: s.businesses,
+      isLoading: s.isLoading,
+      errorMessage: s.errorMessage,
+      loadPublicBusinesses: s.loadPublicBusinesses
+    }))
+  )
+
+  useEffect(() => {
+    void loadPublicBusinesses()
+  }, [loadPublicBusinesses])
+
+  const openBusinessPage = (business) => {
+    const id = String(business?._id || '').trim()
+    if (!id) return
+    void recordPublicBusinessView(id).catch(() => {})
+    navigate(buildPublicBusinessDetailHref(id))
+  }
+
+  const scrollToVibeDiscovery = useCallback(() => {
+    document.getElementById('vibe-discovery')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
+  const handleHeroFeaturedCategory = useCallback(
+    (categoryId) => {
+      if (categoryId) setGuestVibe(categoryId)
+      requestAnimationFrame(scrollToVibeDiscovery)
+    },
+    [scrollToVibeDiscovery]
+  )
+
   return (
-    <div className="bg-[#f8f5f0] text-[#1f1f1f]">
+    <motion.div className="bg-[#f8f5f0] text-[#1f1f1f]">
       <LandingHeroSection
         ctaVariant="public"
-        exploreHref="/#popular-places"
-        onFeaturedCategorySelect={scrollToPopularPlaces}
+        exploreHref="/#vibe-discovery"
+        featuredCategoryId={guestVibe}
+        onFeaturedCategorySelect={handleHeroFeaturedCategory}
       />
 
+      {errorMessage && !businesses.length ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-auto mt-6 max-w-6xl px-6 lg:px-10"
+        >
+          <motion.div className="rounded-2xl border border-[#fecdca] bg-[#fff4f2] p-6 text-sm text-[#7a271a]">
+            <p className="font-medium">We could not load partner listings.</p>
+            <p className="mt-1 text-[#b42318]">{errorMessage}</p>
+            <button
+              type="button"
+              onClick={() => void loadPublicBusinesses()}
+              className="mt-4 rounded-full bg-[#ff7a1a] px-4 py-2 text-sm font-medium text-white hover:bg-[#eb6c12]"
+            >
+              Try again
+            </button>
+          </motion.div>
+        </motion.div>
+      ) : null}
+
+      <motion.div className="mx-auto w-full max-w-6xl px-6 py-10 lg:px-10">
+        <TouristVibeDiscoverySection
+          businesses={businesses}
+          partnersLoading={isLoading}
+          onOpenPartner={openBusinessPage}
+          activeVibe={guestVibe}
+          onActiveVibeChange={setGuestVibe}
+        />
+      </motion.div>
 
       <section className="mx-auto w-full max-w-6xl px-6 py-16 lg:px-10">
         <MotionDiv {...fadeUp} className="mb-8 text-center">
@@ -39,7 +105,7 @@ const Landing = () => {
           </p>
         </MotionDiv>
 
-        <div className="grid gap-5 md:grid-cols-3">
+        <motion.div className="grid gap-5 md:grid-cols-3">
           {[
             {
               title: 'For Customers',
@@ -66,18 +132,17 @@ const Landing = () => {
               <p className="text-sm leading-7 text-[#6d665e]">{item.body}</p>
             </MotionArticle>
           ))}
-        </div>
+        </motion.div>
       </section>
 
       <LandingPopularPlacesSection />
-      
+
       <LandingWhyChooseSection />
 
       <LandingHowItWorksSection />
 
-
       <LandingTestimonialsSection />
-    </div>
+    </motion.div>
   )
 }
 
