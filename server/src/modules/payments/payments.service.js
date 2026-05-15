@@ -1935,6 +1935,55 @@ const buildBusinessApprovalRevokedMessage = ({ businessName, notes }) => {
     })
 }
 
+const buildBusinessApprovalRejectedMessage = ({ businessName, notes }) => {
+    const trimmedNotes = typeof notes === 'string' ? notes.trim() : ''
+
+    return templateReader('business-approval-rejected', {
+        businessName: businessName || 'your business',
+        hasNotes: Boolean(trimmedNotes),
+        notes: trimmedNotes
+    })
+}
+
+const notifyBusinessVerificationStatusChange = async ({
+    status,
+    previousStatus,
+    revoke,
+    hydratedBusiness,
+    notes
+}) => {
+    const owner =
+        hydratedBusiness?.userId && typeof hydratedBusiness.userId === 'object' ? hydratedBusiness.userId : null
+    const toEmail = String(owner?.email || '').trim()
+    if (!toEmail) return
+
+    const businessName = hydratedBusiness.name
+    const isRevoked =
+        Boolean(revoke) || (previousStatus === 'VERIFIED' && status === 'PENDING')
+
+    let subject = ''
+    let html = ''
+
+    if (status === 'VERIFIED') {
+        subject = '[TaraBisita] Business verification approved'
+        html = buildBusinessApprovalMessage({ businessName, notes })
+    } else if (status === 'REJECTED') {
+        subject = '[TaraBisita] Business verification declined'
+        html = buildBusinessApprovalRejectedMessage({ businessName, notes })
+    } else if (isRevoked) {
+        subject = '[TaraBisita] Business approval cancelled'
+        html = buildBusinessApprovalRevokedMessage({ businessName, notes })
+    } else {
+        return
+    }
+
+    try {
+        await sendMailer(toEmail, subject, html)
+    } catch {
+        // Best-effort: verification status is already saved.
+    }
+}
+
 export const incrementPublicBusinessProfileViewCount = async (businessId) => {
     if (!mongoose.Types.ObjectId.isValid(businessId)) {
         return null
@@ -2091,31 +2140,13 @@ export const updateBusinessVerificationStatusById = async ({ businessId, status,
         .populate('category', 'name')
         .populate('userId', 'name email')
 
-    if (status === 'VERIFIED' && hydratedBusiness?.userId?.email) {
-        const html = buildBusinessApprovalMessage({
-            businessName: hydratedBusiness.name,
-            notes
-        })
-
-        await sendMailer(
-            hydratedBusiness.userId.email,
-            '[TaraBisita] Business verification approved',
-            html
-        )
-    }
-
-    if (previousStatus === 'VERIFIED' && status === 'PENDING' && hydratedBusiness?.userId?.email) {
-        const html = buildBusinessApprovalRevokedMessage({
-            businessName: hydratedBusiness.name,
-            notes
-        })
-
-        await sendMailer(
-            hydratedBusiness.userId.email,
-            '[TaraBisita] Business approval revoked',
-            html
-        )
-    }
+    await notifyBusinessVerificationStatusChange({
+        status,
+        previousStatus,
+        revoke,
+        hydratedBusiness,
+        notes
+    })
 
     return {
         _id: hydratedBusiness._id,

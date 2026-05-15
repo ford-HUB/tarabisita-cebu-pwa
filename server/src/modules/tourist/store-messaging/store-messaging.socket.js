@@ -1,6 +1,10 @@
 import jwt from 'jsonwebtoken'
 import User from '../../auth/models/user.model.js'
-import { appendStoreMessage, assertSocketAccessToConversation } from './store-messaging.service.js'
+import {
+    appendStoreMessage,
+    assertSocketAccessToConversation,
+    maybeAppendFirstTouristMessageAutoReply
+} from './store-messaging.service.js'
 
 const parseAccessTokenFromCookieHeader = (cookieHeader) => {
     if (!cookieHeader || typeof cookieHeader !== 'string') return null
@@ -77,7 +81,7 @@ export const attachStoreMessagingSocket = (io) => {
                 return reply({ ok: false, error: 'MISSING_CONVERSATION_ID' })
             }
             try {
-                await assertSocketAccessToConversation({
+                const conv = await assertSocketAccessToConversation({
                     conversationId,
                     userId: socket.data.userId,
                     role: socket.data.role
@@ -90,6 +94,12 @@ export const attachStoreMessagingSocket = (io) => {
                     body: text
                 })
                 nsp.to(`conv:${conversationId}`).emit('message:new', doc)
+                if (senderRole === 'TOURIST') {
+                    const autoReply = await maybeAppendFirstTouristMessageAutoReply(conv)
+                    if (autoReply) {
+                        nsp.to(`conv:${conversationId}`).emit('message:new', autoReply)
+                    }
+                }
                 return reply({ ok: true, message: doc })
             } catch (e) {
                 const code = String(e?.message || '')

@@ -4,17 +4,20 @@ import { formatBillingDateTime, formatBillingPesoForPdf } from '../../../../shar
 import { computeTransactionSummaryMetrics } from './transactions.utils'
 import { normalizeTransactionDisplayStatus } from './transactions.constants'
 
-/** TaraBisita admin / marketing palette (aligned with dashboard UI). */
+/** TaraBisita palette — aligned with `/logo.png` and app orange accents (#ff7a1a). */
 const BRAND = {
-  rust: [155, 90, 44],
-  rustDark: [122, 69, 34],
-  cream: [247, 239, 229],
+  orange: [255, 122, 26],
+  orangeDark: [235, 108, 18],
+  orangeDeep: [198, 107, 43],
+  cream: [255, 248, 242],
   paper: [252, 250, 247],
   ink: [31, 31, 31],
   muted: [93, 85, 78],
-  accent: [134, 59, 255],
-  rule: [231, 223, 213]
+  accent: [255, 122, 26],
+  rule: [255, 212, 188]
 }
+
+const LOGO_MM = 16
 
 const MM = { left: 16, right: 16, top: 14, bottom: 18 }
 
@@ -22,7 +25,7 @@ const formatGeneratedLine = (date) =>
   date.toLocaleString('en-PH', { dateStyle: 'full', timeStyle: 'short' })
 
 /**
- * Rasterize `/favicon.svg` for jsPDF (PNG). Returns null if loading or canvas fails.
+ * Rasterize `/logo.png` for jsPDF (PNG). Returns null if loading or canvas fails.
  */
 const loadBrandLogoPng = () =>
   new Promise((resolve) => {
@@ -30,14 +33,16 @@ const loadBrandLogoPng = () =>
       resolve(null)
       return
     }
-    const path = `${(import.meta.env.BASE_URL || '/').replace(/\/?$/, '/') }favicon.svg`
+    const path = `${(import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')}logo.png`
     const src = path.startsWith('http') ? path : new URL(path, window.location.origin).href
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       try {
-        const w = 112
-        const h = 108
+        const maxSide = 128
+        const scale = Math.min(maxSide / img.naturalWidth, maxSide / img.naturalHeight, 1)
+        const w = Math.max(1, Math.round(img.naturalWidth * scale))
+        const h = Math.max(1, Math.round(img.naturalHeight * scale))
         const canvas = document.createElement('canvas')
         canvas.width = w
         canvas.height = h
@@ -46,8 +51,6 @@ const loadBrandLogoPng = () =>
           resolve(null)
           return
         }
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, w, h)
         ctx.drawImage(img, 0, 0, w, h)
         resolve(canvas.toDataURL('image/png'))
       } catch {
@@ -93,19 +96,20 @@ export const downloadPlanSubscriptionTransactionsSummaryPdf = async ({
   let y = MM.top
 
   const logoDataUrl = await loadBrandLogoPng()
+  const headerTextX = logoDataUrl ? MM.left + LOGO_MM + 4 : MM.left
   if (logoDataUrl) {
-    doc.addImage(logoDataUrl, 'PNG', MM.left, y, 14, 13.5)
+    doc.addImage(logoDataUrl, 'PNG', MM.left, y, LOGO_MM, LOGO_MM)
   }
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(16)
-  doc.setTextColor(...BRAND.rustDark)
-  doc.text('TaraBisita', logoDataUrl ? MM.left + 18 : MM.left, y + 6)
+  doc.setTextColor(...BRAND.orangeDeep)
+  doc.text('TaraBisita', headerTextX, y + 6)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...BRAND.muted)
-  doc.text('Admin · Plan subscription transactions', logoDataUrl ? MM.left + 18 : MM.left, y + 11)
+  doc.text('Admin · Plan subscription transactions', headerTextX, y + 11)
 
   doc.setFontSize(8)
   doc.setTextColor(...BRAND.accent)
@@ -113,7 +117,7 @@ export const downloadPlanSubscriptionTransactionsSummaryPdf = async ({
   doc.text(tag, pw - MM.right, y + 6, { align: 'right' })
 
   y += 20
-  doc.setDrawColor(...BRAND.rust)
+  doc.setDrawColor(...BRAND.orange)
   doc.setLineWidth(0.6)
   doc.line(MM.left, y, pw - MM.right, y)
   y += 6
@@ -149,7 +153,7 @@ export const downloadPlanSubscriptionTransactionsSummaryPdf = async ({
     theme: 'plain',
     styles: { fontSize: 9, cellPadding: 2.5, textColor: BRAND.ink },
     headStyles: {
-      fillColor: BRAND.rust,
+      fillColor: BRAND.orange,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 9
@@ -191,7 +195,7 @@ export const downloadPlanSubscriptionTransactionsSummaryPdf = async ({
     styles: { fontSize: 9, cellPadding: 2.8, textColor: BRAND.ink },
     alternateRowStyles: { fillColor: BRAND.cream },
     headStyles: {
-      fillColor: BRAND.rust,
+      fillColor: BRAND.orange,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 9,
@@ -227,7 +231,7 @@ export const downloadPlanSubscriptionTransactionsSummaryPdf = async ({
     styles: { fontSize: 9, cellPadding: 2.5, textColor: BRAND.ink },
     alternateRowStyles: { fillColor: BRAND.paper },
     headStyles: {
-      fillColor: BRAND.rustDark,
+      fillColor: BRAND.orangeDark,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 9,
@@ -284,7 +288,7 @@ export const downloadPlanSubscriptionTransactionsSummaryPdf = async ({
     theme: 'striped',
     styles: { fontSize: 7.5, cellPadding: 2, textColor: BRAND.ink, overflow: 'linebreak' },
     headStyles: {
-      fillColor: BRAND.rust,
+      fillColor: BRAND.orange,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 7.5,

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { io } from 'socket.io-client'
 import { toast } from 'sonner'
 import { getSocketBaseUrl } from '../shared/utils/socketBase.utils.js'
+import {
+  connectStoreMessagingSocket,
+  disconnectStoreMessagingSocket
+} from '../shared/utils/storeMessagingSocket.utils.js'
 import {
   getStoreMessagingConversations,
   getStoreMessagingSession,
@@ -55,6 +58,7 @@ export const useTouristStoreMessagingRoom = ({ m, c }) => {
 
     const seq = ++loadSeqRef.current
     let cancelled = false
+    const isActive = () => !cancelled && seq === loadSeqRef.current
     const socketBase = getSocketBaseUrl()
     if (!socketBase) {
       setRoom({ session: null, messages: [], loading: false, error: 'Missing server URL.', socketConnected: false })
@@ -66,7 +70,7 @@ export const useTouristStoreMessagingRoom = ({ m, c }) => {
     ;(async () => {
       try {
         const res = m ? await getStoreMessagingSession(m) : await getStoreMessagingThread(c)
-        if (cancelled || seq !== loadSeqRef.current) return
+        if (!isActive()) return
         const data = res.data?.data
         if (!data?.conversationId) throw new Error('INVALID_RESPONSE')
         const messages = Array.isArray(data.messages) ? data.messages : []
@@ -78,43 +82,30 @@ export const useTouristStoreMessagingRoom = ({ m, c }) => {
           socketConnected: false
         })
 
-        const socket = io(`${socketBase}/store-messaging`, {
-          withCredentials: true,
-          transports: ['websocket', 'polling'],
-          timeout: 10000,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 800,
-          reconnectionDelayMax: 4000
+        const socket = connectStoreMessagingSocket({
+          socketBase,
+          conversationId: data.conversationId,
+          isActive,
+          onConnected: () => {
+            setRoom((r) => ({ ...r, socketConnected: true }))
+          },
+          onDisconnected: () => {
+            setRoom((r) => ({ ...r, socketConnected: false }))
+          },
+          onMessage: (msg) => {
+            setRoom((r) => {
+              if (!msg?.id || r.messages.some((x) => x.id === msg.id)) return r
+              return { ...r, messages: [...r.messages, msg] }
+            })
+          },
+          onJoinFailed: () => {
+            toast.error('Could not join chat room.')
+          }
         })
         socketRef.current = socket
-
-        socket.on('connect', () => {
-          if (cancelled || seq !== loadSeqRef.current) return
-          setRoom((r) => ({ ...r, socketConnected: true }))
-          socket.emit('join', { conversationId: data.conversationId }, (ack) => {
-            if (!ack?.ok) {
-              toast.error('Could not join chat room.')
-            }
-          })
-        })
-
-        socket.on('disconnect', () => {
-          setRoom((r) => ({ ...r, socketConnected: false }))
-        })
-
-        socket.on('connect_error', () => {
-          setRoom((r) => ({ ...r, socketConnected: false }))
-        })
-
-        socket.on('message:new', (msg) => {
-          setRoom((r) => {
-            if (!msg?.id || r.messages.some((x) => x.id === msg.id)) return r
-            return { ...r, messages: [...r.messages, msg] }
-          })
-        })
       } catch (e) {
         const msg = e?.response?.data?.message || e?.message || 'Could not open chat.'
-        if (!cancelled && seq === loadSeqRef.current) {
+        if (isActive()) {
           setRoom({ session: null, messages: [], loading: false, error: msg, socketConnected: false })
         }
       }
@@ -122,10 +113,8 @@ export const useTouristStoreMessagingRoom = ({ m, c }) => {
 
     return () => {
       cancelled = true
-      const s = socketRef.current
+      disconnectStoreMessagingSocket(socketRef.current)
       socketRef.current = null
-      s?.removeAllListeners()
-      s?.disconnect()
     }
   }, [mode, m, c])
 
