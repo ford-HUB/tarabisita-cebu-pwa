@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const storeMessagingLinkBodySchema = z.object({
     body: z.object({
         businessId: z.string().min(1),
-        /** Omit for resort/hotel inquiry from a public listing (no order yet). */
+        /** Omit for restaurant/resort/hotel inquiry from a public listing (no order yet). */
         customerOrderId: z.string().min(1).optional()
     })
 })

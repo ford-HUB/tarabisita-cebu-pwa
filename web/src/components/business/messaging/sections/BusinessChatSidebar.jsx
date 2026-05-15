@@ -101,7 +101,7 @@ const BusinessChatSidebar = ({
             </div>
             <p className="mt-4 text-sm font-medium text-[#1f1f1f]">No customer chats yet</p>
             <p className="mt-2 text-xs text-[#5b5b5b]">
-              When a guest messages you from their order, it will show up here.
+              When a guest uses Inquire on your listing or messages from an order, it will show up here.
             </p>
             <Link
               to={businessOrdersHref}

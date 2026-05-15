@@ -41,6 +41,12 @@ const resolveBusinessCategorySlug = (business) => {
     return normalized
 }
 
+/** Listing-page inquiry chat (no order yet) — resorts/hotels and restaurants. */
+const businessSupportsListingInquiryMessaging = (business) => {
+    const slug = resolveBusinessCategorySlug(business)
+    return slug === 'resort' || slug === 'restaurant'
+}
+
 const extractBusinessCard = (businessDoc) => {
     if (!businessDoc || typeof businessDoc !== 'object') {
         return { businessName: '', businessStoreImage: '' }
@@ -63,9 +69,11 @@ const extractBusinessCard = (businessDoc) => {
 
 const buildInquirySnapshot = (businessLean) => {
     const card = extractBusinessCard(businessLean)
+    const categorySlug = resolveBusinessCategorySlug(businessLean)
     return {
         orderType: 'INQUIRY',
-        productName: 'General inquiry',
+        businessCategorySlug: categorySlug,
+        productName: categorySlug === 'restaurant' ? 'Restaurant inquiry' : 'General inquiry',
         productImage: card.businessStoreImage || '',
         productDetails: '',
         orderCode: '',
@@ -132,7 +140,7 @@ export const createStoreMessagingLinkToken = async (touristUserId, { businessId,
         if (!business) {
             throw new Error('BUSINESS_NOT_FOUND')
         }
-        if (resolveBusinessCategorySlug(business) !== 'resort') {
+        if (!businessSupportsListingInquiryMessaging(business)) {
             throw new Error('INQUIRY_MESSAGING_NOT_AVAILABLE')
         }
         const token = sealStoreMessagingPayload({
@@ -251,7 +259,7 @@ export const resolveTouristMessagingSession = async (touristUserId, messagingTok
         if (!business) {
             throw new Error('BUSINESS_NOT_FOUND')
         }
-        if (resolveBusinessCategorySlug(business) !== 'resort') {
+        if (!businessSupportsListingInquiryMessaging(business)) {
             throw new Error('INQUIRY_MESSAGING_NOT_AVAILABLE')
         }
         const snapshot = buildInquirySnapshot(business)
@@ -445,15 +453,17 @@ export const listBusinessConversations = async (businessUserId) => {
                 : []
         const statusByOrderId = new Map(orders.map((o) => [String(o._id), String(o.status || '').toUpperCase()]))
         activeRows = rows.filter((r) => {
+            if (isInquiryConversation(r)) return true
             const st = statusByOrderId.get(String(r.customerOrderId || ''))
             if (!st) return false
             return !TOURIST_MESSAGING_CLOSED_STATUSES.has(st)
         })
     }
 
-    /** Resort/hotel chat sidebar: unread customer messages since the business last opened the thread. */
+    /** Resort/hotel and restaurant chat sidebar: unread customer messages since the business last opened the thread. */
     const unreadByConvId = new Map()
-    if (categorySlug === 'resort' && activeRows.length > 0) {
+    const tracksInquiryUnread = categorySlug === 'resort' || categorySlug === 'restaurant'
+    if (tracksInquiryUnread && activeRows.length > 0) {
         const ids = activeRows.map((r) => r._id).filter(Boolean)
         if (ids.length > 0) {
             const unreadRows = await StoreConversation.aggregate([
@@ -478,8 +488,7 @@ export const listBusinessConversations = async (businessUserId) => {
             orderCode: snap.orderCode || '',
             productName: snap.productName || '',
             lastMessageAt: r.lastMessageAt || r.updatedAt,
-            unreadFromCustomerCount:
-                categorySlug === 'resort' ? unreadByConvId.get(String(r._id)) || 0 : 0
+            unreadFromCustomerCount: tracksInquiryUnread ? unreadByConvId.get(String(r._id)) || 0 : 0
         }
     })
 }
