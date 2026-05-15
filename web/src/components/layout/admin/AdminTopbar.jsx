@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import { FiChevronDown, FiLogOut, FiSettings, FiUser } from 'react-icons/fi'
-import { toEncryptedRoute } from '../../../shared/utils/direct.utils'
+import { FiChevronDown, FiLogOut, FiUser } from 'react-icons/fi'
 
 const AdminTopbar = ({
   isProfileOpen,
   onToggleProfile,
   onCloseProfile,
+  onOpenProfile,
   userName,
   avatarFallback,
   onLogout
@@ -50,20 +49,16 @@ const AdminTopbar = ({
 
         {isProfileOpen && (
           <div className="absolute right-0 top-12 mt-2 w-52 rounded-xl border border-[#e7dfd5] bg-white p-2 shadow-lg">
-            <Link
-              to={`/${toEncryptedRoute('admin/dashboard')}`}
-              onClick={onCloseProfile}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#f5eee4]"
+            <button
+              type="button"
+              onClick={() => {
+                onCloseProfile()
+                onOpenProfile?.()
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[#1f1f1f] transition hover:bg-[#f5eee4]"
             >
               <FiUser size={15} />
               Profile
-            </Link>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#f5eee4]"
-            >
-              <FiSettings size={15} />
-              Settings
             </button>
             <button
               type="button"

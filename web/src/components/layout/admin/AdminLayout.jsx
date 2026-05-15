@@ -5,6 +5,7 @@ import { useAuthStore } from '../../../store/auth/auth.store'
 import { roleBasedRoute } from '../../../shared/utils/direct.utils'
 import AdminSidebar from './AdminSidebar'
 import AdminTopbar from './AdminTopbar'
+import AdminProfileModal from './AdminProfileModal.jsx'
 import { adminSidebarLinks, getAdminAvatarFallback } from './adminLayout.constants'
 
 const AdminLayout = () => {
@@ -13,6 +14,7 @@ const AdminLayout = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState({ Business: true })
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
   const avatarFallback = useMemo(() => getAdminAvatarFallback(user?.name), [user?.name])
 
@@ -56,6 +58,7 @@ const AdminLayout = () => {
           isProfileOpen={isProfileOpen}
           onToggleProfile={() => setIsProfileOpen((value) => !value)}
           onCloseProfile={() => setIsProfileOpen(false)}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
           userName={user?.name}
           avatarFallback={avatarFallback}
           onLogout={handleLogout}
@@ -65,6 +68,8 @@ const AdminLayout = () => {
           <Outlet />
         </main>
       </div>
+
+      <AdminProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
     </div>
   )
 }
