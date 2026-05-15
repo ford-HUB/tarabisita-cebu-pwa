@@ -38,11 +38,25 @@ export const fetchPublicMenuFeed = async (menuCategory = 'ALL') => {
   return response
 }
 
+/** Guest catalog feed for unauthenticated public pages (no TOURIST session required). */
+export const fetchGuestMenuFeed = async (menuCategory = 'ALL') => {
+  const response = await apiInstance.get('business/public/guest-menu-feed', {
+    params: { menuCategory }
+  })
+  return response
+}
+
 /**
  * Gemini-backed relevance ranking for tourist catalog search (API key stays on the server).
  * @param {{ query: string, items: { name?: string, category?: string, businessName?: string }[] }} body
  */
 export const postTouristCatalogSearchRank = async (body) => {
   const response = await apiInstance.post('business/public/tourist-catalog-search-rank', body)
+  return response
+}
+
+/** Guest search ranking for unauthenticated public search (no TOURIST session required). */
+export const postGuestCatalogSearchRank = async (body) => {
+  const response = await apiInstance.post('business/public/guest-catalog-search-rank', body)
   return response
 }

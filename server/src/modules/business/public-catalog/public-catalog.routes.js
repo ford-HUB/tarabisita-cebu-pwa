@@ -29,10 +29,18 @@ publicCatalogRoutes.get(
     validateRequest(listPublicLandingRestaurantReviewsSchema),
     getPublicLandingRestaurantReviews
 )
+/** Authenticated tourists (dashboard explore, home hub hero search). */
 publicCatalogRoutes.get('/public/menu-feed', guard(['TOURIST']), getPublicMenuFeed)
 publicCatalogRoutes.post(
     '/public/tourist-catalog-search-rank',
     guard(['TOURIST']),
+    validateRequest(touristCatalogSearchRankSchema),
+    postTouristCatalogSearchRank
+)
+/** Unauthenticated guests (public landing hero, public search). */
+publicCatalogRoutes.get('/public/guest-menu-feed', getPublicMenuFeed)
+publicCatalogRoutes.post(
+    '/public/guest-catalog-search-rank',
     validateRequest(touristCatalogSearchRankSchema),
     postTouristCatalogSearchRank
 )

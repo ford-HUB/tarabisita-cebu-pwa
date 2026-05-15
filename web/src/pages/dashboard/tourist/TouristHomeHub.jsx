@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
+import AuthFooter from '../../../components/layout/auth/AuthFooter.jsx'
 import { useAuth } from '../../../hooks/useAuth.hook'
 import LandingHeroSection from '../../../components/public/LandingHeroSection.jsx'
 import TouristVibeDiscoverySection from '../../../components/tourist/home/TouristVibeDiscoverySection.jsx'
@@ -52,7 +53,7 @@ const TouristHomeHub = () => {
       if (vb !== va) return vb - va
       return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' })
     })
-    return list.slice(0, 10)
+    return list
   }, [businesses])
 
   return (
@@ -95,11 +96,16 @@ const TouristHomeHub = () => {
             subtitle="Popular Tara Bisita partners in Cebu—dining, stays, and local experiences."
             items={featuredPlaces}
             onOpen={openBusinessPage}
-            seeAllTo={touristExploreHref}
+            previewLimit={3}
             seeAllLabel="Browse all"
+            seeLessLabel="Show less"
           />
         </div>
       ) : null}
+
+      <div className="-mx-4 sm:-mx-5 md:-mx-6 lg:-mx-8 xl:-mx-10 2xl:-mx-12">
+        <AuthFooter />
+      </div>
     </div>
   )
 }

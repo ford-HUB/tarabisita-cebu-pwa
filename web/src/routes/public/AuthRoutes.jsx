@@ -4,6 +4,8 @@ import Register from "../../pages/auth/Register"
 import VerifyEmail from "../../pages/auth/VerifyEmail"
 import ResetPassword from "../../pages/auth/ResetPassword"
 import Landing from "../../pages/public/Landing"
+import PublicSearchResults from "../../pages/public/PublicSearchResults"
+import PublicCart from "../../pages/public/PublicCart"
 import BookingPayment from "../../pages/dashboard/tourist/BookingPayment"
 
 export const AuthRoutes = [
@@ -24,15 +26,19 @@ export const AuthRoutes = [
         element: <Landing />,
       },
       {
+        path: 'search',
+        element: <PublicSearchResults />,
+      },
+      {
+        path: 'cart',
+        element: <PublicCart />,
+      },
+      {
         path: 'register',
         element: <Register />,
       },
       {
         path: 'login',
-        element: <Login />,
-      },
-      {
-        path: 'admin/login',
         element: <Login />,
       },
       {

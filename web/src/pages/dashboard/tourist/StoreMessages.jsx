@@ -28,7 +28,9 @@ const StoreMessages = () => {
       <div className="space-y-6 md:space-y-8">
         <header>
           <h1 className="text-2xl font-semibold text-[#1f1f1f] md:text-3xl">Messages</h1>
-          <p className="mt-1 text-sm text-[#5b5b5b]">Chats you have opened with restaurants appear here.</p>
+          <p className="mt-1 text-sm text-[#5b5b5b]">
+            Chats with restaurants and resort inquiries appear here.
+          </p>
         </header>
         <MessagingHubSection items={hub.items} isLoading={hub.loading} errorMessage={hub.error} />
       </div>
@@ -36,13 +38,17 @@ const StoreMessages = () => {
   }
 
   const session = room.session
+  const isInquiry =
+    session?.conversationKind === 'INQUIRY' || session?.orderSnapshot?.orderType === 'INQUIRY'
 
   return (
     <div className="space-y-6 md:space-y-8">
       <header>
         <h1 className="text-2xl font-semibold text-[#1f1f1f] md:text-3xl">Store messages</h1>
         <p className="mt-1 text-sm text-[#5b5b5b]">
-          You are messaging {session?.businessName || 'the store'} about your order.
+          {isInquiry
+            ? `You are messaging ${session?.businessName || 'this resort'} — ask about stays, packages, or availability.`
+            : `You are messaging ${session?.businessName || 'the store'} about your order.`}
         </p>
       </header>
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FiStar } from 'react-icons/fi'
 import { categoryDisplayLabel } from '../../../../shared/utils/touristExplore.utils.js'
@@ -12,6 +13,8 @@ const thumb = (business) => business?.banner || business?.coverImage || business
  *   subtitle?: string,
  *   seeAllTo?: string,
  *   seeAllLabel?: string,
+ *   seeLessLabel?: string,
+ *   previewLimit?: number,
  *   headerAlign?: 'left' | 'center',
  *   fillAvailableWidth?: boolean
  * }} props
@@ -23,13 +26,24 @@ const TouristBusinessCarouselSection = ({
   subtitle,
   seeAllTo,
   seeAllLabel = 'See all',
+  seeLessLabel = 'Show less',
+  previewLimit,
   headerAlign = 'left',
   fillAvailableWidth = false
 }) => {
+  const [expanded, setExpanded] = useState(false)
+
   if (!items?.length) return null
 
-  const showHeaderRow = Boolean(subtitle || seeAllTo)
+  const canExpandInline =
+    previewLimit != null && Number.isFinite(previewLimit) && items.length > previewLimit
+  const isExpanded = canExpandInline && expanded
+  const visibleItems = isExpanded ? items : canExpandInline ? items.slice(0, previewLimit) : items
+  const showSeeAllControl = Boolean(seeAllTo || canExpandInline)
+
+  const showHeaderRow = Boolean(subtitle || showSeeAllControl)
   const centered = headerAlign === 'center'
+  const gridFillWidth = fillAvailableWidth || isExpanded
 
   return (
     <section aria-label={title} className="scroll-mt-4">
@@ -37,10 +51,10 @@ const TouristBusinessCarouselSection = ({
         <div
           className={[
             'mb-2.5 flex flex-wrap gap-3 md:mb-3',
-            seeAllTo ? 'items-end justify-between' : centered ? 'flex-col items-center text-center' : 'items-end justify-between'
+            showSeeAllControl ? 'items-end justify-between' : centered ? 'flex-col items-center text-center' : 'items-end justify-between'
           ].join(' ')}
         >
-          <div className={['min-w-0', centered && !seeAllTo ? 'mx-auto max-w-2xl' : ''].filter(Boolean).join(' ')}>
+          <div className={['min-w-0', centered && !showSeeAllControl ? 'mx-auto max-w-2xl' : ''].filter(Boolean).join(' ')}>
             <h2
               className={[
                 'text-base font-semibold tracking-tight text-[#1f1f1f] md:text-xl',
@@ -64,7 +78,16 @@ const TouristBusinessCarouselSection = ({
               </p>
             ) : null}
           </div>
-          {seeAllTo ? (
+          {canExpandInline ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={isExpanded}
+              className="shrink-0 rounded-full border border-[#eadfce] bg-[#fffaf6] px-3 py-1.5 text-xs font-semibold text-[#9b5a2c] transition hover:border-[#c66b2b]/40 hover:bg-[#fff7ed] md:text-sm"
+            >
+              {isExpanded ? seeLessLabel : seeAllLabel}
+            </button>
+          ) : seeAllTo ? (
             <Link
               to={seeAllTo}
               className="shrink-0 rounded-full border border-[#eadfce] bg-[#fffaf6] px-3 py-1.5 text-xs font-semibold text-[#9b5a2c] transition hover:border-[#c66b2b]/40 hover:bg-[#fff7ed] md:text-sm"
@@ -89,12 +112,12 @@ const TouristBusinessCarouselSection = ({
         className={
           'gap-3 pb-2 max-md:flex max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto max-md:pb-3 ' +
           'max-md:[-ms-overflow-style:none] max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden ' +
-          (fillAvailableWidth
+          (gridFillWidth
             ? 'md:grid md:grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))] md:gap-4 md:overflow-visible'
             : 'md:grid md:grid-cols-[repeat(auto-fill,minmax(12rem,14rem))] md:justify-start md:gap-4 md:overflow-visible')
         }
       >
-        {items.map((business) => {
+        {visibleItems.map((business) => {
           const img = thumb(business)
           const label = categoryDisplayLabel(business.category)
           const sum = business?.restaurantReviewSummary
@@ -108,7 +131,7 @@ const TouristBusinessCarouselSection = ({
               onClick={() => onOpen(business)}
               className={
                 'group relative max-md:w-44 max-md:max-w-[min(85vw,13.5rem)] max-md:snap-start max-md:shrink-0 overflow-hidden rounded-xl border border-[#e7dfd5] bg-[#1a120c] text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md md:min-w-0 md:w-full ' +
-                (fillAvailableWidth ? 'md:max-w-none' : 'md:max-w-56')
+                (gridFillWidth ? 'md:max-w-none' : 'md:max-w-56')
               }
             >
               <div className="relative aspect-[4/5] w-full overflow-hidden">

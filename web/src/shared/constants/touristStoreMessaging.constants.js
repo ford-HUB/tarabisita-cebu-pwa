@@ -27,6 +27,7 @@ export const MENU_ORDER_QUICK_REPLIES = [
 export const getTouristStoreDefaultQuickReplies = (orderType) => {
   const t = String(orderType || '').toUpperCase()
   if (t === 'MENU_ORDER') return MENU_ORDER_QUICK_REPLIES
+  if (t === 'INQUIRY') return BOOKING_REQUEST_QUICK_REPLIES
   return BOOKING_REQUEST_QUICK_REPLIES
 }
 

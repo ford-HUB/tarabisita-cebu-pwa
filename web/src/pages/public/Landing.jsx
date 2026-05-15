@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import { motion } from 'motion/react'
 import LandingHeroSection from '../../components/public/LandingHeroSection.jsx'
 import LandingWhyChooseSection from '../../components/public/LandingWhyChooseSection.jsx'
@@ -16,9 +17,17 @@ const fadeUp = {
 }
 
 const Landing = () => {
+  const scrollToPopularPlaces = useCallback(() => {
+    document.getElementById('popular-places')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
   return (
     <div className="bg-[#f8f5f0] text-[#1f1f1f]">
-      <LandingHeroSection ctaVariant="marketing" />
+      <LandingHeroSection
+        ctaVariant="public"
+        exploreHref="/#popular-places"
+        onFeaturedCategorySelect={scrollToPopularPlaces}
+      />
 
 
       <section className="mx-auto w-full max-w-6xl px-6 py-16 lg:px-10">

@@ -12,6 +12,7 @@ import { groupCartItemsByBusiness, useTouristCartItemStore } from '../store/tour
 import { getTouristMenuOrderCheckoutStatus, postTouristCustomerOrderCheckout } from '../services/tourist/touristCustomerOrder.service.js'
 import { putTouristCartItems } from '../services/tourist/tourist-cart-item.service.js'
 import {
+  buildTouristExploreBusinessDetailHref,
   buildTouristExploreBusinessEditCartHref,
   TOURIST_CART_EDIT_KEY_STORAGE,
   touristCartHref,
@@ -105,6 +106,12 @@ export const useTouristRestaurantCheckout = (options = {}) => {
     if (implicitSingleBusinessId) return implicitSingleBusinessId
     return null
   }, [activeCheckoutBusinessId, implicitSingleBusinessId])
+
+  /** Checkout "Edit" returns to the restaurant menu (no item modal deep-link). */
+  const restaurantEditHref = useMemo(() => {
+    if (!effectiveCheckoutBusinessId) return touristCartHref
+    return buildTouristExploreBusinessDetailHref(effectiveCheckoutBusinessId)
+  }, [effectiveCheckoutBusinessId])
 
   /** Checkout route: multiple restaurants saved and user did not start checkout from one store. */
   const checkoutBlockedMultiStore = useMemo(
@@ -516,6 +523,7 @@ export const useTouristRestaurantCheckout = (options = {}) => {
     selectedSpansMultipleStores,
     checkoutBlockedMultiStore,
     effectiveCheckoutBusinessId,
+    restaurantEditHref,
     otherStoresSummary,
     multiStoreInSavedCart: storeDistinctIds.length > 1,
     isXenditMobileCheckoutModalOpen: Boolean(xenditInAppCheckoutUrl),

@@ -1,12 +1,21 @@
+import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useTouristRestaurantCheckout } from '../../../hooks/useTouristRestaurantCheckout.hook.js'
-import { touristCartHref } from '../../../components/layout/tourist/touristLayout.constants.js'
+import { TOURIST_CART_EDIT_KEY_STORAGE, touristCartHref } from '../../../components/layout/tourist/touristLayout.constants.js'
 import XenditMobileCheckoutModal from '../../../components/business/billing/modals/XenditMobileCheckoutModal.jsx'
 import TouristCheckoutBillingSummarySection from '../../../components/tourist/checkout/sections/TouristCheckoutBillingSummarySection.jsx'
 import TouristCheckoutCustomerSection from '../../../components/tourist/checkout/sections/TouristCheckoutCustomerSection.jsx'
 import TouristCheckoutOrderReviewSection from '../../../components/tourist/checkout/sections/TouristCheckoutOrderReviewSection.jsx'
 
 const RestaurantCheckout = () => {
+  const clearCartEditDeepLink = useCallback(() => {
+    try {
+      sessionStorage.removeItem(TOURIST_CART_EDIT_KEY_STORAGE)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   const {
     items,
     storeItems,
@@ -28,6 +37,7 @@ const RestaurantCheckout = () => {
     setItemNotes,
     removeItem,
     checkoutBlockedMultiStore,
+    restaurantEditHref,
     otherStoresSummary,
     isXenditMobileCheckoutModalOpen,
     xenditMobileCheckoutUrl,
@@ -141,7 +151,8 @@ const RestaurantCheckout = () => {
       <TouristCheckoutOrderReviewSection
         groups={groupsForCheckout}
         formatPhp={formatPhp}
-        editCartHref={touristCartHref}
+        editCartHref={restaurantEditHref}
+        onEditCartClick={clearCartEditDeepLink}
         setItemNotes={setItemNotes}
         removeItem={removeItem}
       />

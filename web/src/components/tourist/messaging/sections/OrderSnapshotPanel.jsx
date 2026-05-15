@@ -18,6 +18,8 @@ const withoutBillingLine = (text) => {
 const OrderSnapshotPanel = ({ snapshot }) => {
   if (!snapshot || typeof snapshot !== 'object') return null
 
+  const orderType = snapshot.orderType != null ? String(snapshot.orderType) : ''
+  const isInquiry = orderType === 'INQUIRY'
   const orderCode = snapshot.orderCode != null ? String(snapshot.orderCode) : ''
   const productName = snapshot.productName != null ? String(snapshot.productName) : ''
   const detailsRaw = snapshot.productDetails != null ? String(snapshot.productDetails) : ''
@@ -25,8 +27,7 @@ const OrderSnapshotPanel = ({ snapshot }) => {
   const total = snapshot.total != null ? String(snapshot.total) : ''
   const itemsCount = snapshot.itemsCount
   const rawStatus = snapshot.status != null ? String(snapshot.status) : ''
-  const orderType = snapshot.orderType != null ? String(snapshot.orderType) : ''
-  const statusLabel = rawStatus ? touristCustomerOrderStatusLabel(rawStatus, orderType) : ''
+  const statusLabel = !isInquiry && rawStatus ? touristCustomerOrderStatusLabel(rawStatus, orderType) : ''
   const statusBadgeClass = touristCustomerOrderStatusBadgeClass(rawStatus)
 
   return (
@@ -36,8 +37,10 @@ const OrderSnapshotPanel = ({ snapshot }) => {
           <FiPackage className="h-5 w-5" aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#9f9387]">Order in this chat</p>
-          <p className="mt-1 font-semibold text-[#1f1f1f]">{productName || 'Menu order'}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#9f9387]">
+            {isInquiry ? 'Inquiry' : 'Order in this chat'}
+          </p>
+          <p className="mt-1 font-semibold text-[#1f1f1f]">{productName || (isInquiry ? 'General inquiry' : 'Menu order')}</p>
           {orderCode ? <p className="mt-0.5 font-mono text-xs text-[#6b5545]">{orderCode}</p> : null}
           {statusLabel ? (
             <span

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { touristCartHref } from '../../../layout/tourist/touristLayout.constants.js'
+import { useGuestCartStore } from '../../../../store/guest/guest-cart.store.js'
 import { FiChevronLeft, FiChevronRight, FiMinus, FiPlus } from 'react-icons/fi'
 import { useBodyScrollLock } from '../../../../hooks/useBodyScrollLock.hook.js'
 import { fetchPublicBusinessById } from '../../../../services/tourist/touristExplore.service.js'
@@ -20,9 +21,15 @@ const formatPricePhp = (n) => {
 
 const clampModalQty = (n) => Math.min(99, Math.max(1, Math.round(Number(n)) || 1))
 
-const TouristMenuItemDetailModal = ({ item, onClose, editCartKey = null }) => {
+const TouristMenuItemDetailModal = ({
+  item,
+  onClose,
+  editCartKey = null,
+  guestCartMode = false
+}) => {
   useBodyScrollLock(Boolean(item))
   const navigate = useNavigate()
+  const addGuestItem = useGuestCartStore((s) => s.addItem)
   const addItem = useTouristCartItemStore((s) => s.addItem)
   const updateItem = useTouristCartItemStore((s) => s.updateItem)
   const isEditing = Boolean(editCartKey)
@@ -118,6 +125,11 @@ const TouristMenuItemDetailModal = ({ item, onClose, editCartKey = null }) => {
   const handleAddToCart = () => {
     const payload = cartPayload()
     if (!payload) return
+    if (guestCartMode) {
+      addGuestItem(payload)
+      onClose?.()
+      return
+    }
     if (isEditing) {
       updateItem(String(editCartKey), payload)
       onClose?.()

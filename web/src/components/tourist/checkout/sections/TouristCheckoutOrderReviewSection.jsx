@@ -5,7 +5,7 @@ import { isTouristCartStayListing } from '../../../../shared/utils/tourist-cart-
 
 const MAX_ITEM_NOTES = 500
 
-const TouristCheckoutOrderReviewSection = ({ groups, formatPhp, editCartHref, setItemNotes, removeItem }) => {
+const TouristCheckoutOrderReviewSection = ({ groups, formatPhp, editCartHref, onEditCartClick, setItemNotes, removeItem }) => {
   if (!groups.length) return null
 
   return (
@@ -16,14 +16,15 @@ const TouristCheckoutOrderReviewSection = ({ groups, formatPhp, editCartHref, se
         </h2>
         <Link
           to={editCartHref}
+          onClick={() => onEditCartClick?.()}
           className="text-sm font-semibold text-[#9b5a2c] underline decoration-[#e7dfd5] underline-offset-2 transition hover:text-[#ff7a1a]"
         >
-          Edit cart
+          Edit
         </Link>
       </div>
       <p className="mt-1 text-xs text-[#5b5b5b]">
         Review what you selected. Add optional notes per item (for example spice level or allergies). To change items
-        or quantities, use Edit cart.
+        or quantities, use Edit.
       </p>
 
       <div className="mt-4 space-y-5">

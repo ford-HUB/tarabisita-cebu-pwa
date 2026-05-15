@@ -11,6 +11,9 @@ const LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000
 /** Tourist hub hides threads when the order is done or canceled (`CustomerOrder.status`). */
 const TOURIST_MESSAGING_CLOSED_STATUSES = new Set(['FINISHED', 'CANCELED'])
 
+const isInquiryConversation = (conv) =>
+    conv?.conversationKind === 'INQUIRY' || (conv != null && conv.customerOrderId == null)
+
 const assertOrderAllowsTouristMessaging = (order) => {
     if (!order) {
         throw new Error('ORDER_NOT_FOUND')
@@ -58,6 +61,25 @@ const extractBusinessCard = (businessDoc) => {
     }
 }
 
+const buildInquirySnapshot = (businessLean) => {
+    const card = extractBusinessCard(businessLean)
+    return {
+        orderType: 'INQUIRY',
+        productName: 'General inquiry',
+        productImage: card.businessStoreImage || '',
+        productDetails: '',
+        orderCode: '',
+        itemsCount: null,
+        total: '',
+        amount: null,
+        currency: 'PHP',
+        status: 'OPEN',
+        notes: '',
+        businessName: card.businessName,
+        businessStoreImage: card.businessStoreImage
+    }
+}
+
 const buildOrderSnapshot = (orderLean, businessLean) => {
     const card = extractBusinessCard(businessLean)
     return {
@@ -98,8 +120,32 @@ const mapMessage = (m) => ({
 export const createStoreMessagingLinkToken = async (touristUserId, { businessId, customerOrderId }) => {
     const uid = String(touristUserId)
     const bid = String(businessId || '')
-    const oid = String(customerOrderId || '')
-    if (!mongoose.Types.ObjectId.isValid(bid) || !mongoose.Types.ObjectId.isValid(oid)) {
+    const oid = String(customerOrderId || '').trim()
+    if (!mongoose.Types.ObjectId.isValid(bid)) {
+        throw new Error('INVALID_IDS')
+    }
+
+    const exp = Date.now() + LINK_TTL_MS
+
+    if (!oid) {
+        const business = await Business.findById(bid).populate('category', 'name').lean()
+        if (!business) {
+            throw new Error('BUSINESS_NOT_FOUND')
+        }
+        if (resolveBusinessCategorySlug(business) !== 'resort') {
+            throw new Error('INQUIRY_MESSAGING_NOT_AVAILABLE')
+        }
+        const token = sealStoreMessagingPayload({
+            v: 1,
+            kind: 'INQUIRY',
+            touristUserId: uid,
+            businessId: bid,
+            exp
+        })
+        return { messagingToken: token, expiresAt: new Date(exp).toISOString() }
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(oid)) {
         throw new Error('INVALID_IDS')
     }
     const order = await CustomerOrder.findOne({
@@ -113,9 +159,9 @@ export const createStoreMessagingLinkToken = async (touristUserId, { businessId,
         throw new Error('ORDER_NOT_FOUND')
     }
     assertOrderAllowsTouristMessaging(order)
-    const exp = Date.now() + LINK_TTL_MS
     const token = sealStoreMessagingPayload({
         v: 1,
+        kind: 'ORDER',
         touristUserId: uid,
         businessId: bid,
         customerOrderId: oid,
@@ -131,7 +177,12 @@ const assertTokenForTourist = (touristUserId, messagingToken) => {
     } catch {
         throw new Error('INVALID_MESSAGING_TOKEN')
     }
-    if (payload.v !== 1 || !payload.exp || !payload.touristUserId || !payload.businessId || !payload.customerOrderId) {
+    const isInquiry = payload.kind === 'INQUIRY'
+    const hasOrderFields = payload.customerOrderId != null && String(payload.customerOrderId).trim() !== ''
+    if (payload.v !== 1 || !payload.exp || !payload.touristUserId || !payload.businessId) {
+        throw new Error('INVALID_MESSAGING_TOKEN')
+    }
+    if (!isInquiry && !hasOrderFields) {
         throw new Error('INVALID_MESSAGING_TOKEN')
     }
     if (Number(payload.exp) < Date.now()) {
@@ -147,7 +198,8 @@ const getOrCreateConversation = async ({ touristUserId, businessId, customerOrde
     const existing = await StoreConversation.findOne({
         touristUserId,
         businessId,
-        customerOrderId
+        customerOrderId,
+        conversationKind: 'ORDER'
     }).lean()
     if (existing) {
         if (!existing.orderSnapshot && orderSnapshot) {
@@ -160,6 +212,29 @@ const getOrCreateConversation = async ({ touristUserId, businessId, customerOrde
         touristUserId,
         businessId,
         customerOrderId,
+        conversationKind: 'ORDER',
+        orderSnapshot
+    })
+    return created.toObject()
+}
+
+const getOrCreateInquiryConversation = async ({ touristUserId, businessId, orderSnapshot }) => {
+    const existing = await StoreConversation.findOne({
+        touristUserId,
+        businessId,
+        conversationKind: 'INQUIRY'
+    }).lean()
+    if (existing) {
+        if (!existing.orderSnapshot && orderSnapshot) {
+            await StoreConversation.updateOne({ _id: existing._id }, { $set: { orderSnapshot } })
+            return StoreConversation.findById(existing._id).lean()
+        }
+        return existing
+    }
+    const created = await StoreConversation.create({
+        touristUserId,
+        businessId,
+        conversationKind: 'INQUIRY',
         orderSnapshot
     })
     return created.toObject()
@@ -167,6 +242,36 @@ const getOrCreateConversation = async ({ touristUserId, businessId, customerOrde
 
 export const resolveTouristMessagingSession = async (touristUserId, messagingToken) => {
     const payload = assertTokenForTourist(touristUserId, messagingToken)
+
+    if (payload.kind === 'INQUIRY') {
+        const business = await Business.findById(payload.businessId)
+            .populate('category', 'name')
+            .select('name contact_info website socialMedia logo coverImage banner category')
+            .lean()
+        if (!business) {
+            throw new Error('BUSINESS_NOT_FOUND')
+        }
+        if (resolveBusinessCategorySlug(business) !== 'resort') {
+            throw new Error('INQUIRY_MESSAGING_NOT_AVAILABLE')
+        }
+        const snapshot = buildInquirySnapshot(business)
+        const conv = await getOrCreateInquiryConversation({
+            touristUserId,
+            businessId: business._id,
+            orderSnapshot: snapshot
+        })
+        const messages = await StoreMessage.find({ conversationId: conv._id }).sort({ createdAt: 1 }).lean()
+        const card = extractBusinessCard(business)
+        return {
+            conversationId: String(conv._id),
+            businessId: String(business._id),
+            conversationKind: 'INQUIRY',
+            ...card,
+            orderSnapshot: snapshot,
+            messages: messages.map(mapMessage)
+        }
+    }
+
     const order = await CustomerOrder.findOne({
         _id: payload.customerOrderId,
         businessId: payload.businessId,
@@ -195,6 +300,7 @@ export const resolveTouristMessagingSession = async (touristUserId, messagingTok
     return {
         conversationId: String(conv._id),
         businessId: String(order.businessId._id || order.businessId),
+        conversationKind: 'ORDER',
         ...card,
         orderSnapshot: overlayFreshOrderOnSnapshot(conv.orderSnapshot, order, b),
         messages: messages.map(mapMessage)
@@ -212,6 +318,30 @@ export const resolveTouristMessagingThread = async (touristUserId, conversationI
     if (!conv) {
         throw new Error('CONVERSATION_NOT_FOUND')
     }
+
+    if (isInquiryConversation(conv)) {
+        const business = await Business.findById(conv.businessId)
+            .select('name contact_info website socialMedia logo coverImage banner')
+            .lean()
+        if (!business) {
+            throw new Error('BUSINESS_NOT_FOUND')
+        }
+        const snapshot =
+            conv.orderSnapshot && typeof conv.orderSnapshot === 'object'
+                ? conv.orderSnapshot
+                : buildInquirySnapshot(business)
+        const messages = await StoreMessage.find({ conversationId: conv._id }).sort({ createdAt: 1 }).lean()
+        const card = extractBusinessCard(business)
+        return {
+            conversationId: String(conv._id),
+            businessId: String(conv.businessId),
+            conversationKind: 'INQUIRY',
+            ...card,
+            orderSnapshot: snapshot,
+            messages: messages.map(mapMessage)
+        }
+    }
+
     const order = await CustomerOrder.findById(conv.customerOrderId)
         .populate('businessId', 'name contact_info website socialMedia logo coverImage banner')
         .lean()
@@ -226,6 +356,7 @@ export const resolveTouristMessagingThread = async (touristUserId, conversationI
     return {
         conversationId: String(conv._id),
         businessId: String(order.businessId._id || order.businessId),
+        conversationKind: 'ORDER',
         ...card,
         orderSnapshot: snapshot,
         messages: messages.map(mapMessage)
@@ -247,6 +378,7 @@ export const listTouristConversations = async (touristUserId) => {
             : []
     const statusByOrderId = new Map(orders.map((o) => [String(o._id), String(o.status || '').toUpperCase()]))
     const activeRows = rows.filter((r) => {
+        if (isInquiryConversation(r)) return true
         const st = statusByOrderId.get(String(r.customerOrderId || ''))
         if (!st) return false
         return !TOURIST_MESSAGING_CLOSED_STATUSES.has(st)
@@ -255,13 +387,15 @@ export const listTouristConversations = async (touristUserId) => {
         const b = r.businessId && typeof r.businessId === 'object' ? r.businessId : null
         const card = extractBusinessCard(b)
         const snap = r.orderSnapshot && typeof r.orderSnapshot === 'object' ? r.orderSnapshot : {}
+        const inquiry = isInquiryConversation(r)
         return {
             conversationId: String(r._id),
             businessId: String(r.businessId?._id || r.businessId),
             businessName: card.businessName,
             businessStoreImage: card.businessStoreImage,
+            conversationKind: inquiry ? 'INQUIRY' : 'ORDER',
             orderCode: snap.orderCode || '',
-            productName: snap.productName || '',
+            productName: inquiry ? snap.productName || 'General inquiry' : snap.productName || '',
             lastMessageAt: r.lastMessageAt || r.updatedAt
         }
     })
@@ -365,13 +499,39 @@ export const resolveBusinessMessagingThread = async (businessUserId, conversatio
     if (!conv) {
         throw new Error('CONVERSATION_NOT_FOUND')
     }
+
+    const tourist = await User.findById(conv.touristUserId).select('name avatar').lean()
+
+    if (isInquiryConversation(conv)) {
+        const business = await Business.findById(conv.businessId)
+            .select('name contact_info website socialMedia logo coverImage banner')
+            .lean()
+        const snapshot =
+            conv.orderSnapshot && typeof conv.orderSnapshot === 'object'
+                ? conv.orderSnapshot
+                : buildInquirySnapshot(business)
+        const messages = await StoreMessage.find({ conversationId: conv._id }).sort({ createdAt: 1 }).lean()
+        const storeName = business?.name != null ? String(business.name).trim() : ''
+        await StoreConversation.updateOne({ _id: conv._id }, { $set: { businessLastReadAt: new Date() } })
+        return {
+            conversationId: String(conv._id),
+            businessId: String(biz._id),
+            businessName: storeName,
+            conversationKind: 'INQUIRY',
+            orderSnapshot: snapshot,
+            messages: messages.map(mapMessage),
+            touristName: tourist?.name != null ? String(tourist.name).trim() : 'Guest',
+            touristAvatar: tourist?.avatar != null ? String(tourist.avatar).trim() : '',
+            touristUserId: String(conv.touristUserId)
+        }
+    }
+
     const order = await CustomerOrder.findById(conv.customerOrderId)
         .populate('businessId', 'name contact_info website socialMedia logo coverImage banner')
         .lean()
     if (!order) {
         throw new Error('ORDER_NOT_FOUND')
     }
-    const tourist = await User.findById(conv.touristUserId).select('name avatar').lean()
     const b = order.businessId && typeof order.businessId === 'object' && order.businessId._id ? order.businessId : null
     const snapshot =
         conv.orderSnapshot && typeof conv.orderSnapshot === 'object' ? conv.orderSnapshot : buildOrderSnapshot(order, b)
@@ -382,6 +542,7 @@ export const resolveBusinessMessagingThread = async (businessUserId, conversatio
         conversationId: String(conv._id),
         businessId: String(biz._id),
         businessName: storeName,
+        conversationKind: 'ORDER',
         orderSnapshot: snapshot,
         messages: messages.map(mapMessage),
         touristName: tourist?.name != null ? String(tourist.name).trim() : 'Guest',
@@ -629,6 +790,9 @@ export const assertSocketAccessToConversation = async ({ conversationId, userId,
     if (role === 'TOURIST') {
         if (String(conv.touristUserId) !== String(userId)) {
             throw new Error('FORBIDDEN')
+        }
+        if (isInquiryConversation(conv)) {
+            return conv
         }
         const order = await CustomerOrder.findById(conv.customerOrderId).select('status').lean()
         assertOrderAllowsTouristMessaging(order)

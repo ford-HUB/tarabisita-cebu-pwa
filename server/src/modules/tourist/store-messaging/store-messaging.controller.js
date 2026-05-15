@@ -23,6 +23,13 @@ const mapErr = (error) => {
         return { status: 404, message: 'This chat is closed because the order is finished or canceled.' }
     }
     if (code === 'INVALID_IDS') return { status: 400, message: 'Invalid request.' }
+    if (code === 'BUSINESS_NOT_FOUND') return { status: 404, message: 'This listing was not found.' }
+    if (code === 'INQUIRY_MESSAGING_NOT_AVAILABLE') {
+        return {
+            status: 400,
+            message: 'Direct messaging is only available for resorts and hotels from their listing page.'
+        }
+    }
     if (code === 'INVALID_MESSAGING_TOKEN' || code === 'MESSAGING_TOKEN_EXPIRED' || code === 'MESSAGING_TOKEN_MISMATCH') {
         return { status: 400, message: 'This chat link is invalid or has expired. Open a new chat from your order.' }
     }

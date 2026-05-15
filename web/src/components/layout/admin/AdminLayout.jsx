@@ -8,7 +8,7 @@ import AdminTopbar from './AdminTopbar'
 import { adminSidebarLinks, getAdminAvatarFallback } from './adminLayout.constants'
 
 const AdminLayout = () => {
-  const { user, isAuthenticated, isAuthLoading } = useAuth()
+  const { user, isAuthLoading } = useAuth()
   const logout = useAuthStore((state) => state.logout)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState({ Business: true })
@@ -22,7 +22,7 @@ const AdminLayout = () => {
 
   const handleLogout = async () => {
     await logout()
-    window.location.href = '/admin/login'
+    window.location.href = '/login'
   }
 
   useEffect(() => {
@@ -35,10 +35,6 @@ const AdminLayout = () => {
         Loading admin session...
       </div>
     )
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />
   }
 
   if (user?.role !== 'ADMIN') {

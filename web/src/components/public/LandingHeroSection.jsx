@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { buildTouristSearchHref } from '../layout/tourist/touristLayout.constants.js'
+import { buildPublicSearchHref } from '../../shared/constants/publicCatalog.constants.js'
 import { useTouristExploreStore } from '../../store/tourist/touristExplore.store.js'
 import TouristCatalogSearchField from '../tourist/search/TouristCatalogSearchField.jsx'
 
@@ -14,7 +15,7 @@ const HERO_POSTER_URL = '/travel-view.jpg'
 
 /**
  * @param {{
- *   ctaVariant?: 'marketing' | 'tourist',
+ *   ctaVariant?: 'marketing' | 'tourist' | 'public',
  *   userName?: string,
  *   exploreHref?: string,
  *   ordersHref?: string,
@@ -30,6 +31,8 @@ const LandingHeroSection = (props) => {
     onFeaturedCategorySelect
   } = props
   const isTourist = ctaVariant === 'tourist'
+  const isPublic = ctaVariant === 'public'
+  const showCatalogHero = isTourist || isPublic
   const firstName = String(userName || '').trim().split(/\s+/)[0] || 'Explorer'
   const [videoRevealed, setVideoRevealed] = useState(false)
   const [heroQuery, setHeroQuery] = useState('')
@@ -44,16 +47,16 @@ const LandingHeroSection = (props) => {
   )
 
   useEffect(() => {
-    if (!isTourist) return
-    void loadMenuFeed('ALL')
+    if (!showCatalogHero) return
+    void loadMenuFeed('ALL', { guest: isPublic })
     void loadPublicBusinesses()
-  }, [isTourist, loadMenuFeed, loadPublicBusinesses])
+  }, [showCatalogHero, isPublic, loadMenuFeed, loadPublicBusinesses])
 
   const handleHeroCatalogSearch = useCallback(
     (q) => {
-      navigate(buildTouristSearchHref(q))
+      navigate(isPublic ? buildPublicSearchHref(q) : buildTouristSearchHref(q))
     },
-    [navigate]
+    [navigate, isPublic]
   )
 
   const revealVideo = useCallback(() => {
@@ -61,7 +64,7 @@ const LandingHeroSection = (props) => {
   }, [])
 
   useEffect(() => {
-    if (isTourist || typeof document === 'undefined') return
+    if (showCatalogHero || typeof document === 'undefined') return
     const link = document.createElement('link')
     link.rel = 'preload'
     link.as = 'video'
@@ -70,9 +73,9 @@ const LandingHeroSection = (props) => {
     return () => {
       link.remove()
     }
-  }, [isTourist])
+  }, [showCatalogHero])
 
-  if (isTourist) {
+  if (showCatalogHero) {
     return (
       <section className="relative ml-[calc(50%-50vw)] w-screen overflow-x-clip overflow-hidden border-b border-[#eadfce]">
         <div className="pointer-events-none absolute inset-0 z-0">

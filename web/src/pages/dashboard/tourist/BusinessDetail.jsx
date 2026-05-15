@@ -71,6 +71,9 @@ const groupByCategory = (items) => {
   return Array.from(map.entries()).map(([name, rows]) => ({ name, rows }))
 }
 
+const isMenuItemOrderable = (item) =>
+  Boolean(item?.isAvailable) && String(item?.stockStatus || '') !== 'OUT_OF_STOCK'
+
 const MenuTabs = ({
   selected,
   onSelect,
@@ -361,11 +364,33 @@ const BusinessDetail = () => {
       const token = res?.data?.data?.messagingToken
       if (!token) throw new Error('NO_TOKEN')
       navigate(`/${buildTouristStoreMessagingHref(token)}`)
-    } catch {
-      toast.error('Could not open message. Please try again.')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not open message. Please try again.')
     } finally {
       setIsOpeningMessage(false)
     }
+  }
+
+  const handleQuickAddMenuItem = (item) => {
+    const id = business?._id ? String(business._id) : ''
+    if (!id) return
+    if (!isMenuItemOrderable(item)) {
+      toast.error('This item is not available right now.')
+      return
+    }
+    const image = Array.isArray(item.images) && item.images.length ? String(item.images[0]).trim() : ''
+    const listingType = String(item?.listingType || '').trim().toUpperCase()
+    addItem({
+      businessId: id,
+      businessName: business.name,
+      catalogItemId: String(item.id),
+      name: item.name,
+      unitPrice: Number(item.price) || 0,
+      image,
+      qty: 1,
+      ...(listingType ? { listingType } : {}),
+      ...pickCartItemDetailsFromMenuItem(item)
+    })
   }
 
   if (isLoading && !business) {
@@ -527,7 +552,7 @@ const BusinessDetail = () => {
               className="inline-flex h-10 items-center gap-2 rounded-md border border-[#d8d8d8] bg-white px-4 text-sm font-medium text-[#262626] transition hover:bg-[#fafafa] disabled:opacity-60"
             >
               <FiMessageCircle className="h-4 w-4" aria-hidden />
-              {isOpeningMessage ? 'Opening…' : 'inqiure'}
+              {isOpeningMessage ? 'Opening…' : 'Inquire'}
             </button>
           </div>
         </div>
@@ -665,15 +690,12 @@ const BusinessDetail = () => {
                           </div>
                           <button
                             type="button"
-                            onClick={() =>
-                              setSelectedMenuItem({
-                                ...item,
-                                businessId: String(business._id),
-                                businessName: business.name
-                              })
-                            }
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleQuickAddMenuItem(item)
+                            }}
                             className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfdfdf] bg-white text-[#232323] shadow-sm transition hover:bg-[#f6f6f6]"
-                            aria-label={`View ${item.name} details`}
+                            aria-label={`Add ${item.name} to cart`}
                           >
                             <FiPlus className="h-4 w-4" aria-hidden />
                           </button>
