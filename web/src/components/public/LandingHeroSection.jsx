@@ -127,12 +127,6 @@ const LandingHeroSection = (props) => {
               >
                 What&apos;s your vibe?
               </a>
-              <Link
-                to={exploreHref}
-                className="text-white/90 underline-offset-4 transition hover:text-white hover:underline"
-              >
-                Browse all partners
-              </Link>
             </div>
           </MotionDiv>
         </div>

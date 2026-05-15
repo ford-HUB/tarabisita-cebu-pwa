@@ -17,6 +17,8 @@ import { FiClock } from 'react-icons/fi'
 import { postTouristCustomerOrder } from '../../../services/tourist/touristCustomerOrder.service.js'
 import StayDatePickerField from '../../../components/tourist/stay/StayDatePickerField.jsx'
 
+const STAY_BOOKING_PHONE_MAX_LENGTH = 11
+
 const formatPrice = (n) => {
   const num = Number(n)
   if (Number.isNaN(num)) return '—'
@@ -200,9 +202,18 @@ const StayBooking = () => {
   const stayBusiness = location?.state?.stayBusiness || null
   const touristName = String(user?.name || '').trim()
   const touristEmail = String(user?.email || '').trim()
-  const touristPhone = String(user?.phone || user?.contact_info?.phone || '').trim()
+  const touristPhone = String(user?.phone || user?.contact_info?.phone || '')
+    .trim()
+    .slice(0, STAY_BOOKING_PHONE_MAX_LENGTH)
 
-  const { register, control, handleSubmit, setValue, getValues } = useForm({
+  const {
+    register,
+    control,
+    handleSubmit,
+    setValue,
+    getValues,
+    formState: { errors }
+  } = useForm({
     defaultValues: {
       checkInDate: '',
       checkInTime: '14:00',
@@ -567,6 +578,12 @@ const StayBooking = () => {
   }
 
   const onSubmit = async (values) => {
+    const phone = String(values.phone || '').trim()
+    if (phone.length > STAY_BOOKING_PHONE_MAX_LENGTH) {
+      toast.error(`Phone number must be at most ${STAY_BOOKING_PHONE_MAX_LENGTH} characters.`)
+      return
+    }
+
     const nights = computeStayDays(
       values.checkInDate,
       values.checkOutDate,
@@ -618,7 +635,7 @@ const StayBooking = () => {
       `Guests: ${values.guests}`,
       `Guest name: ${values.fullName}`,
       `Email: ${values.email}`,
-      `Phone: ${values.phone}`,
+      phone ? `Phone: ${phone}` : '',
       values.travelPurpose ? `Purpose: ${values.travelPurpose}` : '',
       `With pets: ${values.withPets}`,
       `Need parking: ${values.needParking}`,
@@ -636,7 +653,7 @@ const StayBooking = () => {
     try {
       await postTouristCustomerOrder(String(stayPackage.businessId || ''), {
         customerName: values.fullName,
-        customerPhone: values.phone,
+        customerPhone: phone,
         billingType: 'PAY_AT_PICKUP',
         orderType: 'BOOKING_REQUEST',
         notes: bookingNotes,
@@ -883,7 +900,24 @@ const StayBooking = () => {
           </label>
           <label className="space-y-1 md:col-span-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-[#7a7a7a]">Phone number</span>
-            <input type="tel" required {...register('phone')} className="w-full rounded-lg border border-[#ddd2c6] px-3 py-2.5 text-sm outline-none focus:border-[#c9b6a3]" />
+            <input
+              type="tel"
+              inputMode="tel"
+              maxLength={STAY_BOOKING_PHONE_MAX_LENGTH}
+              placeholder="Optional"
+              {...register('phone', {
+                maxLength: {
+                  value: STAY_BOOKING_PHONE_MAX_LENGTH,
+                  message: `Phone number must be at most ${STAY_BOOKING_PHONE_MAX_LENGTH} characters`
+                }
+              })}
+              className="w-full rounded-lg border border-[#ddd2c6] px-3 py-2.5 text-sm outline-none focus:border-[#c9b6a3]"
+            />
+            {errors.phone ? (
+              <p className="text-xs text-[#b42318]" role="alert">
+                {errors.phone.message}
+              </p>
+            ) : null}
           </label>
         </div>
 
