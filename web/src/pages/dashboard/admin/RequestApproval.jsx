@@ -25,7 +25,8 @@ const RequestApproval = () => {
     openReviewModal,
     closeAllModals,
     submitAction,
-    submitRevoke
+    submitRevoke,
+    exportCsv
   } = useAdminRequestApproval()
 
   return (
@@ -38,6 +39,8 @@ const RequestApproval = () => {
         isLoading={isLoading}
         requests={filteredRequests}
         onOpenReview={openReviewModal}
+        onExportCsv={exportCsv}
+        isExportDisabled={isLoading || filteredRequests.length === 0}
       />
 
       <ReviewModal

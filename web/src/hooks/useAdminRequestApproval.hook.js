@@ -1,5 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { toast } from 'sonner'
 import { useShallow } from 'zustand/react/shallow'
+import { buildRequestApprovalCsv } from '../components/ui/admin/request-approval/utils'
 import { useAdminRequestApprovalStore } from '../store/admin/requestApproval.store'
 
 export const useAdminRequestApproval = () => {
@@ -65,6 +67,22 @@ export const useAdminRequestApproval = () => {
     await useAdminRequestApprovalStore.getState().submitRevokeApproval({ notes })
   }
 
+  const exportCsv = useCallback(() => {
+    if (!filteredRequests.length) {
+      toast.message('Nothing to export for the current filter.')
+      return
+    }
+    const csv = buildRequestApprovalCsv(filteredRequests)
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `business-verification-requests-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success('CSV downloaded.')
+  }, [filteredRequests])
+
   return {
     search,
     statusFilter,
@@ -83,6 +101,7 @@ export const useAdminRequestApproval = () => {
     openReviewModal,
     closeAllModals,
     submitAction,
-    submitRevoke
+    submitRevoke,
+    exportCsv
   }
 }
