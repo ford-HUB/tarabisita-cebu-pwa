@@ -19,12 +19,6 @@ export const CEBU_VIBE_CATEGORIES = [
     gradient: 'from-[#7c3aed] to-[#4c1d95]'
   },
   {
-    id: 'hotel',
-    label: 'Hotel',
-    blurb: 'Stays from city to shoreline',
-    gradient: 'from-[#b45309] to-[#78350f]'
-  },
-  {
     id: 'market',
     label: 'Market',
     blurb: 'Dried fish, fruits, local finds',
@@ -130,35 +124,6 @@ export const CEBU_CURATED_SPOTS_BY_VIBE = {
       image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&q=80',
       rating: 4.3,
       tags: ['Culture', 'Street scene']
-    }
-  ],
-  hotel: [
-    {
-      id: 'cebu-city-stays',
-      name: 'Cebu City skyline hotels',
-      area: 'Ayala · IT Park',
-      description: 'Rooftop pools, gyms, and quick access to malls and dining.',
-      image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80',
-      rating: 4.7,
-      tags: ['City center', 'Business travel']
-    },
-    {
-      id: 'mactan-resorts',
-      name: 'Mactan resort strip',
-      area: 'Lapu-Lapu',
-      description: 'Beachfront rooms, spas, and airport transfers.',
-      image: 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&q=80',
-      rating: 4.8,
-      tags: ['Resort', 'Airport nearby']
-    },
-    {
-      id: 'south-cebu-hideaways',
-      name: 'South Cebu boutique stays',
-      area: 'Dalaguete · Oslob',
-      description: 'Hillside inns and coastal guesthouses near whale sharks and falls.',
-      image: 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&q=80',
-      rating: 4.6,
-      tags: ['Boutique', 'Nature']
     }
   ],
   market: [
