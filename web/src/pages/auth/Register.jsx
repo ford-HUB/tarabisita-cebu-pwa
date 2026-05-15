@@ -8,6 +8,8 @@ import { useAuthStore } from '../../store/auth/auth.store'
 import { showErrorToast, showSuccessToast } from '../../shared/ui/toast.util'
 import { useNavigate } from 'react-router-dom'
 import { BUSINESS_CATEGORIES } from '../../shared/constants/businessCategories.constants'
+import { BUSINESS_CATEGORY_DESCRIPTION_BY_VALUE } from '../../shared/constants/businessCategoryDescriptions.constants'
+import CebuCityAutocomplete from '../../components/auth/CebuCityAutocomplete'
 
 /** Basic shape check before calling the mail-checker API (avoids spam while typing). */
 const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
@@ -50,7 +52,9 @@ const Register = () => {
     accountType: 'TOURIST',
     businessName: '',
     businessDescription: '',
-    businessAddress: '',
+    businessCity: '',
+    businessDistrict: '',
+    businessStreet: '',
     businessContact: '',
     businessCategory: '',
   }
@@ -73,6 +77,8 @@ const Register = () => {
 
   const accountType = watch('accountType')
   const emailValue = watch('email')
+  const businessCategory = watch('businessCategory')
+  const businessCity = watch('businessCity')
   const isBusiness = accountType === 'BUSINESS'
   const isBusinessDetailsStep = isBusiness && businessStep === 2
 
@@ -207,6 +213,18 @@ const Register = () => {
     return () => window.clearTimeout(timeoutId)
   }, [emailValue, handleEmailCheck, isBusinessDetailsStep])
 
+  useEffect(() => {
+    if (!businessCategory) return
+
+    const presetDescription = BUSINESS_CATEGORY_DESCRIPTION_BY_VALUE[businessCategory]
+    if (presetDescription) {
+      setValue('businessDescription', presetDescription, {
+        shouldDirty: true,
+        shouldValidate: hasAttemptedBusinessSubmit,
+      })
+    }
+  }, [businessCategory, hasAttemptedBusinessSubmit, setValue])
+
   const onSubmit = async (data) => {
     try {
       if (emailStatus.exists && emailStatus.isEmailVerified) {
@@ -218,10 +236,17 @@ const Register = () => {
       const isBusinessAccount = data.accountType === 'BUSINESS'
       const normalizedPayload = isBusinessAccount
         ? {
-            ...data,
+            name: data.name,
+            email: data.email,
+            password: data.password,
+            confirmPassword: data.confirmPassword,
+            accountType: data.accountType,
             businessName: data.businessName?.trim() || '',
             businessDescription: data.businessDescription?.trim() || '',
-            businessAddress: data.businessAddress?.trim() || '',
+            businessAddress: [data.businessStreet, data.businessDistrict, data.businessCity]
+              .map((part) => String(part || '').trim())
+              .filter(Boolean)
+              .join(', '),
             businessContact: data.businessContact?.trim() || '',
             businessCategory: data.businessCategory?.trim() || '',
           }
@@ -233,9 +258,7 @@ const Register = () => {
             accountType: data.accountType,
           }
 
-      if (!emailStatus.exists) {
-        await registerUser(normalizedPayload)
-      }
+      await registerUser(normalizedPayload)
 
       const response = await sendVerificationCode({ email: data.email })
       const sessionToken = response.data.properties.sessionToken
@@ -326,7 +349,9 @@ const Register = () => {
     const businessFields = [
       'businessName',
       'businessDescription',
-      'businessAddress',
+      'businessCity',
+      'businessDistrict',
+      'businessStreet',
       'businessContact',
       'businessCategory',
     ]
@@ -556,6 +581,30 @@ const Register = () => {
                 <div>
                   <label
                     className="mb-2 block text-sm font-medium text-[#3f3a35]"
+                    htmlFor="businessCategory"
+                  >
+                    Business Category
+                  </label>
+                  <select
+                    className={inputClassName}
+                    id="businessCategory"
+                    {...register('businessCategory')}
+                  >
+                    <option value="">Select a category</option>
+                    {BUSINESS_CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
+                  {shouldShowBusinessDetailsErrors && errors.businessCategory && (
+                    <p className={errorTextClassName}>{errors.businessCategory.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    className="mb-2 block text-sm font-medium text-[#3f3a35]"
                     htmlFor="businessName"
                   >
                     Business Name
@@ -594,19 +643,70 @@ const Register = () => {
                 <div>
                   <label
                     className="mb-2 block text-sm font-medium text-[#3f3a35]"
-                    htmlFor="businessAddress"
+                    htmlFor="businessCity"
                   >
-                    Business Address
+                    City
+                  </label>
+                  <CebuCityAutocomplete
+                    errorMessage={errors.businessCity?.message}
+                    errorTextClassName={errorTextClassName}
+                    inputClassName={inputClassName}
+                    shouldShowError={shouldShowBusinessDetailsErrors}
+                    value={businessCity}
+                    onChange={(nextCity) => {
+                      setValue('businessCity', nextCity, {
+                        shouldDirty: true,
+                        shouldValidate: hasAttemptedBusinessSubmit,
+                      })
+                    }}
+                    onSelectSuggestion={(suggestion) => {
+                      setValue('businessDistrict', suggestion.district || '', {
+                        shouldDirty: true,
+                        shouldValidate: hasAttemptedBusinessSubmit,
+                      })
+                      setValue('businessStreet', suggestion.street || '', {
+                        shouldDirty: true,
+                        shouldValidate: hasAttemptedBusinessSubmit,
+                      })
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    className="mb-2 block text-sm font-medium text-[#3f3a35]"
+                    htmlFor="businessDistrict"
+                  >
+                    District
                   </label>
                   <input
                     className={inputClassName}
-                    id="businessAddress"
-                    placeholder="Cebu City"
+                    id="businessDistrict"
+                    placeholder="Lahug"
                     type="text"
-                    {...register('businessAddress')}
+                    {...register('businessDistrict')}
                   />
-                  {shouldShowBusinessDetailsErrors && errors.businessAddress && (
-                    <p className={errorTextClassName}>{errors.businessAddress.message}</p>
+                  {shouldShowBusinessDetailsErrors && errors.businessDistrict && (
+                    <p className={errorTextClassName}>{errors.businessDistrict.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    className="mb-2 block text-sm font-medium text-[#3f3a35]"
+                    htmlFor="businessStreet"
+                  >
+                    Street
+                  </label>
+                  <input
+                    className={inputClassName}
+                    id="businessStreet"
+                    placeholder="Acacia Street"
+                    type="text"
+                    {...register('businessStreet')}
+                  />
+                  {shouldShowBusinessDetailsErrors && errors.businessStreet && (
+                    <p className={errorTextClassName}>{errors.businessStreet.message}</p>
                   )}
                 </div>
 
@@ -620,36 +720,17 @@ const Register = () => {
                   <input
                     className={inputClassName}
                     id="businessContact"
-                    placeholder="+63 900 000 0000"
+                    inputMode="numeric"
+                    placeholder="09091****19"
                     type="text"
-                    {...register('businessContact')}
+                    {...register('businessContact', {
+                      onChange: (event) => {
+                        event.target.value = event.target.value.replace(/\D/g, '')
+                      },
+                    })}
                   />
                   {shouldShowBusinessDetailsErrors && errors.businessContact && (
                     <p className={errorTextClassName}>{errors.businessContact.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    className="mb-2 block text-sm font-medium text-[#3f3a35]"
-                    htmlFor="businessCategory"
-                  >
-                    Business Category
-                  </label>
-                  <select
-                    className={inputClassName}
-                    id="businessCategory"
-                    {...register('businessCategory')}
-                  >
-                    <option value="">Select a category</option>
-                    {BUSINESS_CATEGORIES.map((category) => (
-                      <option key={category.value} value={category.value}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </select>
-                  {shouldShowBusinessDetailsErrors && errors.businessCategory && (
-                    <p className={errorTextClassName}>{errors.businessCategory.message}</p>
                   )}
                 </div>
               </div>

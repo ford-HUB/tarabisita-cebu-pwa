@@ -14,10 +14,16 @@ const storeConversationSchema = new mongoose.Schema(
             required: true,
             index: true
         },
+        conversationKind: {
+            type: String,
+            enum: ['ORDER', 'INQUIRY'],
+            default: 'ORDER',
+            index: true
+        },
         customerOrderId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'CustomerOrder',
-            required: true,
+            default: null,
             index: true
         },
         /** Snapshot of the order at first open; shown for the life of the thread. */
@@ -38,7 +44,14 @@ const storeConversationSchema = new mongoose.Schema(
     { timestamps: true, collection: 'storeconversations' }
 )
 
-storeConversationSchema.index({ touristUserId: 1, businessId: 1, customerOrderId: 1 }, { unique: true })
+storeConversationSchema.index(
+    { touristUserId: 1, businessId: 1, customerOrderId: 1 },
+    { unique: true, partialFilterExpression: { conversationKind: 'ORDER' } }
+)
+storeConversationSchema.index(
+    { touristUserId: 1, businessId: 1 },
+    { unique: true, partialFilterExpression: { conversationKind: 'INQUIRY' } }
+)
 
 const StoreConversation = mongoose.model('StoreConversation', storeConversationSchema)
 

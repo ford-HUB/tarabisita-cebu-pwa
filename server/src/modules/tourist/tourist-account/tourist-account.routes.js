@@ -7,7 +7,11 @@ import {
     postMyTouristChangePassword,
     postRequestTouristEmailChange,
     postResendTouristEmailChange,
-    postConfirmTouristEmailChange
+    postConfirmTouristEmailChange,
+    patchMyTouristSupportEmail,
+    postRequestTouristSupportEmailVerification,
+    postResendTouristSupportEmailVerification,
+    postConfirmTouristSupportEmailVerification
 } from './tourist-account.controller.js'
 import {
     updateTouristProfileSchema,
@@ -15,7 +19,11 @@ import {
     changeTouristPasswordSchema,
     requestTouristEmailChangeSchema,
     confirmTouristEmailChangeSchema,
-    resendTouristEmailChangeSchema
+    resendTouristEmailChangeSchema,
+    clearTouristSupportEmailSchema,
+    requestTouristSupportEmailVerificationSchema,
+    confirmTouristSupportEmailVerificationSchema,
+    resendTouristSupportEmailVerificationSchema
 } from './tourist-account.validator.js'
 
 const touristAccountRoutes = express.Router()
@@ -50,6 +58,30 @@ touristAccountRoutes.post(
     guard(['TOURIST']),
     validateRequest(confirmTouristEmailChangeSchema),
     postConfirmTouristEmailChange
+)
+touristAccountRoutes.post(
+    '/support-email/verification/request',
+    guard(['TOURIST']),
+    validateRequest(requestTouristSupportEmailVerificationSchema),
+    postRequestTouristSupportEmailVerification
+)
+touristAccountRoutes.post(
+    '/support-email/verification/resend',
+    guard(['TOURIST']),
+    validateRequest(resendTouristSupportEmailVerificationSchema),
+    postResendTouristSupportEmailVerification
+)
+touristAccountRoutes.post(
+    '/support-email/verification/confirm',
+    guard(['TOURIST']),
+    validateRequest(confirmTouristSupportEmailVerificationSchema),
+    postConfirmTouristSupportEmailVerification
+)
+touristAccountRoutes.patch(
+    '/support-email',
+    guard(['TOURIST']),
+    validateRequest(clearTouristSupportEmailSchema),
+    patchMyTouristSupportEmail
 )
 
 export default touristAccountRoutes

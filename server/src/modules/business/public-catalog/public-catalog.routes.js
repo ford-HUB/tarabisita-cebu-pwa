@@ -8,17 +8,42 @@ import {
     postTouristCustomerOrderCheckout,
     getPublicBusinesses,
     recordPublicBusinessView,
-    getBusinessById
+    getPublicBusinessRestaurantReviews,
+    getPublicLandingRestaurantReviews,
+    getBusinessById,
+    postTouristCatalogSearchRank
 } from './public-catalog.controller.js'
 import {
     createTouristCustomerOrderSchema,
-    createTouristCustomerOrderCheckoutSchema
+    createTouristCustomerOrderCheckoutSchema,
+    listPublicRestaurantReviewsSchema,
+    listPublicLandingRestaurantReviewsSchema,
+    touristCatalogSearchRankSchema
 } from './public-catalog.validator.js'
 
 const publicCatalogRoutes = express.Router()
 
 publicCatalogRoutes.get('/public', getPublicBusinesses)
+publicCatalogRoutes.get(
+    '/public/landing-restaurant-reviews',
+    validateRequest(listPublicLandingRestaurantReviewsSchema),
+    getPublicLandingRestaurantReviews
+)
+/** Authenticated tourists (dashboard explore, home hub hero search). */
 publicCatalogRoutes.get('/public/menu-feed', guard(['TOURIST']), getPublicMenuFeed)
+publicCatalogRoutes.post(
+    '/public/tourist-catalog-search-rank',
+    guard(['TOURIST']),
+    validateRequest(touristCatalogSearchRankSchema),
+    postTouristCatalogSearchRank
+)
+/** Unauthenticated guests (public landing hero, public search). */
+publicCatalogRoutes.get('/public/guest-menu-feed', getPublicMenuFeed)
+publicCatalogRoutes.post(
+    '/public/guest-catalog-search-rank',
+    validateRequest(touristCatalogSearchRankSchema),
+    postTouristCatalogSearchRank
+)
 publicCatalogRoutes.post(
     '/public/:businessId/customer-order',
     guard(['TOURIST']),
@@ -32,6 +57,11 @@ publicCatalogRoutes.post(
     postTouristCustomerOrderCheckout
 )
 publicCatalogRoutes.post('/public/:businessId/view', recordPublicBusinessView)
+publicCatalogRoutes.get(
+    '/public/:businessId/restaurant-reviews',
+    validateRequest(listPublicRestaurantReviewsSchema),
+    getPublicBusinessRestaurantReviews
+)
 publicCatalogRoutes.get('/public/:businessId', getBusinessById)
 publicCatalogRoutes.get('/subscription-catalog', getManageSubscriptionCatalog)
 

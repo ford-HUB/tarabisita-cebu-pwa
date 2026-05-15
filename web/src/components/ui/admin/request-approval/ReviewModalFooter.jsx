@@ -1,11 +1,12 @@
 const ReviewModalFooter = ({
   activeStep,
-  actionsDisabled,
+  isApproved,
   onPrevious,
   onNext,
   onClose,
   onOpenDecline,
-  onOpenApprove
+  onOpenApprove,
+  onOpenRevoke
 }) => (
   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#f0e7dd] px-5 py-4">
     <div className="flex items-center gap-2">
@@ -34,26 +35,33 @@ const ReviewModalFooter = ({
       >
         Close
       </button>
-      <button
-        type="button"
-        onClick={onOpenDecline}
-        disabled={actionsDisabled}
-        aria-disabled={actionsDisabled}
-        title={actionsDisabled ? 'This request is already approved.' : undefined}
-        className="rounded-full bg-[#dc2626] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#b91c1c] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[#dc2626]"
-      >
-        Decline
-      </button>
-      <button
-        type="button"
-        onClick={onOpenApprove}
-        disabled={actionsDisabled}
-        aria-disabled={actionsDisabled}
-        title={actionsDisabled ? 'This request is already approved.' : undefined}
-        className="rounded-full bg-[#15803d] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#166534] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-[#15803d]"
-      >
-        Approve
-      </button>
+      {isApproved ? (
+        <button
+          type="button"
+          onClick={onOpenRevoke}
+          className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+        >
+          <span aria-hidden>⚠</span>
+          Cancel approval
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onOpenDecline}
+            className="rounded-full bg-[#dc2626] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#b91c1c]"
+          >
+            Decline
+          </button>
+          <button
+            type="button"
+            onClick={onOpenApprove}
+            className="rounded-full bg-[#15803d] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#166534]"
+          >
+            Approve
+          </button>
+        </>
+      )}
     </div>
   </div>
 )

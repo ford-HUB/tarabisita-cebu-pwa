@@ -11,7 +11,18 @@ export const getAvatarFallback = (name) => {
 }
 
 /** Signed paths for `ProtectedRoute` (requires `rk` query). */
+export const touristHomeHref = `/${toEncryptedRoute('tourist/home')}`
 export const touristExploreHref = `/${toEncryptedRoute('tourist/explore')}`
+
+/** Menu item search (catalog). Query is appended with `&q=` because the path already includes `?rk=`. */
+export const touristSearchHref = `/${toEncryptedRoute('tourist/explore/search')}`
+
+/** @param {string} [query] */
+export const buildTouristSearchHref = (query = '') => {
+  const q = String(query || '').trim()
+  if (!q) return touristSearchHref
+  return `${touristSearchHref}&q=${encodeURIComponent(q)}`
+}
 export const buildTouristExploreBusinessDetailHref = (businessId) => {
   const id = String(businessId || '').trim()
   if (!id) return touristExploreHref
@@ -26,6 +37,19 @@ export const buildTouristExploreReorderHref = (businessId, menuItemId) => {
   const joiner = touristExploreHref.includes('?') ? '&' : '?'
   return `${touristExploreHref}${joiner}openMenuBusiness=${encodeURIComponent(b)}&openMenuItem=${encodeURIComponent(m)}`
 }
+
+/** Deep-link to a business menu page and open the item modal in cart-edit mode. */
+export const buildTouristExploreBusinessEditCartHref = (businessId, menuItemId, cartItemKey) => {
+  const base = buildTouristExploreBusinessDetailHref(businessId)
+  const m = String(menuItemId || '').trim()
+  if (!m) return base
+  const joiner = base.includes('?') ? '&' : '?'
+  const k = String(cartItemKey || '').trim()
+  const keyPart = k ? `&editCartKey=${encodeURIComponent(k)}` : ''
+  return `${base}${joiner}editMenuItem=${encodeURIComponent(m)}${keyPart}`
+}
+
+export const TOURIST_CART_EDIT_KEY_STORAGE = 'tb_tourist_cart_edit_key'
 export const touristCartHref = `/${toEncryptedRoute('tourist/explore/cart')}`
 export const touristCheckoutHref = `/${toEncryptedRoute('tourist/explore/checkout')}`
 export const touristStayBookingHref = `/${toEncryptedRoute('tourist/explore/stay-booking')}`

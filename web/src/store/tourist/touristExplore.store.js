@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import {
   fetchPublicBusinesses,
   fetchPublicMenuFeed,
+  fetchGuestMenuFeed,
   recordPublicBusinessView
 } from '../../services/tourist/touristExplore.service.js'
 
@@ -49,10 +50,15 @@ export const useTouristExploreStore = create((set, get) => ({
     }
   },
 
-  loadMenuFeed: async (menuCategory = 'ALL') => {
+  /**
+   * @param {string} [menuCategory]
+   * @param {{ guest?: boolean }} [options] When true, uses unauthenticated guest catalog API.
+   */
+  loadMenuFeed: async (menuCategory = 'ALL', options = {}) => {
+    const guest = Boolean(options?.guest)
     set({ menuFeedLoading: true, menuFeedError: null })
     try {
-      const { data } = await fetchPublicMenuFeed(menuCategory)
+      const { data } = await (guest ? fetchGuestMenuFeed(menuCategory) : fetchPublicMenuFeed(menuCategory))
       const payload = data?.data
       set({
         menuFeedItems: Array.isArray(payload?.items) ? payload.items : [],

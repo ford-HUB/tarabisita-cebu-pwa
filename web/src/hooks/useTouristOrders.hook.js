@@ -123,7 +123,8 @@ export const useTouristOrders = () => {
                 image: String(li.image || '')
               }))
               .filter((li) => li.menuItemId)
-          : []
+          : [],
+        restaurantReview: o.restaurantReview || null
       })),
     [rawOrders]
   )
@@ -164,6 +165,7 @@ export const useTouristOrders = () => {
     orders,
     storeOrderGroups,
     isLoading,
-    errorMessage
+    errorMessage,
+    refreshOrders
   }
 }

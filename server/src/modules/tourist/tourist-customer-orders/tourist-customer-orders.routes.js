@@ -7,17 +7,33 @@ import {
     postBookingPaymentLinkResolvePublicHandler,
     postMyBookingPaymentLinkCheckoutHandler,
     postMyBookingPaymentLinkResolveHandler,
-    postMyBookingRequestPaymentCheckoutHandler
+    postMyBookingRequestPaymentCheckoutHandler,
+    getMyRestaurantOrderReviewHandler,
+    putMyRestaurantOrderReviewHandler
 } from './tourist-customer-orders.controller.js'
 import {
     bookingPaymentLinkCheckoutSchema,
     bookingPaymentLinkResolveSchema,
-    bookingRequestPaymentCheckoutSchema
+    bookingRequestPaymentCheckoutSchema,
+    restaurantOrderReviewParamsSchema,
+    restaurantOrderReviewUpsertBodySchema
 } from './tourist-customer-orders.validator.js'
 
 const touristCustomerOrdersRoutes = express.Router()
 
 touristCustomerOrdersRoutes.get('/my-customer-orders', guard(['TOURIST']), getMyTouristCustomerOrdersHandler)
+touristCustomerOrdersRoutes.get(
+    '/my-customer-orders/:orderId/restaurant-review',
+    guard(['TOURIST']),
+    validateRequest(restaurantOrderReviewParamsSchema),
+    getMyRestaurantOrderReviewHandler
+)
+touristCustomerOrdersRoutes.put(
+    '/my-customer-orders/:orderId/restaurant-review',
+    guard(['TOURIST']),
+    validateRequest(restaurantOrderReviewUpsertBodySchema),
+    putMyRestaurantOrderReviewHandler
+)
 touristCustomerOrdersRoutes.post(
     '/my-customer-orders/:orderId/booking-payment-checkout',
     guard(['TOURIST']),

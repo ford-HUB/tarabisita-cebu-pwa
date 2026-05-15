@@ -67,3 +67,37 @@ export const createTouristCustomerOrderCheckoutSchema = zod.object({
         )
     })
 })
+
+export const touristCatalogSearchRankSchema = zod.object({
+    body: zod.object({
+        query: zod.string().trim().min(1).max(220),
+        items: zod
+            .array(
+                zod.object({
+                    name: zod.string().max(160).optional().default(''),
+                    category: zod.string().max(100).optional().default(''),
+                    businessName: zod.string().max(120).optional().default('')
+                })
+            )
+            .min(1)
+            .max(100)
+    })
+})
+
+export const listPublicRestaurantReviewsSchema = zod.object({
+    params: zod.object({
+        businessId: zod.string().regex(/^[a-fA-F0-9]{24}$/, 'Invalid business id')
+    }),
+    query: zod.object({
+        sort: zod.enum(['newest', 'highest', 'lowest']).optional().default('newest'),
+        rating: zod.coerce.number().int().min(1).max(5).optional(),
+        page: zod.coerce.number().int().min(1).optional().default(1),
+        limit: zod.coerce.number().int().min(1).max(50).optional().default(20)
+    })
+})
+
+export const listPublicLandingRestaurantReviewsSchema = zod.object({
+    query: zod.object({
+        limit: zod.coerce.number().int().min(1).max(24).optional().default(12)
+    })
+})

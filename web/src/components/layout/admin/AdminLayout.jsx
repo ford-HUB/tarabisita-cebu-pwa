@@ -5,14 +5,16 @@ import { useAuthStore } from '../../../store/auth/auth.store'
 import { roleBasedRoute } from '../../../shared/utils/direct.utils'
 import AdminSidebar from './AdminSidebar'
 import AdminTopbar from './AdminTopbar'
+import AdminProfileModal from './AdminProfileModal.jsx'
 import { adminSidebarLinks, getAdminAvatarFallback } from './adminLayout.constants'
 
 const AdminLayout = () => {
-  const { user, isAuthenticated, isAuthLoading } = useAuth()
+  const { user, isAuthLoading } = useAuth()
   const logout = useAuthStore((state) => state.logout)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [expandedMenus, setExpandedMenus] = useState({ Business: true })
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
 
   const avatarFallback = useMemo(() => getAdminAvatarFallback(user?.name), [user?.name])
 
@@ -22,7 +24,7 @@ const AdminLayout = () => {
 
   const handleLogout = async () => {
     await logout()
-    window.location.href = '/admin/login'
+    window.location.href = '/login'
   }
 
   useEffect(() => {
@@ -35,10 +37,6 @@ const AdminLayout = () => {
         Loading admin session...
       </div>
     )
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />
   }
 
   if (user?.role !== 'ADMIN') {
@@ -60,6 +58,7 @@ const AdminLayout = () => {
           isProfileOpen={isProfileOpen}
           onToggleProfile={() => setIsProfileOpen((value) => !value)}
           onCloseProfile={() => setIsProfileOpen(false)}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
           userName={user?.name}
           avatarFallback={avatarFallback}
           onLogout={handleLogout}
@@ -69,6 +68,8 @@ const AdminLayout = () => {
           <Outlet />
         </main>
       </div>
+
+      <AdminProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
     </div>
   )
 }

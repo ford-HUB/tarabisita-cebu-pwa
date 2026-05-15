@@ -29,6 +29,7 @@ export const useAdminRequestApprovalStore = create((set, get) => ({
   selectedRequest: null,
   isApproveModalOpen: false,
   isDeclineModalOpen: false,
+  isRevokeModalOpen: false,
   isLoading: true,
   isSubmittingAction: false,
 
@@ -45,6 +46,7 @@ export const useAdminRequestApprovalStore = create((set, get) => ({
     })),
   setIsApproveModalOpen: (isApproveModalOpen) => set({ isApproveModalOpen }),
   setIsDeclineModalOpen: (isDeclineModalOpen) => set({ isDeclineModalOpen }),
+  setIsRevokeModalOpen: (isRevokeModalOpen) => set({ isRevokeModalOpen }),
   setIsLoading: (isLoading) => set({ isLoading }),
   setIsSubmittingAction: (isSubmittingAction) => set({ isSubmittingAction }),
 
@@ -85,6 +87,39 @@ export const useAdminRequestApprovalStore = create((set, get) => ({
       return { ok: true }
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to update request.')
+      return { ok: false }
+    } finally {
+      set({ isSubmittingAction: false })
+    }
+  },
+
+  submitRevokeApproval: async ({ notes = '' }) => {
+    const current = get().selectedRequest
+    if (!current?.id || current.status !== APPROVAL_STATUS.VERIFIED) return { ok: false }
+    const trimmedNotes = typeof notes === 'string' ? notes.trim() : ''
+    set({ isSubmittingAction: true })
+    try {
+      const response = await updateBusinessApprovalStatus({
+        businessId: current.id,
+        status: APPROVAL_STATUS.PENDING,
+        notes: trimmedNotes,
+        revoke: true
+      })
+      const updated = mapRequest(response?.data?.data || {})
+      set((s) => {
+        const mergedSelected = s.selectedRequest ? { ...s.selectedRequest, ...updated } : s.selectedRequest
+        return {
+          requests: s.requests.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+          selectedRequest: mergedSelected,
+          isRevokeModalOpen: false,
+          isApproveModalOpen: false,
+          isDeclineModalOpen: false
+        }
+      })
+      toast.success('Business approval revoked. The partner was notified by email.')
+      return { ok: true }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to revoke approval.')
       return { ok: false }
     } finally {
       set({ isSubmittingAction: false })

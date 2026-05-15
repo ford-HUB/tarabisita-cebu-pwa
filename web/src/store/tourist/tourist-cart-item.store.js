@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
-import { pickCartItemDetailsFromPayload } from '../../shared/utils/tourist-cart-item-details.utils.js'
+import {
+  isTouristCartStayListing,
+  pickCartItemDetailsFromPayload
+} from '../../shared/utils/tourist-cart-item-details.utils.js'
 
 const itemKey = (businessId, catalogItemId) => `${businessId}:${catalogItemId}`
 
@@ -31,6 +34,27 @@ const resolveCatalogItemId = (payload) =>
 
 const MAX_ITEM_NOTES = 500
 
+/** Persists which restaurant checkout is for (multi-store cart + refresh on checkout). */
+const CHECKOUT_BUSINESS_STORAGE_KEY = 'tb_tourist_checkout_business_id'
+
+const readCheckoutBusinessIdFromStorage = () => {
+  try {
+    const v = sessionStorage.getItem(CHECKOUT_BUSINESS_STORAGE_KEY)
+    return v && String(v).trim() ? String(v).trim() : null
+  } catch {
+    return null
+  }
+}
+
+const writeCheckoutBusinessIdToStorage = (id) => {
+  try {
+    if (id) sessionStorage.setItem(CHECKOUT_BUSINESS_STORAGE_KEY, String(id))
+    else sessionStorage.removeItem(CHECKOUT_BUSINESS_STORAGE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Cap length only; do not trim (trim on submit / display-only) so spaces survive while typing and sync. */
 const clampItemNotes = (v) => String(v ?? '').slice(0, MAX_ITEM_NOTES)
 
@@ -47,8 +71,27 @@ export const groupCartItemsByBusiness = (list) => {
 
 export const useTouristCartItemStore = create((set, get) => ({
   items: [],
+  /** When set, menu checkout only considers rows for this `businessId` (see `useTouristRestaurantCheckout`). */
+  activeCheckoutBusinessId: null,
   /** Item keys the user explicitly unchecked (default: every item is selected). */
   deselectedItemKeys: {},
+
+  setActiveCheckoutBusinessId: (businessId) => {
+    const v = businessId != null && String(businessId).trim() ? String(businessId).trim() : null
+    writeCheckoutBusinessIdToStorage(v)
+    set({ activeCheckoutBusinessId: v })
+  },
+
+  clearActiveCheckoutBusinessId: () => {
+    writeCheckoutBusinessIdToStorage(null)
+    set({ activeCheckoutBusinessId: null })
+  },
+
+  /** Call when opening checkout so scope survives reload mid-flow. */
+  rehydrateActiveCheckoutBusinessIdFromStorage: () => {
+    const v = readCheckoutBusinessIdFromStorage()
+    set({ activeCheckoutBusinessId: v })
+  },
 
   isItemSelected: (key) => !get().deselectedItemKeys[String(key)],
 
@@ -69,6 +112,11 @@ export const useTouristCartItemStore = create((set, get) => ({
   addItem: (payload, options = {}) => {
     const { silent } = options
     const { businessId, businessName, name, unitPrice, image } = payload
+    const notifyItemAdded = () => {
+      if (silent) return
+      const label = String(name || '').trim()
+      toast.success('Item added', label ? { description: label } : undefined)
+    }
     const catalogItemId = resolveCatalogItemId(payload)
     if (!businessId || !catalogItemId || !name) return
     const key = itemKey(businessId, catalogItemId)
@@ -77,6 +125,14 @@ export const useTouristCartItemStore = create((set, get) => ({
     const prev = get().items
     const idx = prev.findIndex((it) => it.key === key)
     if (idx >= 0) {
+      if (isTouristCartStayListing(payload)) {
+        if (!silent) {
+          toast.message('Already in your cart', {
+            description: 'This stay package is already saved. Remove it from your cart first if you want to change it.'
+          })
+        }
+        return
+      }
       const next = [...prev]
       const merged = Math.min(99, next[idx].qty + qty)
       const incomingNotes = clampItemNotes(payload.itemNotes)
@@ -88,7 +144,7 @@ export const useTouristCartItemStore = create((set, get) => ({
         ...(incomingNotes.trim() ? { itemNotes: incomingNotes } : {})
       }
       set({ items: next })
-      if (!silent) toast.success('Cart updated')
+      notifyItemAdded()
       return
     }
     set({
@@ -109,7 +165,47 @@ export const useTouristCartItemStore = create((set, get) => ({
         }
       ]
     })
-    if (!silent) toast.success('Added to cart')
+    notifyItemAdded()
+  },
+
+  /**
+   * Replace an existing cart row (edit flow — does not merge quantities).
+   * @param {string} key
+   * @param {Record<string, unknown>} payload
+   * @param {{ silent?: boolean }} [options]
+   * @returns {boolean}
+   */
+  updateItem: (key, payload, options = {}) => {
+    const { silent } = options
+    const k = String(key || '').trim()
+    if (!k) return false
+    const prev = get().items
+    const idx = prev.findIndex((it) => it.key === k)
+    if (idx < 0) return false
+
+    const row = prev[idx]
+    const catalogItemId = resolveCatalogItemId(payload) || row.catalogItemId
+    const qty = Math.min(99, Math.max(1, Number(payload.qty) || row.qty || 1))
+    const details = pickCartItemDetailsFromPayload(payload)
+    const incomingNotes = clampItemNotes(payload.itemNotes ?? row.itemNotes)
+
+    const next = [...prev]
+    next[idx] = {
+      ...row,
+      businessId: String(payload.businessId || row.businessId),
+      businessName: String(payload.businessName || row.businessName || 'Business'),
+      catalogItemId,
+      name: String(payload.name || row.name),
+      unitPrice: Number(payload.unitPrice ?? row.unitPrice) || 0,
+      image: String(payload.image ?? row.image ?? ''),
+      qty,
+      listingType: String(payload.listingType || row.listingType || ''),
+      ...details,
+      itemNotes: incomingNotes
+    }
+    set({ items: next })
+    if (!silent) toast.success('Cart updated')
+    return true
   },
 
   /** @param {string} key */
@@ -136,7 +232,10 @@ export const useTouristCartItemStore = create((set, get) => ({
     })
   },
 
-  clear: () => set({ items: [], deselectedItemKeys: {} }),
+  clear: () => {
+    writeCheckoutBusinessIdToStorage(null)
+    set({ items: [], deselectedItemKeys: {}, activeCheckoutBusinessId: null })
+  },
 
   /** Remove specific cart items (e.g. after a successful partial checkout). */
   removeItemsByKeys: (keys) => {

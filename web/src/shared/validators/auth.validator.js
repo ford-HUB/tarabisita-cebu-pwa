@@ -11,7 +11,9 @@ const baseSchema = z.object({
   accountType: z.enum(['TOURIST', 'BUSINESS']),
   businessName: z.string().optional(),
   businessDescription: z.string().optional(),
-  businessAddress: z.string().optional(),
+  businessCity: z.string().optional(),
+  businessDistrict: z.string().optional(),
+  businessStreet: z.string().optional(),
   businessContact: z.string().optional(),
   businessCategory: z.string().optional(),
 })
@@ -61,7 +63,9 @@ export const registerSchema = baseSchema.superRefine((data, ctx) => {
     const requiredBusinessFields = [
       'businessName',
       'businessDescription',
-      'businessAddress',
+      'businessCity',
+      'businessDistrict',
+      'businessStreet',
       'businessContact',
       'businessCategory',
     ]
@@ -75,11 +79,15 @@ export const registerSchema = baseSchema.superRefine((data, ctx) => {
               ? 'Business name is required'
               : field === 'businessDescription'
                 ? 'Business description is required'
-                : field === 'businessAddress'
-                  ? 'Business address is required'
-                  : field === 'businessContact'
-                    ? 'Business contact is required'
-                    : 'Business category is required',
+                : field === 'businessCity'
+                  ? 'City is required'
+                  : field === 'businessDistrict'
+                    ? 'District is required'
+                    : field === 'businessStreet'
+                      ? 'Street is required'
+                      : field === 'businessContact'
+                        ? 'Business contact is required'
+                        : 'Business category is required',
           path: [field],
         })
       }
@@ -90,6 +98,14 @@ export const registerSchema = baseSchema.superRefine((data, ctx) => {
         code: z.ZodIssueCode.custom,
         message: 'Please select a valid business category',
         path: ['businessCategory'],
+      })
+    }
+
+    if (data.businessContact?.trim() && !/^\d+$/.test(data.businessContact.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Business contact must contain numbers only',
+        path: ['businessContact'],
       })
     }
   }

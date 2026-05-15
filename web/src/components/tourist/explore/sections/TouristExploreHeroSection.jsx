@@ -32,7 +32,7 @@ const HeroSlide = ({ business, userName, onOpen, padForDots }) => {
       >
         <p className="text-xs font-medium uppercase tracking-wider text-white/80">Spotlight partner</p>
         <h2 className="mt-1 max-w-none text-2xl font-semibold leading-tight sm:text-3xl md:text-4xl">
-          Hello, {userName}! Start with {business.name}
+          Hello, {userName.trim().split(' ')[0]}! Start with {business.name}
         </h2>
         <p className="mt-2 line-clamp-2 max-w-none text-sm leading-relaxed text-white/90 md:text-base">
           {business.description || 'Verified partner — open the card to order, book, or see what they offer.'}

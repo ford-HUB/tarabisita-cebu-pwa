@@ -4,7 +4,6 @@ import { useAuth } from '../../../hooks/useAuth.hook'
 import { useTouristCartItemPersistence } from '../../../hooks/useTouristCartItemPersistence.hook'
 import { useAuthStore } from '../../../store/auth/auth.store'
 import TouristTopbar from './TouristTopbar'
-import TouristAccountModal from './TouristAccountModal'
 import { getAvatarFallback, touristShellContentClass } from './touristLayout.constants'
 
 const TouristLayout = () => {
@@ -33,17 +32,13 @@ const TouristLayout = () => {
   return (
     <div className="flex min-h-screen min-h-dvh flex-col bg-[#f8f5f0] text-[#1f1f1f]">
       <TouristTopbar
+        accountOpen={accountModal.open}
+        accountInitialView={accountModal.initialView}
         onToggleAccount={toggleAccount}
         onCloseAccount={closeAccount}
+        onLogout={handleLogout}
         avatarUrl={user?.avatar || ''}
         avatarFallback={avatarFallback}
-      />
-
-      <TouristAccountModal
-        isOpen={accountModal.open}
-        initialView={accountModal.initialView}
-        onClose={closeAccount}
-        onLogout={handleLogout}
       />
 
       <main className={`${touristShellContentClass} flex-1 py-5 md:py-6 lg:py-8`}>

@@ -1,15 +1,27 @@
+import { useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { useTouristRestaurantCheckout } from '../../../hooks/useTouristRestaurantCheckout.hook.js'
-import { touristCartHref } from '../../../components/layout/tourist/touristLayout.constants.js'
+import { TOURIST_CART_EDIT_KEY_STORAGE, touristCartHref } from '../../../components/layout/tourist/touristLayout.constants.js'
 import XenditMobileCheckoutModal from '../../../components/business/billing/modals/XenditMobileCheckoutModal.jsx'
 import TouristCheckoutBillingSummarySection from '../../../components/tourist/checkout/sections/TouristCheckoutBillingSummarySection.jsx'
 import TouristCheckoutCustomerSection from '../../../components/tourist/checkout/sections/TouristCheckoutCustomerSection.jsx'
 import TouristCheckoutOrderReviewSection from '../../../components/tourist/checkout/sections/TouristCheckoutOrderReviewSection.jsx'
 
 const RestaurantCheckout = () => {
+  const clearCartEditDeepLink = useCallback(() => {
+    try {
+      sessionStorage.removeItem(TOURIST_CART_EDIT_KEY_STORAGE)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   const {
     items,
+    storeItems,
     groupsForCheckout,
     cartTotal,
+    fullStoreCartTotal,
     selectedItemRowCount,
     selectedCount,
     selectedTotal,
@@ -23,11 +35,15 @@ const RestaurantCheckout = () => {
     goExplore,
     goCart,
     setItemNotes,
+    removeItem,
+    checkoutBlockedMultiStore,
+    restaurantEditHref,
+    otherStoresSummary,
     isXenditMobileCheckoutModalOpen,
     xenditMobileCheckoutUrl,
     closeXenditMobileCheckoutModal,
     continueXenditMobileCheckout
-  } = useTouristRestaurantCheckout()
+  } = useTouristRestaurantCheckout({ variant: 'checkout' })
 
   const {
     register,
@@ -35,7 +51,27 @@ const RestaurantCheckout = () => {
     formState: { errors }
   } = form
 
-  if (!items.length) {
+  if (checkoutBlockedMultiStore && storeItems.length > 0) {
+    return (
+      <div className="mx-auto max-w-lg space-y-6 pb-10">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm">
+          <h1 className="text-lg font-semibold text-[#1f1f1f]">Choose one restaurant</h1>
+          <p className="mt-2 text-sm text-[#5b5b5b]">
+            Your saved cart has items from more than one restaurant. Open your cart, select items from one partner, then tap{' '}
+            <span className="font-medium">Proceed to checkout</span>.
+          </p>
+          <Link
+            to={touristCartHref}
+            className="mt-5 inline-flex rounded-full bg-[#ff7a1a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#eb6c12]"
+          >
+            Open cart
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!storeItems.length) {
     return (
       <div className="mx-auto max-w-lg rounded-2xl border border-[#e7dfd5] bg-white p-8 text-center shadow-sm md:p-10">
         <h1 className="text-lg font-semibold text-[#1f1f1f]">Your cart is empty</h1>
@@ -51,13 +87,33 @@ const RestaurantCheckout = () => {
     )
   }
 
+  if (!items.length) {
+    return (
+      <div className="mx-auto max-w-lg space-y-6 pb-10">
+        <div className="rounded-2xl border border-[#e7dfd5] bg-white p-6 text-center shadow-sm">
+          <h1 className="text-lg font-semibold text-[#1f1f1f]">Nothing to check out for this restaurant</h1>
+          <p className="mt-2 text-sm text-[#5b5b5b]">
+            This checkout session is tied to one store, but there are no lines for it in your cart. Open your cart to
+            add items or pick another restaurant.
+          </p>
+          <Link
+            to={touristCartHref}
+            className="mt-5 inline-flex rounded-full bg-[#ff7a1a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#eb6c12]"
+          >
+            Open cart
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   if (selectedCount === 0) {
     return (
       <div className="mx-auto max-w-lg space-y-6 pb-10">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm">
           <h1 className="text-lg font-semibold text-[#1f1f1f]">Nothing selected for checkout</h1>
           <p className="mt-2 text-sm text-[#5b5b5b]">
-            Choose at least one item in your cart, then return here to enter payment and contact details.
+            Choose at least one item for this restaurant, then return here to enter payment and contact details.
           </p>
           <button
             type="button"
@@ -71,20 +127,34 @@ const RestaurantCheckout = () => {
     )
   }
 
+  const savedAside =
+    otherStoresSummary.rowCount > 0 ? (
+      <>
+        Other restaurants still in your cart: {otherStoresSummary.rowCount} line
+        {otherStoresSummary.rowCount === 1 ? '' : 's'} · {formatPhp(otherStoresSummary.total)}.{' '}
+        <Link to={touristCartHref} className="font-semibold text-[#9b5a2c] underline underline-offset-2">
+          Manage in cart
+        </Link>
+      </>
+    ) : null
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-10">
       <div>
         <h1 className="text-xl font-semibold text-[#1f1f1f] md:text-2xl">Checkout</h1>
         <p className="mt-1 text-sm text-[#5b5b5b]">
-          Enter your details, then pay securely. Your order is sent to the restaurant only after payment succeeds.
+          Enter your details, then pay securely. Only the restaurant shown below receives this order after payment
+          succeeds.
         </p>
       </div>
 
       <TouristCheckoutOrderReviewSection
         groups={groupsForCheckout}
         formatPhp={formatPhp}
-        editCartHref={touristCartHref}
+        editCartHref={restaurantEditHref}
+        onEditCartClick={clearCartEditDeepLink}
         setItemNotes={setItemNotes}
+        removeItem={removeItem}
       />
 
       <TouristCheckoutBillingSummarySection
@@ -94,6 +164,8 @@ const RestaurantCheckout = () => {
         cartTotal={cartTotal}
         billingMethodLabel={billingMethodLabel}
         formatPhp={formatPhp}
+        fullCartRowLabel="This restaurant (all lines)"
+        savedCartAside={savedAside}
       />
 
       <TouristCheckoutCustomerSection
@@ -110,7 +182,12 @@ const RestaurantCheckout = () => {
             <span className="text-lg font-semibold text-[#ff7a1a]">{formatPhp(selectedTotal)}</span>
           </p>
           {selectedItemRowCount < items.length || Math.abs(selectedTotal - cartTotal) > 0.001 ? (
-            <p className="mt-0.5 text-xs text-[#5b5b5b]">Full cart: {formatPhp(cartTotal)}</p>
+            <p className="mt-0.5 text-xs text-[#5b5b5b]">This store&apos;s cart: {formatPhp(cartTotal)}</p>
+          ) : null}
+          {otherStoresSummary.rowCount > 0 ? (
+            <p className="mt-0.5 text-xs text-[#5b5b5b]">
+              All saved items across Tara Bisita: {formatPhp(fullStoreCartTotal)}
+            </p>
           ) : null}
         </div>
         <button
@@ -130,7 +207,8 @@ const RestaurantCheckout = () => {
       ) : null}
 
       <p className="text-center text-xs text-[#6b6b6b]">
-        Totals use current catalog prices on our server. Online prepayment is one restaurant at a time.
+        Totals use current catalog prices on our server. One restaurant per online checkout — other saved items stay
+        in your cart.
       </p>
 
       <XenditMobileCheckoutModal

@@ -10,6 +10,14 @@ const userSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
+    /** Optional alternate sign-in email for tourists (one per account; unique across users when set). */
+    supportEmail: {
+        type: String,
+        required: false,
+        default: null,
+        sparse: true,
+        unique: true
+    },
     isEmailVerified: {
         type: Boolean,
         default: false

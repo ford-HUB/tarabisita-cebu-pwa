@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { FiChevronDown, FiImage } from 'react-icons/fi'
 import TouristCartItemMeta from '../TouristCartItemMeta.jsx'
+import { isTouristCartFoodListing } from '../../../../shared/utils/tourist-cart-item-details.utils.js'
 
 const ItemDetails = ({ item, formatPhp }) => (
   <div className="mt-2 space-y-1.5 border-t border-[#ece3d9] pt-2 text-xs text-[#5b5b5b]">
@@ -8,10 +9,12 @@ const ItemDetails = ({ item, formatPhp }) => (
       <span>Unit price</span>
       <span className="font-medium text-[#1f1f1f]">{formatPhp(item.unitPrice)}</span>
     </div>
-    <div className="flex justify-between gap-3">
-      <span>Quantity</span>
-      <span className="font-medium text-[#1f1f1f]">{item.qty}</span>
-    </div>
+    {isTouristCartFoodListing(item) ? (
+      <div className="flex justify-between gap-3">
+        <span>Quantity</span>
+        <span className="font-medium text-[#1f1f1f]">{item.qty}</span>
+      </div>
+    ) : null}
     <div className="flex justify-between gap-3 border-t border-dashed border-[#e7dfd5] pt-1.5 font-semibold text-[#1f1f1f]">
       <span>Subtotal</span>
       <span className="text-[#ff7a1a]">{formatPhp(item.unitPrice * item.qty)}</span>
@@ -30,11 +33,38 @@ const ItemDetails = ({ item, formatPhp }) => (
   </div>
 )
 
+const CartItemActions = ({ item, onEditItem, removeItem }) => (
+  <div className="flex items-center gap-1 justify-end pb-2">
+    {onEditItem ? (
+      <>
+        <button
+          type="button"
+          onClick={() => onEditItem(item)}
+          className="rounded-lg px-2 py-1 text-xs font-semibold text-[#9b5a2c] transition hover:bg-[#fff4eb] hover:text-[#ff7a1a]"
+        >
+          Edit
+        </button>
+        <span className="text-[10px] text-[#d4c4b6]" aria-hidden>
+          |
+        </span>
+      </>
+    ) : null}
+    <button
+      type="button"
+      onClick={() => removeItem(item.key)}
+      className="rounded-lg px-2 py-1 text-xs font-semibold text-[#b42318] transition hover:bg-[#fee4e2]"
+    >
+      Remove
+    </button>
+  </div>
+)
+
 const TouristCheckoutCartSection = ({
   groups,
   formatPhp,
   setItemQty,
   removeItem,
+  onEditItem,
   isItemSelected,
   toggleItemSelected
 }) => {
@@ -52,12 +82,14 @@ const TouristCheckoutCartSection = ({
   if (!groups.length) return null
 
   return (
+    
     <section className="rounded-2xl border border-[#e7dfd5] bg-white p-4 shadow-sm md:p-5" aria-labelledby="checkout-cart-heading">
       <h2 id="checkout-cart-heading" className="text-base font-semibold text-[#1f1f1f]">
         Your cart
       </h2>
 
       <div className="mt-4 space-y-5">
+        
         {groups.map((g) => (
           <div key={g.businessId}>
             <p className="text-sm font-medium text-[#9b5a2c]">{g.businessName}</p>
@@ -65,6 +97,7 @@ const TouristCheckoutCartSection = ({
               {g.items.map((item) => {
                 const isOpen = openKeys.has(item.key)
                 const checked = isItemSelected(item.key)
+                const showQty = isTouristCartFoodListing(item)
                 return (
                   <li
                     key={item.key}
@@ -72,6 +105,7 @@ const TouristCheckoutCartSection = ({
                       checked ? 'border-[#e7dfd5]' : 'border-dashed border-[#d4c4b6] opacity-90'
                     }`}
                   >
+                    <CartItemActions item={item} onEditItem={onEditItem} removeItem={removeItem} />
                     <div className="flex gap-3">
                       <div className="flex shrink-0 flex-col items-center gap-2 pt-1">
                         <input
@@ -82,6 +116,7 @@ const TouristCheckoutCartSection = ({
                           aria-label={`Include ${item.name} in this checkout`}
                         />
                       </div>
+                      
 
                       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[#e7dfd5] bg-[#ece3d9]">
                         {item.image ? (
@@ -121,25 +156,23 @@ const TouristCheckoutCartSection = ({
                       </div>
 
                       <div className="flex shrink-0 flex-col items-end gap-2">
-                        <label className="sr-only" htmlFor={`qty-${item.key}`}>
-                          Quantity for {item.name}
-                        </label>
-                        <input
-                          id={`qty-${item.key}`}
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={item.qty}
-                          onChange={(e) => setItemQty(item.key, e.target.value)}
-                          className="w-16 rounded-lg border border-[#e7dfd5] bg-white px-2 py-1.5 text-center text-sm font-medium text-[#1f1f1f] outline-none focus:border-[#ff7a1a] focus:ring-2 focus:ring-[#ff7a1a]/25"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.key)}
-                          className="rounded-lg px-2 py-1 text-xs font-semibold text-[#b42318] hover:bg-[#fee4e2]"
-                        >
-                          Remove
-                        </button>
+                        {showQty ? (
+                          <>
+                            <label className="sr-only" htmlFor={`qty-${item.key}`}>
+                              Quantity for {item.name}
+                            </label>
+                            <input
+                              id={`qty-${item.key}`}
+                              type="number"
+                              min={1}
+                              max={99}
+                              value={item.qty}
+                              onChange={(e) => setItemQty(item.key, e.target.value)}
+                              className="w-16 rounded-lg border border-[#e7dfd5] bg-white px-2 py-1.5 text-center text-sm font-medium text-[#1f1f1f] outline-none focus:border-[#ff7a1a] focus:ring-2 focus:ring-[#ff7a1a]/25"
+                            />
+                          </>
+                        ) : null}
+                        
                         <p className="text-sm font-semibold text-[#ff7a1a]">{formatPhp(item.unitPrice * item.qty)}</p>
                       </div>
                     </div>

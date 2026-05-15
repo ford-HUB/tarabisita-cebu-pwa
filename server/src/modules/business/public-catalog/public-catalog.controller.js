@@ -7,7 +7,15 @@ import {
     createTouristCustomerOrder,
     createTouristMenuOrderXenditCheckout
 } from './public-catalog.service.js'
+import { rankTouristCatalogItemsWithGemini } from './public-catalog-ai.service.js'
 import { sanitizeBusinessPayload } from '../../../shared/utils/business-controller.helpers.js'
+import {
+    getRestaurantRecentReviewsGrouped,
+    getRestaurantReviewPublicSummary,
+    getRestaurantReviewStatsMapForBusinessIds,
+    listPublicLandingRestaurantReviews,
+    listPublicRestaurantReviewsForBusiness
+} from '../../tourist/restaurant-order-reviews/restaurant-order-reviews.service.js'
 
 const hasActivePaidSubscription = (business) => {
     const sub = business?.subscription || {}
@@ -150,14 +158,44 @@ export const postTouristCustomerOrder = async (req, res) => {
     }
 }
 
+export const getPublicLandingRestaurantReviews = async (req, res) => {
+    try {
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
+        const { limit } = req.validatedData.query
+        const businesses = await Business.find({ verificationStatus: 'VERIFIED' }).select('_id subscription').lean()
+        const ids = businesses.filter(hasActivePaidSubscription).map((b) => b._id)
+        const data = await listPublicLandingRestaurantReviews(ids, { limit })
+        return res.status(200).json({ data })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}
+
 export const getPublicBusinesses = async (_req, res) => {
     try {
         const businesses = await Business.find({ verificationStatus: 'VERIFIED' })
             .populate('category')
             .sort({ publicProfileViewCount: -1, createdAt: -1 })
 
+        const filtered = businesses.filter(hasActivePaidSubscription)
+        const ids = filtered.map((b) => b._id)
+        const statsMap = await getRestaurantReviewStatsMapForBusinessIds(ids)
+        const recentMap = await getRestaurantRecentReviewsGrouped(ids, { perBusiness: 3 })
+
         return res.status(200).json({
-            data: businesses.filter(hasActivePaidSubscription).map(sanitizeBusinessPayload)
+            data: filtered.map((b) => {
+                const id = String(b._id)
+                const stats = statsMap.get(id) || { averageRating: null, reviewCount: 0 }
+                const recentReviews = recentMap.get(id) || []
+                return {
+                    ...sanitizeBusinessPayload(b),
+                    restaurantReviewSummary: {
+                        averageRating: stats.averageRating,
+                        reviewCount: stats.reviewCount,
+                        recentReviews
+                    }
+                }
+            })
         })
     } catch (error) {
         return res.status(500).json({ message: error.message })
@@ -176,6 +214,48 @@ export const recordPublicBusinessView = async (req, res) => {
         return res.status(200).json({
             data: { publicProfileViewCount: business.publicProfileViewCount ?? 0 }
         })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const getPublicBusinessRestaurantReviews = async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store')
+        const { businessId } = req.validatedData.params
+        const { sort, rating, page, limit } = req.validatedData.query
+
+        const business = await Business.findById(businessId).select('_id verificationStatus subscription')
+
+        if (!business) {
+            return res.status(404).json({ message: 'Business not found' })
+        }
+        if (business.verificationStatus !== 'VERIFIED') {
+            return res.status(403).json({ message: 'Business is not yet publicly available' })
+        }
+        if (!hasActivePaidSubscription(business)) {
+            return res.status(403).json({ message: 'Business is not yet publicly available' })
+        }
+
+        const data = await listPublicRestaurantReviewsForBusiness(business._id, {
+            sort,
+            rating: rating ?? null,
+            page,
+            limit
+        })
+
+        return res.status(200).json({ data })
+    } catch (error) {
+        return res.status(500).json({ message: error.message })
+    }
+}
+
+export const postTouristCatalogSearchRank = async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store')
+        const { query, items } = req.validatedData.body
+        const indices = await rankTouristCatalogItemsWithGemini({ query, items })
+        return res.status(200).json({ data: { indices } })
     } catch (error) {
         return res.status(500).json({ message: error.message })
     }
@@ -204,11 +284,14 @@ export const getBusinessById = async (req, res) => {
             listPublicMenuItemsFromBusinessDoc(business)
         )
 
+        const restaurantReviewSummary = await getRestaurantReviewPublicSummary(business._id, { recentLimit: 8 })
+
         return res.status(200).json({
             data: {
                 ...sanitizeBusinessPayload(business),
                 menuItems,
-                availablePaymentMethods: resolveAvailableTouristPaymentMethods(business)
+                availablePaymentMethods: resolveAvailableTouristPaymentMethods(business),
+                restaurantReviewSummary
             }
         })
     } catch (error) {

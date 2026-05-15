@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useAuth } from './useAuth.hook.js'
 import { getTouristCartItems, putTouristCartItems } from '../services/tourist/tourist-cart-item.service.js'
 import { useTouristCartItemStore } from '../store/tourist/tourist-cart-item.store.js'
+import {
+  clearGuestCartCheckoutPending,
+  clearGuestCartStorage,
+  readGuestCartSnapshot
+} from '../shared/utils/guestCartStorage.utils.js'
+import { mergeGuestItemsIntoServerList, peekGuestCartTransfer } from '../shared/utils/guestCartTransfer.utils.js'
 
 const SYNC_DEBOUNCE_MS = 450
 
@@ -20,6 +26,7 @@ export const useTouristCartItemPersistence = () => {
   const isTourist = user?.role === 'TOURIST'
 
   const hydrateCart = useTouristCartItemStore((s) => s.hydrateCart)
+  const setActiveCheckoutBusinessId = useTouristCartItemStore((s) => s.setActiveCheckoutBusinessId)
   const skipPersistRef = useRef(true)
   const debounceTimerRef = useRef(null)
   const baseUrlRef = useRef(
@@ -88,16 +95,35 @@ export const useTouristCartItemPersistence = () => {
         const res = await getTouristCartItems()
         if (cancelled) return
         const payload = res?.data?.data
-        const remoteItems = Array.isArray(payload?.items) ? payload.items : []
-        const remoteDeselected =
+        let remoteItems = Array.isArray(payload?.items) ? payload.items : []
+        let remoteDeselected =
           payload?.deselectedItemKeys &&
           typeof payload.deselectedItemKeys === 'object' &&
           !Array.isArray(payload.deselectedItemKeys)
             ? payload.deselectedItemKeys
             : {}
 
-        // Server cart is canonical for authenticated users. Avoid reviving stale
-        // local entries (e.g. items already removed after successful checkout).
+        const guestSnapshot = readGuestCartSnapshot()
+        const guestTransfer = peekGuestCartTransfer()
+        if (guestSnapshot.items.length) {
+          remoteItems = mergeGuestItemsIntoServerList(remoteItems, guestSnapshot.items)
+          remoteDeselected = {}
+          clearGuestCartStorage()
+          try {
+            await putTouristCartItems({
+              items: remoteItems.map(stripItemKeyForApi),
+              deselectedItemKeys: remoteDeselected
+            })
+          } catch (syncErr) {
+            console.error('Failed to sync merged guest cart', syncErr)
+          }
+          if (guestTransfer.checkoutPending && guestTransfer.singleBusinessId) {
+            setActiveCheckoutBusinessId(guestTransfer.singleBusinessId)
+          } else {
+            clearGuestCartCheckoutPending()
+          }
+        }
+
         hydrateCart({ items: remoteItems, deselectedItemKeys: remoteDeselected })
       } catch (err) {
         console.error('Failed to load tourist cart', err)
@@ -111,7 +137,7 @@ export const useTouristCartItemPersistence = () => {
     return () => {
       cancelled = true
     }
-  }, [isAuthLoading, isAuthenticated, isTourist, user?._id, hydrateCart])
+  }, [isAuthLoading, isAuthenticated, isTourist, user?._id, hydrateCart, setActiveCheckoutBusinessId])
 
   useEffect(() => {
     if (!isAuthenticated || !isTourist) {

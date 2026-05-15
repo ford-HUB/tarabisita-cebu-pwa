@@ -20,6 +20,7 @@ const ManageUsersTableSection = ({
 
   useEffect(() => {
     if (actionUserId && !rows.some((r) => r.id === actionUserId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync when row no longer in filtered list
       setActionUserId(null)
     }
   }, [actionUserId, rows])
@@ -98,6 +99,7 @@ const ManageUsersTableSection = ({
       </div>
 
       <ManageUsersActionsModal
+        key={actionUser?.id ?? 'closed'}
         user={actionUser}
         onClose={() => setActionUserId(null)}
         currentUserId={currentUserId}

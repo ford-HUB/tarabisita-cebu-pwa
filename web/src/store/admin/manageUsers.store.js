@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import {
   deleteAdminUser as deleteAdminUserRequest,
   getAdminUsers,
+  getAdminUserDetails,
   patchAdminUserWhitelist,
   sendAdminUserWarningEmail
 } from '../../services/admin/users.service'
@@ -18,6 +19,9 @@ export const useAdminManageUsersStore = create((set, get) => ({
   debouncedSearch: '',
   whitelistBusyId: null,
   deleteBusyId: null,
+  userDetails: null,
+  userDetailsLoading: false,
+  userDetailsError: null,
 
   setRows: (updater) =>
     set((s) => ({
@@ -33,6 +37,26 @@ export const useAdminManageUsersStore = create((set, get) => ({
   setDebouncedSearch: (debouncedSearch) => set({ debouncedSearch }),
   setWhitelistBusyId: (whitelistBusyId) => set({ whitelistBusyId }),
   setDeleteBusyId: (deleteBusyId) => set({ deleteBusyId }),
+
+  clearUserDetails: () => set({ userDetails: null, userDetailsError: null, userDetailsLoading: false }),
+
+  fetchUserDetails: async (userId) => {
+    const id = String(userId || '').trim()
+    if (!id) {
+      set({ userDetails: null, userDetailsError: 'Invalid user.', userDetailsLoading: false })
+      return
+    }
+    set({ userDetailsLoading: true, userDetailsError: null })
+    try {
+      const response = await getAdminUserDetails(id)
+      const data = response?.data?.data
+      set({ userDetails: data ?? null, userDetailsLoading: false, userDetailsError: null })
+    } catch (error) {
+      const message = error?.response?.data?.message || 'Failed to load user details.'
+      toast.error(message)
+      set({ userDetails: null, userDetailsLoading: false, userDetailsError: message })
+    }
+  },
 
   fetchList: async ({ role, whitelisted }) => {
     const s = get()
@@ -63,7 +87,7 @@ export const useAdminManageUsersStore = create((set, get) => ({
     }
   },
 
-  toggleWhitelist: async ({ userId, nextWhitelisted, role, whitelisted }) => {
+  toggleWhitelist: async ({ userId, nextWhitelisted }) => {
     set({ whitelistBusyId: userId })
     try {
       await patchAdminUserWhitelist(userId, nextWhitelisted)

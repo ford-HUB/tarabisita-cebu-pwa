@@ -2,6 +2,7 @@ import express from 'express'
 import multer from 'multer'
 import {
     listAdminUsers,
+    getAdminUserDetails,
     patchAdminUserWhitelist,
     deleteAdminUser,
     postAdminUserWarningEmail
@@ -22,6 +23,12 @@ const adminUserEmailUpload = multer({
     limits: { fileSize: 12 * 1024 * 1024, files: 10 }
 })
 
+manageUsersRoutes.get(
+    '/users/:userId',
+    guard(['ADMIN']),
+    validateRequest(adminUserIdParamsSchema),
+    getAdminUserDetails
+)
 manageUsersRoutes.get('/users', guard(['ADMIN']), validateRequest(adminUsersListQuerySchema), listAdminUsers)
 manageUsersRoutes.patch(
     '/:userId/whitelist',

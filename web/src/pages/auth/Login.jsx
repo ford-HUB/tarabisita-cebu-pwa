@@ -9,6 +9,8 @@ import RequestForgotPassword from '../../components/auth/RequestForgotPasswordMo
 import { useAuthStore } from '../../store/auth/auth.store'
 import { showErrorToast, showSuccessToast } from '../../shared/ui/toast.util'
 import { roleBasedRoute } from '../../shared/utils/direct.utils'
+import { touristCheckoutHref } from '../../components/layout/tourist/touristLayout.constants.js'
+import { isGuestCartCheckoutPending } from '../../shared/utils/guestCartStorage.utils.js'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -36,12 +38,11 @@ const Login = () => {
       const role = response.data?.properties?.user?.role
       const nextRaw = String(searchParams.get('next') || '').trim()
       const safeNext = nextRaw.startsWith('/') ? nextRaw : ''
-      if (safeNext) {
-        navigate(safeNext)
-      } else {
-        const destin_url = roleBasedRoute(role)
-        navigate(`/${destin_url}`)
-      }
+      const guestCheckoutPending =
+        String(role || '').toUpperCase() === 'TOURIST' && isGuestCartCheckoutPending()
+      const destination =
+        safeNext || (guestCheckoutPending ? touristCheckoutHref : `/${roleBasedRoute(role)}`)
+      navigate(destination)
       showSuccessToast('Welcome back! You are now signed in.')
     } catch (error) {
       showErrorToast(error?.response?.data?.message)

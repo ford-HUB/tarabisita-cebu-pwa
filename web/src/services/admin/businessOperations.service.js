@@ -12,8 +12,12 @@ export const getAdminBusinessPartners = async () => {
   return response
 }
 
-export const updateBusinessApprovalStatus = async ({ businessId, status, notes = '' }) => {
-  const response = await apiInstance.patch(`business/admin/approval-queue/${businessId}`, { status, notes })
+export const updateBusinessApprovalStatus = async ({ businessId, status, notes = '', revoke = false }) => {
+  const response = await apiInstance.patch(`business/admin/approval-queue/${businessId}`, {
+    status,
+    notes,
+    revoke: Boolean(revoke)
+  })
   return response
 }
 
@@ -21,6 +25,24 @@ export const getAdminPlanSubscriptionTransactions = async ({ days = '7', status 
   const response = await apiInstance.get('admin/transaction/plan-subscription-transactions', {
     params: { days, status }
   })
+  return response
+}
+
+export const getAdminPlanSubscriptionPaymentDetail = async (paymentId) => {
+  const id = encodeURIComponent(String(paymentId || '').trim())
+  const response = await apiInstance.get(`admin/transaction/plan-subscription-payments/${id}`)
+  return response
+}
+
+export const postAdminPlanSubscriptionPaymentApprove = async (paymentId) => {
+  const id = encodeURIComponent(String(paymentId || '').trim())
+  const response = await apiInstance.post(`admin/transaction/plan-subscription-payments/${id}/approve`)
+  return response
+}
+
+export const postAdminPlanSubscriptionPaymentReject = async (paymentId, body = {}) => {
+  const id = encodeURIComponent(String(paymentId || '').trim())
+  const response = await apiInstance.post(`admin/transaction/plan-subscription-payments/${id}/reject`, body)
   return response
 }
 

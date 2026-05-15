@@ -4,7 +4,9 @@ const TouristCheckoutBillingSummarySection = ({
   cartItemCount,
   cartTotal,
   billingMethodLabel,
-  formatPhp
+  formatPhp,
+  fullCartRowLabel = 'Full cart (all items)',
+  savedCartAside = null
 }) => (
   <section
     className="rounded-2xl border border-[#e7dfd5] bg-[#faf8f5] p-4 shadow-sm md:p-5"
@@ -31,12 +33,13 @@ const TouristCheckoutBillingSummarySection = ({
         <dd className="font-medium text-[#1f1f1f]">{billingMethodLabel}</dd>
       </div>
       <div className="flex flex-wrap items-baseline justify-between gap-2 pt-0.5 text-xs text-[#6b6b6b]">
-        <dt>Full cart (all items)</dt>
+        <dt>{fullCartRowLabel}</dt>
         <dd>
           {cartItemCount} item row{cartItemCount === 1 ? '' : 's'} · {formatPhp(cartTotal)}
         </dd>
       </div>
     </dl>
+    {savedCartAside ? <div className="mt-3 text-xs leading-relaxed text-[#6b6b6b]">{savedCartAside}</div> : null}
   </section>
 )
 

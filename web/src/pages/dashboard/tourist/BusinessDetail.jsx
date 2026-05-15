@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner'
 import {
   buildTouristStoreMessagingHref,
+  touristCartHref,
   touristCheckoutHref,
   touristExploreHref,
   touristStayBookingHref
@@ -28,7 +29,10 @@ import {
 import { postStoreMessagingLinkToken } from '../../../services/tourist/store-messaging.service.js'
 import { useTouristCartItemStore } from '../../../store/tourist/tourist-cart-item.store.js'
 import TouristDestinationMapPanel from '../../../components/tourist/explore/modals/TouristDestinationMapPanel.jsx'
+import RestaurantGuestReviewsModal from '../../../components/tourist/explore/modals/RestaurantGuestReviewsModal.jsx'
 import TouristStayPackageDetailModal from '../../../components/tourist/explore/modals/TouristStayPackageDetailModal.jsx'
+import TouristMenuItemDetailModal from '../../../components/tourist/explore/modals/TouristMenuItemDetailModal.jsx'
+import { useTouristBusinessCartEditDeepLink } from '../../../hooks/useTouristBusinessCartEditDeepLink.hook.js'
 import { pickCartItemDetailsFromMenuItem } from '../../../shared/utils/tourist-cart-item-details.utils.js'
 import { hasValidMapCoordinates } from '../../../shared/utils/mapboxStaticMap.utils.js'
 import { googleDirectionsUrl, googleSearchAddressUrl } from '../../../shared/utils/touristMapLinks.utils.js'
@@ -66,6 +70,9 @@ const groupByCategory = (items) => {
   }
   return Array.from(map.entries()).map(([name, rows]) => ({ name, rows }))
 }
+
+const isMenuItemOrderable = (item) =>
+  Boolean(item?.isAvailable) && String(item?.stockStatus || '') !== 'OUT_OF_STOCK'
 
 const MenuTabs = ({
   selected,
@@ -174,9 +181,11 @@ const BusinessDetail = () => {
   const { businessId } = useParams()
   const navigate = useNavigate()
   const addItem = useTouristCartItemStore((s) => s.addItem)
+  const updateItem = useTouristCartItemStore((s) => s.updateItem)
   const cartItems = useTouristCartItemStore((s) => s.items)
   const setItemQty = useTouristCartItemStore((s) => s.setItemQty)
   const removeItem = useTouristCartItemStore((s) => s.removeItem)
+  const setActiveCheckoutBusinessId = useTouristCartItemStore((s) => s.setActiveCheckoutBusinessId)
 
   const [business, setBusiness] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState('All')
@@ -186,15 +195,36 @@ const BusinessDetail = () => {
   const [errorMessage, setErrorMessage] = useState('')
   const [stickyTopOffset, setStickyTopOffset] = useState(0)
   const [isMapModalOpen, setIsMapModalOpen] = useState(false)
+  const [isGuestReviewsOpen, setIsGuestReviewsOpen] = useState(false)
   const [selectedPackageId, setSelectedPackageId] = useState('')
   const [isPackageModalOpen, setIsPackageModalOpen] = useState(false)
+  const [selectedMenuItem, setSelectedMenuItem] = useState(null)
+  const [editCartKey, setEditCartKey] = useState(null)
+  const [highlightMenuItemId, setHighlightMenuItemId] = useState(null)
 
   useEffect(() => {
     setSelectedCategory('All')
     setMenuSearchTerm('')
     setSelectedPackageId('')
     setIsPackageModalOpen(false)
+    setSelectedMenuItem(null)
+    setEditCartKey(null)
+    setHighlightMenuItemId(null)
+    useTouristCartItemStore.getState().clearActiveCheckoutBusinessId()
   }, [businessId])
+
+  useEffect(() => {
+    if (!highlightMenuItemId) return undefined
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`menu-item-${highlightMenuItemId}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 350)
+    const clearHighlight = window.setTimeout(() => setHighlightMenuItemId(null), 4000)
+    return () => {
+      window.clearTimeout(timer)
+      window.clearTimeout(clearHighlight)
+    }
+  }, [highlightMenuItemId])
 
   useEffect(() => {
     const updateStickyOffset = () => {
@@ -250,6 +280,19 @@ const BusinessDetail = () => {
     () => categoryMatchesLabel(business?.category, 'Resort') || categoryMatchesLabel(business?.category, 'Hotel'),
     [business?.category]
   )
+
+  useTouristBusinessCartEditDeepLink({
+    businessId: business?._id ? String(business._id) : '',
+    businessName: business?.name || '',
+    menuItems,
+    isStayBusiness,
+    setSelectedMenuItem,
+    setEditCartKey,
+    setHighlightMenuItemId,
+    setIsPackageModalOpen,
+    setSelectedPackageId
+  })
+
   const categories = useMemo(() => {
     const dynamic = getMenuCategories(menuItems)
     const total = dynamic.reduce((sum, entry) => sum + entry.count, 0)
@@ -296,8 +339,11 @@ const BusinessDetail = () => {
   const categoryLabel = categoryDisplayLabel(business?.category)
   const listingLabel = isStayBusiness ? 'Stay List' : 'Restaurant List'
   const businessName = business?.name || 'Restaurant'
-  const rating = formatRating(business?.averageRating || business?.rating)
-  const ratingCount = Number(business?.ratingCount || business?.reviewsCount || business?.reviewCount || 1000)
+  const reviewSum = business?.restaurantReviewSummary
+  const ratingAvg = reviewSum?.averageRating != null ? Number(reviewSum.averageRating) : null
+  const ratingCount = Number(reviewSum?.reviewCount || 0)
+  const hasReviews = Number.isFinite(ratingAvg) && ratingCount > 0
+  const ratingDisplay = hasReviews ? formatRating(ratingAvg) : null
   const sidebarStickyTop = stickyTopOffset + 8
   const destination = hasValidMapCoordinates(business?.businessLocation)
     ? { lat: business.businessLocation.lat, lng: business.businessLocation.lng }
@@ -318,11 +364,33 @@ const BusinessDetail = () => {
       const token = res?.data?.data?.messagingToken
       if (!token) throw new Error('NO_TOKEN')
       navigate(`/${buildTouristStoreMessagingHref(token)}`)
-    } catch {
-      toast.error('Could not open message. Please try again.')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not open message. Please try again.')
     } finally {
       setIsOpeningMessage(false)
     }
+  }
+
+  const handleQuickAddMenuItem = (item) => {
+    const id = business?._id ? String(business._id) : ''
+    if (!id) return
+    if (!isMenuItemOrderable(item)) {
+      toast.error('This item is not available right now.')
+      return
+    }
+    const image = Array.isArray(item.images) && item.images.length ? String(item.images[0]).trim() : ''
+    const listingType = String(item?.listingType || '').trim().toUpperCase()
+    addItem({
+      businessId: id,
+      businessName: business.name,
+      catalogItemId: String(item.id),
+      name: item.name,
+      unitPrice: Number(item.price) || 0,
+      image,
+      qty: 1,
+      ...(listingType ? { listingType } : {}),
+      ...pickCartItemDetailsFromMenuItem(item)
+    })
   }
 
   if (isLoading && !business) {
@@ -383,17 +451,28 @@ const BusinessDetail = () => {
     const image = Array.isArray(selectedPackageWithBusiness.images) && selectedPackageWithBusiness.images.length
       ? selectedPackageWithBusiness.images[0]
       : ''
-    addItem({
+    const editingRow = editCartKey
+      ? useTouristCartItemStore.getState().items.find((it) => it.key === editCartKey)
+      : null
+    const payload = {
       businessId: selectedPackageWithBusiness.businessId,
       businessName: selectedPackageWithBusiness.businessName,
       catalogItemId: String(selectedPackageWithBusiness.id || ''),
       name: selectedPackageWithBusiness.name || 'Stay package',
       unitPrice: Number(selectedPackageWithBusiness.price) || 0,
       image,
-      qty: 1,
+      qty: Math.min(99, Math.max(1, Number(editingRow?.qty) || 1)),
       listingType: 'STAY',
       ...pickCartItemDetailsFromMenuItem(selectedPackageWithBusiness)
-    })
+    }
+    if (editCartKey) {
+      updateItem(editCartKey, payload)
+      setEditCartKey(null)
+      setIsPackageModalOpen(false)
+      navigate(touristCartHref)
+      return
+    }
+    addItem(payload)
     setIsPackageModalOpen(false)
   }
 
@@ -414,6 +493,12 @@ const BusinessDetail = () => {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-[#ededed] bg-white">
+        {img ? (
+          <div className="relative h-44 w-full border-b border-[#efefef] bg-[#eaeaea] sm:h-52 md:h-56">
+            <img src={img} alt="" className="h-full w-full object-cover" />
+          </div>
+        ) : null}
+
         <div className="border-b border-[#efefef] px-4 py-4 md:px-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-3">
@@ -424,10 +509,35 @@ const BusinessDetail = () => {
                 <p className="text-xs text-[#8a8a8a]">{categoryLabel}</p>
                 <h1 className="truncate text-3xl font-semibold leading-tight text-[#1f1f1f]">{businessName}</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#555]">
-                  <span className="inline-flex items-center gap-1">
-                    <FiStar className="h-3.5 w-3.5 text-[#f59f0b]" aria-hidden />
-                    {rating}/5 ({ratingCount.toLocaleString('en-PH')}+) · See reviews
-                  </span>
+                  {!isStayBusiness ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsGuestReviewsOpen(true)}
+                      className="inline-flex max-w-full items-center gap-1 rounded-md text-left text-[#555] underline decoration-[#ccc] decoration-1 underline-offset-2 transition hover:bg-[#f7f7f7] hover:text-[#222]"
+                    >
+                      <FiStar className="h-3.5 w-3.5 shrink-0 text-[#f59f0b]" aria-hidden />
+                      <span>
+                        {hasReviews ? (
+                          <>
+                            Reviews · {ratingDisplay} ★ · {ratingCount} review{ratingCount === 1 ? '' : 's'}
+                          </>
+                        ) : (
+                          <>View reviews — guests can leave feedback after online orders</>
+                        )}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      <FiStar className="h-3.5 w-3.5 text-[#f59f0b]" aria-hidden />
+                      {hasReviews ? (
+                        <>
+                          {ratingDisplay} out of 5 · {ratingCount} review{ratingCount === 1 ? '' : 's'}
+                        </>
+                      ) : (
+                        <>New on Tara Bisita — reviews appear after guests pay online</>
+                      )}
+                    </span>
+                  )}
                   <span className="inline-flex items-center gap-1">
                     <FiInfo className="h-3.5 w-3.5" aria-hidden />
                     More Info
@@ -442,7 +552,7 @@ const BusinessDetail = () => {
               className="inline-flex h-10 items-center gap-2 rounded-md border border-[#d8d8d8] bg-white px-4 text-sm font-medium text-[#262626] transition hover:bg-[#fafafa] disabled:opacity-60"
             >
               <FiMessageCircle className="h-4 w-4" aria-hidden />
-              {isOpeningMessage ? 'Opening…' : 'inqiure'}
+              {isOpeningMessage ? 'Opening…' : 'Inquire'}
             </button>
           </div>
         </div>
@@ -469,22 +579,6 @@ const BusinessDetail = () => {
             </a>
           </div>
         </div>
-
-        {isStayBusiness ? (
-          <div className="border-b border-[#efefef] px-4 py-4 md:px-5">
-            <div className="relative h-52 overflow-hidden rounded-xl border border-[#e7dfd5] bg-[#f1f1f1] sm:h-64">
-              {img ? <img src={img} alt="" className="h-full w-full object-cover" /> : null}
-              <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/30 to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <p className="text-xs font-semibold uppercase tracking-wide text-white/80">{categoryLabel}</p>
-                <h2 className="mt-1 text-3xl leading-tight font-semibold sm:text-5xl">{String(businessName || '').toUpperCase()}</h2>
-                <p className="mt-1 line-clamp-2 text-sm text-white/90">
-                  {business?.description || 'Curated stay experiences with relaxing views and resort comfort.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : null}
 
         {isStayBusiness ? null : (
           <MenuTabs
@@ -514,11 +608,17 @@ const BusinessDetail = () => {
                     const id = String(item?.id || '')
                     const image = Array.isArray(item.images) && item.images.length ? item.images[0] : ''
                     const isSelected = String(selectedPackage?.id || '') === id
+                    const isHighlighted = String(highlightMenuItemId || '') === id
                     return (
                       <article
                         key={id}
+                        id={`menu-item-${id}`}
                         className={`overflow-hidden rounded-xl border bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition ${
-                          isSelected ? 'border-[#222] ring-1 ring-[#222]/10' : 'border-[#e9e9e9]'
+                          isHighlighted
+                            ? 'border-[#ff7a1a] ring-2 ring-[#ff7a1a]/35'
+                            : isSelected
+                              ? 'border-[#222] ring-1 ring-[#222]/10'
+                              : 'border-[#e9e9e9]'
                         }`}
                       >
                         <button
@@ -565,10 +665,16 @@ const BusinessDetail = () => {
                   <div className="grid gap-3 md:grid-cols-2">
                     {group.rows.map((item) => {
                       const image = Array.isArray(item.images) && item.images.length ? item.images[0] : ''
+                      const isHighlighted = String(highlightMenuItemId || '') === String(item.id)
                       return (
                         <article
                           key={item.id}
-                          className="relative overflow-hidden rounded-xl border border-[#e9e9e9] bg-white p-3 pr-11 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                          id={`menu-item-${item.id}`}
+                          className={`relative overflow-hidden rounded-xl border bg-white p-3 pr-11 shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition ${
+                            isHighlighted
+                              ? 'border-[#ff7a1a] ring-2 ring-[#ff7a1a]/35'
+                              : 'border-[#e9e9e9]'
+                          }`}
                         >
                           <div className="flex gap-3">
                             <div className="min-w-0 flex-1">
@@ -584,18 +690,10 @@ const BusinessDetail = () => {
                           </div>
                           <button
                             type="button"
-                            onClick={() =>
-                              addItem({
-                                businessId: String(business._id),
-                                businessName: business.name,
-                                catalogItemId: String(item.id),
-                                name: item.name,
-                                unitPrice: Number(item.price) || 0,
-                                image,
-                                qty: 1,
-                                ...pickCartItemDetailsFromMenuItem(item)
-                              })
-                            }
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleQuickAddMenuItem(item)
+                            }}
                             className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#dfdfdf] bg-white text-[#232323] shadow-sm transition hover:bg-[#f6f6f6]"
                             aria-label={`Add ${item.name} to cart`}
                           >
@@ -685,7 +783,12 @@ const BusinessDetail = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => navigate(touristCheckoutHref)}
+                    onClick={() => {
+                      const id = business?._id ? String(business._id) : ''
+                      if (!id) return
+                      setActiveCheckoutBusinessId(id)
+                      navigate(touristCheckoutHref)
+                    }}
                     disabled={!cartCount}
                     className="mt-3 w-full rounded-md bg-[#e0e0e0] px-4 py-2.5 text-sm font-semibold text-[#4a4a4a] transition enabled:bg-[#222] enabled:text-white enabled:hover:bg-black disabled:cursor-not-allowed"
                   >
@@ -701,6 +804,14 @@ const BusinessDetail = () => {
           </div>
         )}
       </div>
+      {isGuestReviewsOpen ? (
+        <RestaurantGuestReviewsModal
+          key={String(business._id)}
+          onClose={() => setIsGuestReviewsOpen(false)}
+          businessId={String(business._id)}
+          businessName={businessName}
+        />
+      ) : null}
       <StoreLocationModal
         isOpen={isMapModalOpen}
         onClose={() => setIsMapModalOpen(false)}
@@ -711,9 +822,20 @@ const BusinessDetail = () => {
       <TouristStayPackageDetailModal
         open={isStayBusiness && isPackageModalOpen}
         item={selectedPackageWithBusiness}
-        onClose={() => setIsPackageModalOpen(false)}
+        onClose={() => {
+          setIsPackageModalOpen(false)
+          setEditCartKey(null)
+        }}
         onAddToCart={handleAddSelectedPackageToCart}
         onBookNow={handleBookSelectedPackage}
+      />
+      <TouristMenuItemDetailModal
+        item={selectedMenuItem}
+        editCartKey={editCartKey}
+        onClose={() => {
+          setSelectedMenuItem(null)
+          setEditCartKey(null)
+        }}
       />
     </div>
   )

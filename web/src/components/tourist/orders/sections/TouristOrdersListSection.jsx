@@ -16,6 +16,7 @@ import {
   buildTouristStoreMessagingHref
 } from '../../../layout/tourist/touristLayout.constants'
 import { postStoreMessagingLinkToken } from '../../../../services/tourist/store-messaging.service.js'
+import { canTouristRateRestaurantForOrder } from '../../../../shared/utils/touristRestaurantReview.utils.js'
 
 const formatLineUnitPhp = (n) => {
   const num = Number(n)
@@ -64,7 +65,8 @@ const StoreAvatar = ({ src }) => {
  *   isLoading: boolean,
  *   errorMessage: string | null,
  *   variant?: 'grouped' | 'history',
- *   excludeStatuses?: string[]
+ *   excludeStatuses?: string[],
+ *   onRequestRestaurantReview?: (order: Record<string, unknown>) => void
  * }} props
  */
 const TouristOrdersListSection = ({
@@ -73,7 +75,8 @@ const TouristOrdersListSection = ({
   isLoading,
   errorMessage,
   variant = 'grouped',
-  excludeStatuses = []
+  excludeStatuses = [],
+  onRequestRestaurantReview
 }) => {
   const navigate = useNavigate()
   const [expandedKeys, setExpandedKeys] = useState(() => new Set())
@@ -365,6 +368,17 @@ const TouristOrdersListSection = ({
                   {order.total ? <span className="font-medium text-[#1f1f1f]">{order.total}</span> : null}
                   {order.time ? <span>{order.time}</span> : null}
                 </div>
+                {variant === 'history' && canTouristRateRestaurantForOrder(order) && typeof onRequestRestaurantReview === 'function' ? (
+                  <div className="mt-4 border-t border-[#f0e8de] pt-4">
+                    <button
+                      type="button"
+                      onClick={() => onRequestRestaurantReview(order)}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#ffdfbe] bg-[#fff7ed] px-4 py-2 text-xs font-semibold text-[#9b5a2c] transition hover:border-[#ff7a1a]/50 hover:text-[#c66b2b]"
+                    >
+                      {order.restaurantReview ? 'Edit your review' : 'Rate this restaurant'}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           </li>

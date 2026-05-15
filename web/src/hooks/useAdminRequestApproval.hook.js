@@ -10,6 +10,7 @@ export const useAdminRequestApproval = () => {
     selectedRequest,
     isApproveModalOpen,
     isDeclineModalOpen,
+    isRevokeModalOpen,
     isLoading,
     isSubmittingAction
   } = useAdminRequestApprovalStore(
@@ -20,6 +21,7 @@ export const useAdminRequestApproval = () => {
       selectedRequest: s.selectedRequest,
       isApproveModalOpen: s.isApproveModalOpen,
       isDeclineModalOpen: s.isDeclineModalOpen,
+      isRevokeModalOpen: s.isRevokeModalOpen,
       isLoading: s.isLoading,
       isSubmittingAction: s.isSubmittingAction
     }))
@@ -44,6 +46,7 @@ export const useAdminRequestApproval = () => {
     store.setSelectedRequest(request)
     store.setIsApproveModalOpen(false)
     store.setIsDeclineModalOpen(false)
+    store.setIsRevokeModalOpen(false)
   }
 
   const closeAllModals = () => {
@@ -51,10 +54,15 @@ export const useAdminRequestApproval = () => {
     store.setSelectedRequest(null)
     store.setIsApproveModalOpen(false)
     store.setIsDeclineModalOpen(false)
+    store.setIsRevokeModalOpen(false)
   }
 
   const submitAction = async (status, notes = '') => {
     await useAdminRequestApprovalStore.getState().submitApprovalDecision({ status, notes })
+  }
+
+  const submitRevoke = async (notes = '') => {
+    await useAdminRequestApprovalStore.getState().submitRevokeApproval({ notes })
   }
 
   return {
@@ -63,6 +71,7 @@ export const useAdminRequestApproval = () => {
     selectedRequest,
     isApproveModalOpen,
     isDeclineModalOpen,
+    isRevokeModalOpen,
     isLoading,
     isSubmittingAction,
     filteredRequests,
@@ -70,8 +79,10 @@ export const useAdminRequestApproval = () => {
     setStatusFilter: (v) => useAdminRequestApprovalStore.getState().setStatusFilter(v),
     setIsApproveModalOpen: (v) => useAdminRequestApprovalStore.getState().setIsApproveModalOpen(v),
     setIsDeclineModalOpen: (v) => useAdminRequestApprovalStore.getState().setIsDeclineModalOpen(v),
+    setIsRevokeModalOpen: (v) => useAdminRequestApprovalStore.getState().setIsRevokeModalOpen(v),
     openReviewModal,
     closeAllModals,
-    submitAction
+    submitAction,
+    submitRevoke
   }
 }
