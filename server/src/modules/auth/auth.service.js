@@ -32,7 +32,7 @@ export const getSignupEmailVerifiedFromCodes = async (userId) => {
     const record = await VerificationCode.findOne({
         userId,
         used: true,
-        purpose: { $nin: ['EMAIL_CHANGE', 'SUPPORT_EMAIL'] }
+        purpose: 'DEFAULT'
     })
         .sort({ updatedAt: -1 })
         .select('updatedAt createdAt')
@@ -166,8 +166,7 @@ export const registerUserAccount = async ({
             throw createDuplicateEmailError()
         }
 
-        const verification = await resolveUserEmailVerification(existingUser)
-        if (verification.isEmailVerified) {
+        if (Boolean(existingUser.isEmailVerified)) {
             throw createDuplicateEmailError()
         }
 

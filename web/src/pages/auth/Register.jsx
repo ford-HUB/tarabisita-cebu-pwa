@@ -109,7 +109,7 @@ const Register = () => {
 
       try {
         const response = await mailChecker({ email: nextEmail })
-        if (latestEmailCheckIdRef.current !== checkId) return
+        const isLatest = latestEmailCheckIdRef.current === checkId
 
         const properties = response?.data?.properties || {}
         const exists = Boolean(properties.exists)
@@ -117,61 +117,65 @@ const Register = () => {
         const accountRole = properties.accountRole ? String(properties.accountRole) : null
 
         if (exists && isEmailVerified) {
-          setEmailStatus({
-            state: 'ok',
-            exists: true,
-            isEmailVerified: true,
-            accountRole,
-            message: verifiedEmailTakenMessage(accountRole),
-          })
-          return { exists: true, isEmailVerified: true, accountRole }
+          const result = { exists: true, isEmailVerified: true, accountRole }
+          if (isLatest) {
+            setEmailStatus({
+              state: 'ok',
+              ...result,
+              message: verifiedEmailTakenMessage(accountRole),
+            })
+          }
+          return result
         }
 
         if (exists && !isEmailVerified) {
+          const result = { exists: true, isEmailVerified: false, accountRole }
+          if (isLatest) {
+            setEmailStatus({
+              state: 'ok',
+              ...result,
+              message:
+                accountRole === 'BUSINESS'
+                  ? 'This email is already used for a business signup but is not verified yet. You can continue—we’ll send a new verification code to finish setting up that account.'
+                  : 'This email is already registered but not verified yet. You can reuse it—we’ll send you a new verification code.',
+            })
+          }
+          return result
+        }
+
+        const result = { exists: false, isEmailVerified: false, accountRole: null }
+        if (isLatest) {
           setEmailStatus({
             state: 'ok',
-            exists: true,
-            isEmailVerified: false,
-            accountRole,
-            message:
-              accountRole === 'BUSINESS'
-                ? 'This email is already used for a business signup but is not verified yet. You can continue—we’ll send a new verification code to finish setting up that account.'
-                : 'This email is already registered but not verified yet. You can reuse it—we’ll send you a new verification code.',
-          })
-          return { exists: true, isEmailVerified: false, accountRole }
-        }
-
-        setEmailStatus({
-          state: 'ok',
-          exists: false,
-          isEmailVerified: false,
-          accountRole: null,
-          message: 'This email is available to register.',
-        })
-        return { exists: false, isEmailVerified: false, accountRole: null }
-      } catch (error) {
-        if (latestEmailCheckIdRef.current !== checkId) return
-
-        const status = error?.response?.status
-        if (status === 404) {
-          setEmailStatus({
-            state: 'not_found',
-            exists: false,
-            isEmailVerified: false,
-            accountRole: null,
+            ...result,
             message: 'This email is available to register.',
           })
-          return { exists: false, isEmailVerified: false, accountRole: null }
+        }
+        return result
+      } catch (error) {
+        const isLatest = latestEmailCheckIdRef.current === checkId
+        const status = error?.response?.status
+        if (status === 404) {
+          const result = { exists: false, isEmailVerified: false, accountRole: null }
+          if (isLatest) {
+            setEmailStatus({
+              state: 'not_found',
+              ...result,
+              message: 'This email is available to register.',
+            })
+          }
+          return result
         }
 
-        setEmailStatus({
-          state: 'error',
-          exists: false,
-          isEmailVerified: false,
-          accountRole: null,
-          message: 'Unable to check email right now. Please try again.',
-        })
-        return { exists: false, isEmailVerified: false, accountRole: null }
+        const result = { exists: false, isEmailVerified: false, accountRole: null }
+        if (isLatest) {
+          setEmailStatus({
+            state: 'error',
+            ...result,
+            message: 'Unable to check email right now. Please try again.',
+          })
+        }
+        return result
       }
     },
     [mailChecker]
@@ -206,6 +210,15 @@ const Register = () => {
       return undefined
     }
 
+    // Clear stale availability from a previous address while the debounced check runs.
+    setEmailStatus({
+      state: 'checking',
+      exists: false,
+      isEmailVerified: false,
+      accountRole: null,
+      message: '',
+    })
+
     const timeoutId = window.setTimeout(() => {
       void handleEmailCheck(trimmed)
     }, EMAIL_CHECK_DEBOUNCE_MS)
@@ -227,9 +240,15 @@ const Register = () => {
 
   const onSubmit = async (data) => {
     try {
-      if (emailStatus.exists && emailStatus.isEmailVerified) {
+      const trimmedEmail = String(data.email || '').trim()
+      let availability = emailStatus
+      if (looksLikeEmail(trimmedEmail)) {
+        availability = await handleEmailCheck(trimmedEmail)
+      }
+
+      if (availability.exists && availability.isEmailVerified) {
         setError('email', { type: 'manual', message: 'This email is already taken.' })
-        showErrorToast(verifiedEmailTakenMessage(emailStatus.accountRole))
+        showErrorToast(verifiedEmailTakenMessage(availability.accountRole))
         return
       }
 
@@ -270,7 +289,7 @@ const Register = () => {
       })
       navigate(`/verify-email?${query.toString()}`)
       showSuccessToast(
-        emailStatus.exists && !emailStatus.isEmailVerified
+        availability.exists && !availability.isEmailVerified
           ? 'Account found but not verified. We sent a new verification code to your email.'
           : 'Verification code sent to your email. Please check your inbox.'
       )
@@ -307,6 +326,11 @@ const Register = () => {
             )
             return
           }
+        }
+
+        if (!checked?.exists) {
+          showErrorToast(message)
+          return
         }
 
         setError('email', { type: 'manual', message: 'This email is already taken.' })

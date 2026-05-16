@@ -379,14 +379,8 @@ export const internalEmailChecker = async (req, res) => {
             })
         }
         const accountRole = user.roleId?.name ? String(user.roleId.name) : null
-        let { isEmailVerified, emailVerifiedAt } = await resolveUserEmailVerification(user)
-
-        if (!user.isEmailVerified && isEmailVerified) {
-            await User.updateOne(
-                { _id: user._id },
-                { $set: { isEmailVerified: true, emailVerifiedAt } }
-            )
-        }
+        const isEmailVerified = Boolean(user.isEmailVerified)
+        const emailVerifiedAt = user.emailVerifiedAt || null
 
         return res.status(200).json({
             message: "System found your email existance",
