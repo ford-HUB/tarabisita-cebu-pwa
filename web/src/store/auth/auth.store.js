@@ -135,13 +135,8 @@ export const useAuthStore = create((set) => ({
   },
 
   mailChecker: async (data) => {
-    try {
-      const response = await mailChecker(data)
-      return response
-    } catch (error) {
-      console.error(error)
-      throw error
-    }
+    const response = await mailChecker(data)
+    return response
   },
 
   checkUser: async (options = {}) => {

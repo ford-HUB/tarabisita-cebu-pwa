@@ -41,7 +41,9 @@ export const resetPassword = async (data) => {
 } 
 
 export const mailChecker = async (data) => {
-    const response = await apiInstance.post('auth/mail-checker', data)
+    const response = await apiInstance.post('auth/mail-checker', data, {
+        validateStatus: (status) => status === 200 || status === 404,
+    })
     return response
 }
 

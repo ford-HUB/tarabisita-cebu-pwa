@@ -52,9 +52,9 @@ function AppSessionBootstrap() {
   // Validate httpOnly accessToken (JWT) on app entry — not tied to the login form submit.
   useEffect(() => {
     if (!hasCheckedAuth && !isCheckingAuth) {
-      void checkUser()
+      void checkUser({ silent: isPublicEntry })
     }
-  }, [checkUser, hasCheckedAuth, isCheckingAuth])
+  }, [checkUser, hasCheckedAuth, isCheckingAuth, isPublicEntry])
 
   useEffect(() => {
     if (!hasCheckedAuth || !isAuthenticated || !isPublicEntry) return

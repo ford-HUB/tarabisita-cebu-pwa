@@ -201,54 +201,29 @@ const Register = () => {
         if (!forSubmit && latestEmailCheckIdRef.current !== checkId) return
 
         const status = error?.response?.status
-        if (status === 404) {
-          const result = { exists: false, isEmailVerified: false, accountRole: null }
-          if (isLatest) {
-            setEmailStatus({
-              state: 'not_found',
-              ...result,
-              message: 'This email is available to register.',
-            })
-          }
-          return result
+        const unavailable = {
+          exists: false,
+          isEmailVerified: false,
+          canReuseForSignup: false,
+          registrationBlocked: false,
+          accountRole: null,
         }
 
-        const result = { exists: false, isEmailVerified: false, accountRole: null }
-        if (isLatest) {
+        if (status === 404) {
           setEmailStatus({
             state: 'not_found',
-            exists: false,
-            isEmailVerified: false,
-            canReuseForSignup: false,
-            registrationBlocked: false,
-            accountRole: null,
+            ...unavailable,
             message: 'This email is available to register.',
           })
-          return {
-            exists: false,
-            isEmailVerified: false,
-            canReuseForSignup: false,
-            registrationBlocked: false,
-            accountRole: null,
-          }
+          return unavailable
         }
 
         setEmailStatus({
           state: 'error',
-          exists: false,
-          isEmailVerified: false,
-          canReuseForSignup: false,
-          registrationBlocked: false,
-          accountRole: null,
+          ...unavailable,
           message: 'Unable to check email right now. Please try again.',
         })
-        return {
-          exists: false,
-          isEmailVerified: false,
-          canReuseForSignup: false,
-          registrationBlocked: false,
-          accountRole: null,
-        }
+        return unavailable
       }
     },
     [mailChecker]
@@ -593,6 +568,7 @@ const Register = () => {
                     id="name"
                     placeholder="Juan Dela Cruz"
                     type="text"
+                    autoComplete="name"
                     {...register('name')}
                   />
                   {(shouldShowStep1Errors || shouldShowTouchedError('name')) && errors.name && (
@@ -642,6 +618,7 @@ const Register = () => {
                       id="password"
                       placeholder="Min. 6 characters"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       {...register('password')}
                     />
                     <button
@@ -671,6 +648,7 @@ const Register = () => {
                       id="confirmPassword"
                       placeholder="Re-enter your password"
                       type={showConfirmPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
                       {...register('confirmPassword')}
                     />
                     <button
