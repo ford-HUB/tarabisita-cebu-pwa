@@ -72,10 +72,15 @@ function AppSessionBootstrap() {
   if (isAuthPending) {
     return (
       <div
-        className="flex min-h-svh items-center justify-center bg-[#f8f5f0]"
+        className="flex min-h-svh flex-col items-center justify-center gap-3 bg-[#f8f5f0]"
         aria-busy="true"
         aria-label="Checking session"
-      />
+      >
+        <div
+          aria-hidden="true"
+          className="h-10 w-10 animate-spin rounded-full border-2 border-[#e7dfd5] border-t-[#ff7a1a]"
+        />
+      </div>
     )
   }
 

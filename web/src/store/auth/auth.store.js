@@ -154,14 +154,13 @@ export const useAuthStore = create((set) => ({
       })
       return response
     } catch (error) {
-      if (!silent) {
-        set({
-          user: null,
-          isAuthenticated: false,
-          isCheckingAuth: false,
-          hasCheckedAuth: true
-        })
-      }
+      // Always mark auth as checked so public pages (register, login) are not stuck on the bootstrap shell.
+      set({
+        user: null,
+        isAuthenticated: false,
+        isCheckingAuth: false,
+        hasCheckedAuth: true
+      })
       return null
     }
   },
