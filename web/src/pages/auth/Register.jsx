@@ -202,6 +202,19 @@ const Register = () => {
 
         const status = error?.response?.status
         if (status === 404) {
+          const result = { exists: false, isEmailVerified: false, accountRole: null }
+          if (isLatest) {
+            setEmailStatus({
+              state: 'not_found',
+              ...result,
+              message: 'This email is available to register.',
+            })
+          }
+          return result
+        }
+
+        const result = { exists: false, isEmailVerified: false, accountRole: null }
+        if (isLatest) {
           setEmailStatus({
             state: 'not_found',
             exists: false,
@@ -273,6 +286,15 @@ const Register = () => {
       }))
       return undefined
     }
+
+    // Clear stale availability from a previous address while the debounced check runs.
+    setEmailStatus({
+      state: 'checking',
+      exists: false,
+      isEmailVerified: false,
+      accountRole: null,
+      message: '',
+    })
 
     const timeoutId = window.setTimeout(() => {
       void handleEmailCheck(trimmed)

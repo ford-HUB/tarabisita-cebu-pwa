@@ -319,11 +319,6 @@ const TouristAccountModal = ({ isOpen, onClose, initialView = 'menu', onLogout }
   return (
     <>
       {isOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-[35] bg-black/20 sm:bg-black/25"
-            aria-hidden
-          />
           <div
             ref={panelRef}
             role="dialog"
@@ -710,7 +705,6 @@ const TouristAccountModal = ({ isOpen, onClose, initialView = 'menu', onLogout }
           )}
         </div>
           </div>
-        </>
       ) : null}
 
       <TouristChangePasswordModal
