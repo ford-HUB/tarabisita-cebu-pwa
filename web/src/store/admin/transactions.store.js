@@ -2,10 +2,9 @@ import { create } from 'zustand'
 import { toast } from 'sonner'
 import {
   getAdminPlanSubscriptionTransactions,
-  getAdminPlanSubscriptionPaymentDetail,
-  postAdminPlanSubscriptionPaymentApprove,
-  postAdminPlanSubscriptionPaymentReject
+  getAdminPlanSubscriptionPaymentDetail
 } from '../../services/admin/businessOperations.service'
+import { normalizeTransactionDisplayStatus } from '../../components/ui/admin/transactions/transactions.constants'
 
 const mapRow = (item) => ({
   id: item?.id || '',
@@ -17,7 +16,7 @@ const mapRow = (item) => ({
   currency: item?.currency || 'PHP',
   planId: item?.planId || '',
   months: item?.months,
-  status: item?.status || 'PENDING',
+  status: normalizeTransactionDisplayStatus(item?.status),
   paidAt: item?.paidAt,
   createdAt: item?.createdAt,
   updatedAt: item?.updatedAt,
@@ -37,7 +36,6 @@ export const useAdminTransactionsStore = create((set, get) => ({
   paymentDetail: null,
   paymentDetailLoading: false,
   paymentDetailError: null,
-  paymentActionBusy: false,
 
   setRawRows: (updater) =>
     set((s) => ({
@@ -80,8 +78,7 @@ export const useAdminTransactionsStore = create((set, get) => ({
       reviewPaymentId: null,
       paymentDetail: null,
       paymentDetailError: null,
-      paymentDetailLoading: false,
-      paymentActionBusy: false
+      paymentDetailLoading: false
     }),
 
   loadPaymentDetail: async (paymentId) => {
@@ -91,7 +88,11 @@ export const useAdminTransactionsStore = create((set, get) => ({
     try {
       const response = await getAdminPlanSubscriptionPaymentDetail(id)
       const data = response?.data?.data ?? null
-      set({ paymentDetail: data, paymentDetailLoading: false })
+      const paymentDetail =
+        data && typeof data === 'object'
+          ? { ...data, status: normalizeTransactionDisplayStatus(data.status) }
+          : null
+      set({ paymentDetail, paymentDetailLoading: false })
     } catch (error) {
       const message = error?.response?.data?.message || 'Failed to load payment.'
       toast.error(message)
@@ -111,40 +112,6 @@ export const useAdminTransactionsStore = create((set, get) => ({
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to load transactions.')
       set({ rawRows: [], isLoading: false })
-    }
-  },
-
-  approvePaymentReview: async () => {
-    const id = get().reviewPaymentId
-    if (!id) return
-    set({ paymentActionBusy: true })
-    try {
-      await postAdminPlanSubscriptionPaymentApprove(id)
-      toast.success('Payment approved. The business owner was notified by email.')
-      get().closePaymentReview()
-      const { lastPeriod, lastPaymentStatus } = get()
-      await get().fetchTransactions({ period: lastPeriod, paymentStatus: lastPaymentStatus })
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Could not approve payment.')
-    } finally {
-      set({ paymentActionBusy: false })
-    }
-  },
-
-  rejectPaymentReview: async (reason) => {
-    const id = get().reviewPaymentId
-    if (!id) return
-    set({ paymentActionBusy: true })
-    try {
-      await postAdminPlanSubscriptionPaymentReject(id, { reason: String(reason || '').trim() })
-      toast.success('Payment declined. The business owner was notified by email.')
-      get().closePaymentReview()
-      const { lastPeriod, lastPaymentStatus } = get()
-      await get().fetchTransactions({ period: lastPeriod, paymentStatus: lastPaymentStatus })
-    } catch (error) {
-      toast.error(error?.response?.data?.message || 'Could not decline payment.')
-    } finally {
-      set({ paymentActionBusy: false })
     }
   }
 }))

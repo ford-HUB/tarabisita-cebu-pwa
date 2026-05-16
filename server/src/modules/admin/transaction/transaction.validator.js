@@ -6,7 +6,7 @@ export const adminPlanSubscriptionTransactionsQuerySchema = zod.object({
     query: zod
         .object({
             days: zod.enum(['7', '30', '90', 'all']).optional(),
-            status: zod.enum(['ALL', 'PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REJECTED']).optional()
+            status: zod.enum(['ALL', 'PENDING', 'PAID', 'CANCELLED']).optional()
         })
         .transform((q) => ({
             days: q.days ?? '7',
@@ -20,11 +20,3 @@ export const adminPlanSubscriptionPaymentIdParamsSchema = zod.object({
     })
 })
 
-export const adminPlanSubscriptionPaymentRejectBodySchema = zod.object({
-    params: zod.object({
-        paymentId: mongoId
-    }),
-    body: zod.object({
-        reason: zod.string().max(2000).optional().default('')
-    })
-})

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { TOURIST_CART_EDIT_KEY_STORAGE } from '../components/layout/tourist/touristLayout.constants.js'
 import { useTouristCartItemStore } from '../store/tourist/tourist-cart-item.store.js'
+import { useGuestCartStore } from '../store/guest/guest-cart.store.js'
 
 const isMenuItemOrderable = (item) =>
   Boolean(item?.isAvailable) && String(item?.stockStatus || '') !== 'OUT_OF_STOCK'
@@ -33,6 +34,7 @@ export const useTouristBusinessCartEditDeepLink = ({
   businessName,
   menuItems,
   isStayBusiness,
+  guestBrowse = false,
   setSelectedMenuItem,
   setEditCartKey,
   setHighlightMenuItemId,
@@ -60,11 +62,10 @@ export const useTouristBusinessCartEditDeepLink = ({
     }
 
     const cartKeyFromUrl = editCartKeyParam?.trim() || readCartEditKeyFromStorage()
+    const cartItems = guestBrowse ? useGuestCartStore.getState().items : useTouristCartItemStore.getState().items
     const cartItem =
-      (cartKeyFromUrl
-        ? useTouristCartItemStore.getState().items.find((it) => it.key === cartKeyFromUrl)
-        : null) ||
-      useTouristCartItemStore.getState().items.find(
+      (cartKeyFromUrl ? cartItems.find((it) => it.key === cartKeyFromUrl) : null) ||
+      cartItems.find(
         (it) =>
           String(it.businessId) === String(businessId) &&
           String(it.catalogItemId) === menuItemId
@@ -111,6 +112,7 @@ export const useTouristBusinessCartEditDeepLink = ({
     businessName,
     menuItems,
     isStayBusiness,
+    guestBrowse,
     setSearchParams,
     setSelectedMenuItem,
     setEditCartKey,

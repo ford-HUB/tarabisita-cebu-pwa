@@ -6,6 +6,7 @@ import ResetPassword from "../../pages/auth/ResetPassword"
 import Landing from "../../pages/public/Landing"
 import PublicSearchResults from "../../pages/public/PublicSearchResults"
 import PublicCart from "../../pages/public/PublicCart"
+import PublicBusinessDetail from "../../pages/public/PublicBusinessDetail"
 import BookingPayment from "../../pages/dashboard/tourist/BookingPayment"
 
 export const AuthRoutes = [
@@ -32,6 +33,10 @@ export const AuthRoutes = [
       {
         path: 'cart',
         element: <PublicCart />,
+      },
+      {
+        path: 'business/:businessId',
+        element: <PublicBusinessDetail />,
       },
       {
         path: 'register',

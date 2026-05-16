@@ -1,4 +1,4 @@
-import { FiEye, FiSearch } from 'react-icons/fi'
+import { FiDownload, FiEye, FiSearch } from 'react-icons/fi'
 import { APPROVAL_STATUS, statusLabel, statusTone } from './constants'
 import { formatDate, getInitials } from './utils'
 
@@ -9,7 +9,9 @@ const RequestApprovalTable = ({
   onStatusFilterChange,
   isLoading,
   requests,
-  onOpenReview
+  onOpenReview,
+  onExportCsv,
+  isExportDisabled = false
 }) => (
   <section className="w-full overflow-hidden rounded-2xl border border-[#e7dfd5] bg-white shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0e7dd] px-4 py-4 md:px-6">
@@ -19,9 +21,12 @@ const RequestApprovalTable = ({
       </div>
       <button
         type="button"
-        className="rounded-xl border border-[#d8c7b3] bg-[#f7efe5] px-4 py-2 text-sm font-medium text-[#6d4c34] transition hover:bg-[#efdfcf]"
+        onClick={onExportCsv}
+        disabled={isExportDisabled}
+        className="inline-flex items-center gap-2 rounded-xl border border-[#d8c7b3] bg-[#f7efe5] px-4 py-2 text-sm font-medium text-[#6d4c34] transition hover:bg-[#efdfcf] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Export
+        <FiDownload size={16} className="shrink-0" aria-hidden />
+        Export CSV
       </button>
     </div>
 

@@ -5,6 +5,13 @@ import Business from '../../business/models/business.model.js'
 import ActivityLog from '../../auth/models/activity-log.model.js'
 import { sendMailer } from '../../auth/auth.service.js'
 
+/** Admin UI no longer surfaces `REJECTED`; legacy rows read as cancelled. */
+const normalizeAdminTransactionStatus = (status) => {
+    const s = String(status || '').trim().toUpperCase()
+    if (s === 'REJECTED') return 'CANCELLED'
+    return s || 'PENDING'
+}
+
 const serializeAdminPlanSubscriptionPayment = (payment, subscriptionById = {}) => {
     const businessDoc = payment.businessId && typeof payment.businessId === 'object' ? payment.businessId : null
     const userDoc = payment.userId && typeof payment.userId === 'object' ? payment.userId : null
@@ -24,7 +31,7 @@ const serializeAdminPlanSubscriptionPayment = (payment, subscriptionById = {}) =
         currency: payment.currency || 'PHP',
         planId: payment.planId || '',
         months: payment.months,
-        status: payment.status,
+        status: normalizeAdminTransactionStatus(payment.status),
         paidAt: payment.paidAt,
         createdAt: payment.createdAt,
         updatedAt: payment.updatedAt,
@@ -196,7 +203,7 @@ export const getAdminPlanSubscriptionPaymentDetailById = async (paymentId) => {
     return {
         id: String(p._id),
         orderId,
-        status: p.status,
+        status: normalizeAdminTransactionStatus(p.status),
         amount: p.amount,
         currency: p.currency || 'PHP',
         planId: p.planId || '',

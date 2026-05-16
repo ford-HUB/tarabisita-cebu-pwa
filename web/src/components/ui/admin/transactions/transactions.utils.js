@@ -1,4 +1,5 @@
 import { formatBillingPeso } from '../../../../shared/utils/billingDisplay.utils'
+import { normalizeTransactionDisplayStatus } from './transactions.constants'
 
 const csvEscape = (value) => {
   const text = value == null ? '' : String(value)
@@ -33,7 +34,7 @@ export const buildPlanSubscriptionTransactionsCsv = (rows) => {
       row.currency,
       row.planId,
       row.months,
-      row.status,
+      normalizeTransactionDisplayStatus(row.status),
       row.createdAt,
       row.paidAt,
       row.subscriptionEndsAt
@@ -49,7 +50,7 @@ export const computeTransactionSummaryMetrics = (rows) => {
   let totalAmount = 0
   let paidAmount = 0
   for (const row of rows) {
-    const status = String(row.status || 'UNKNOWN').toUpperCase()
+    const status = normalizeTransactionDisplayStatus(row.status || 'UNKNOWN')
     byStatus[status] = (byStatus[status] || 0) + 1
     const amt = Number(row.amount)
     const n = Number.isFinite(amt) ? amt : 0

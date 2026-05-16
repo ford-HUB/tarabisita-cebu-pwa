@@ -4,7 +4,16 @@ import User from './models/user.model.js'
 import { generateAccessToken } from '../../shared/utils/generateJwt.js'
 import { generateToken, generateResetToken, generateSessionToken } from '../../shared/utils/generateToken.js'
 import { templateReader } from '../../shared/utils/templateReaderExtractor.js'
-import { registerUserAccount, resolveUserEmailVerification, sendMailer, findUserByLoginIdentifier } from './auth.service.js'
+import {
+    registerUserAccount,
+    resolveUserEmailVerification,
+    sendMailer,
+    findUserByLoginIdentifier,
+    getRegistrationEmailAvailability,
+    isDuplicateEmailKeyError,
+    RegistrationError,
+    REGISTRATION_ERROR_CODES
+} from './auth.service.js'
 import VerificationCode from './models/verification-code.model.js'
 import ResetPasswordModel from './models/reset-password.model.js'
 import Business from '../business/models/business.model.js'
@@ -60,13 +69,35 @@ const createBusinessAuthActivityLog = async ({ req, user, action, status = 'SUCC
     })
 }
 
+const respondRegistrationError = (res, error) => {
+    if (error instanceof RegistrationError) {
+        return res.status(error.statusCode).json({
+            message: error.message,
+            code: error.code
+        })
+    }
+
+    if (isDuplicateEmailKeyError(error)) {
+        return res.status(409).json({
+            message: 'This email is already registered.',
+            code: REGISTRATION_ERROR_CODES.DUPLICATE_EMAIL
+        })
+    }
+
+    return res.status(500).json({
+        message: 'Failed to create account. Please try again.',
+        code: REGISTRATION_ERROR_CODES.REGISTRATION_FAILED
+    })
+}
+
 export const register = async (req, res) => {
     const session = await mongoose.startSession()
     try {
         const { name, email, password, accountType, businessName, businessDescription, businessAddress, businessContact, businessCategory } = req.validatedData.body
 
+        let userId
         await session.withTransaction(async () => {
-            await registerUserAccount({
+            userId = await registerUserAccount({
                 session,
                 name,
                 email,
@@ -80,7 +111,11 @@ export const register = async (req, res) => {
             })
         })
 
-        return res.status(201).json({ message: "User registered successfully" })
+        return res.status(201).json({
+            message: 'User registered successfully',
+            code: 'REGISTRATION_SUCCESS',
+            properties: { userId: String(userId) }
+        })
     } catch (error) {
         if (error?.statusCode === 409) {
             return res.status(409).json({ message: "Email is already registered" })
@@ -372,31 +407,30 @@ export const resetPassword = async (req, res) => {
 export const internalEmailChecker = async (req, res) => {
     try {
         const { email } = req.validatedData.body
-        const q = findUserByLoginIdentifier(email)
-        const user = q
-            ? await q.select('_id isEmailVerified emailVerifiedAt roleId').populate('roleId', 'name')
-            : null
-        if (!user) {
+        const availability = await getRegistrationEmailAvailability(email)
+
+        if (!availability.exists) {
             return res.status(404).json({
                 message: "System cannot find your email existance",
                 properties: {
                     exists: false,
                     isEmailVerified: false,
-                    accountRole: null
+                    accountRole: null,
+                    canReuseForSignup: false,
+                    registrationBlocked: false
                 }
             })
         }
-        const accountRole = user.roleId?.name ? String(user.roleId.name) : null
-        const isEmailVerified = Boolean(user.isEmailVerified)
-        const emailVerifiedAt = user.emailVerifiedAt || null
 
         return res.status(200).json({
             message: "System found your email existance",
             properties: {
                 exists: true,
-                isEmailVerified,
-                emailVerifiedAt,
-                accountRole
+                isEmailVerified: availability.isEmailVerified,
+                emailVerifiedAt: null,
+                accountRole: availability.accountRole,
+                canReuseForSignup: availability.canReuseForSignup,
+                registrationBlocked: availability.registrationBlocked
             }
         })
     } catch (error) {
