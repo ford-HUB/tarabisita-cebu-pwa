@@ -13,7 +13,9 @@ const userSchema = new mongoose.Schema({
     /** Optional alternate sign-in email for tourists (unique only when set; field omitted when unused). */
     supportEmail: {
         type: String,
-        required: false
+        required: false,
+        sparse: true,
+        unique: true
     },
     isEmailVerified: {
         type: Boolean,

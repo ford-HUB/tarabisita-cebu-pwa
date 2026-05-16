@@ -13,7 +13,7 @@
     "migrate:customer-orders-collection": "node src/migrations/rename-customer-orders-collection.js",
     "migrate:tourist-cart-collection": "node src/migrations/rename-tourist-cart-collection.js",
     "migrate:remove-business-theme-color": "node src/migrations/remove-business-theme-color.js",
-    "migrate:fix-support-email-index": "node src/migrations/fix-support-email-index.js"
+    "migrate:unset-null-user-support-email": "node src/migrations/unset-null-user-support-email.js"
   },
   "keywords": [],
   "author": "",
