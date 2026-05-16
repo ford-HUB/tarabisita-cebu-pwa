@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FiEye, FiEyeOff, FiMapPin, FiBriefcase } from 'react-icons/fi'
+import { FiEye, FiEyeOff, FiLoader, FiMapPin, FiBriefcase } from 'react-icons/fi'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { motion } from 'motion/react'
@@ -10,6 +10,10 @@ import { useNavigate } from 'react-router-dom'
 import { BUSINESS_CATEGORIES } from '../../shared/constants/businessCategories.constants'
 import { BUSINESS_CATEGORY_DESCRIPTION_BY_VALUE } from '../../shared/constants/businessCategoryDescriptions.constants'
 import CebuCityAutocomplete from '../../components/auth/CebuCityAutocomplete'
+import {
+  REGISTRATION_ERROR_CODES,
+  getRegistrationErrorMessage,
+} from '../../shared/constants/registrationErrors.constants'
 
 /** Basic shape check before calling the mail-checker API (avoids spam while typing). */
 const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
@@ -32,6 +36,8 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [businessStep, setBusinessStep] = useState(1)
   const [hasAttemptedBusinessSubmit, setHasAttemptedBusinessSubmit] = useState(false)
+  const [isRegistering, setIsRegistering] = useState(false)
+  const submitInFlightRef = useRef(false)
   const registerUser = useAuthStore((state) => state.register)
   const sendVerificationCode = useAuthStore((state) => state.sendVerificationCode)
   const mailChecker = useAuthStore((state) => state.mailChecker)
@@ -40,6 +46,8 @@ const Register = () => {
     state: 'idle', // idle | checking | ok | not_found | error
     exists: false,
     isEmailVerified: false,
+    canReuseForSignup: false,
+    registrationBlocked: false,
     accountRole: null,
     message: '',
   })
@@ -83,74 +91,114 @@ const Register = () => {
   const isBusinessDetailsStep = isBusiness && businessStep === 2
 
   const handleEmailCheck = useCallback(
-    async (rawEmail) => {
+    async (rawEmail, { forSubmit = false } = {}) => {
       const nextEmail = String(rawEmail || '').trim().toLowerCase()
       if (!nextEmail) {
         setEmailStatus({
           state: 'idle',
           exists: false,
           isEmailVerified: false,
+          canReuseForSignup: false,
+          registrationBlocked: false,
           accountRole: null,
           message: '',
         })
-        return { exists: false, isEmailVerified: false, accountRole: null }
+        return {
+          exists: false,
+          isEmailVerified: false,
+          canReuseForSignup: false,
+          registrationBlocked: false,
+          accountRole: null,
+        }
       }
 
-      const checkId = latestEmailCheckIdRef.current + 1
-      latestEmailCheckIdRef.current = checkId
+      const checkId = forSubmit ? latestEmailCheckIdRef.current : latestEmailCheckIdRef.current + 1
+      if (!forSubmit) {
+        latestEmailCheckIdRef.current = checkId
+      }
       setEmailStatus((previous) => ({
         ...previous,
         state: 'checking',
         message: '',
         exists: false,
         isEmailVerified: false,
+        canReuseForSignup: false,
+        registrationBlocked: false,
         accountRole: null,
       }))
 
       try {
         const response = await mailChecker({ email: nextEmail })
-        if (latestEmailCheckIdRef.current !== checkId) return
+        if (!forSubmit && latestEmailCheckIdRef.current !== checkId) return
 
         const properties = response?.data?.properties || {}
         const exists = Boolean(properties.exists)
         const isEmailVerified = Boolean(properties.isEmailVerified)
+        const canReuseForSignup = Boolean(properties.canReuseForSignup)
+        const registrationBlocked = Boolean(properties.registrationBlocked)
         const accountRole = properties.accountRole ? String(properties.accountRole) : null
 
-        if (exists && isEmailVerified) {
+        if (exists && registrationBlocked && !canReuseForSignup) {
           setEmailStatus({
             state: 'ok',
             exists: true,
-            isEmailVerified: true,
+            isEmailVerified,
+            canReuseForSignup: false,
+            registrationBlocked: true,
             accountRole,
-            message: verifiedEmailTakenMessage(accountRole),
+            message: isEmailVerified
+              ? verifiedEmailTakenMessage(accountRole)
+              : 'This email is linked to another account as a support email and cannot be used for a new signup. Please sign in or use a different email.',
           })
-          return { exists: true, isEmailVerified: true, accountRole }
+          return {
+            exists: true,
+            isEmailVerified,
+            canReuseForSignup: false,
+            registrationBlocked: true,
+            accountRole,
+          }
         }
 
-        if (exists && !isEmailVerified) {
+        if (exists && canReuseForSignup) {
           setEmailStatus({
             state: 'ok',
             exists: true,
             isEmailVerified: false,
+            canReuseForSignup: true,
+            registrationBlocked: false,
             accountRole,
             message:
               accountRole === 'BUSINESS'
                 ? 'This email is already used for a business signup but is not verified yet. You can continue—we’ll send a new verification code to finish setting up that account.'
                 : 'This email is already registered but not verified yet. You can reuse it—we’ll send you a new verification code.',
           })
-          return { exists: true, isEmailVerified: false, accountRole }
+          return {
+            exists: true,
+            isEmailVerified: false,
+            canReuseForSignup: true,
+            registrationBlocked: false,
+            accountRole,
+          }
         }
 
         setEmailStatus({
           state: 'ok',
           exists: false,
           isEmailVerified: false,
+          canReuseForSignup: false,
+          registrationBlocked: false,
           accountRole: null,
           message: 'This email is available to register.',
         })
-        return { exists: false, isEmailVerified: false, accountRole: null }
+        return {
+          exists: false,
+          isEmailVerified: false,
+          canReuseForSignup: false,
+          registrationBlocked: false,
+          accountRole: null,
+        }
       } catch (error) {
-        if (latestEmailCheckIdRef.current !== checkId) return
+        if (!forSubmit && latestEmailCheckIdRef.current !== checkId) return
 
         const status = error?.response?.status
         if (status === 404) {
@@ -158,20 +206,36 @@ const Register = () => {
             state: 'not_found',
             exists: false,
             isEmailVerified: false,
+            canReuseForSignup: false,
+            registrationBlocked: false,
             accountRole: null,
             message: 'This email is available to register.',
           })
-          return { exists: false, isEmailVerified: false, accountRole: null }
+          return {
+            exists: false,
+            isEmailVerified: false,
+            canReuseForSignup: false,
+            registrationBlocked: false,
+            accountRole: null,
+          }
         }
 
         setEmailStatus({
           state: 'error',
           exists: false,
           isEmailVerified: false,
+          canReuseForSignup: false,
+          registrationBlocked: false,
           accountRole: null,
           message: 'Unable to check email right now. Please try again.',
         })
-        return { exists: false, isEmailVerified: false, accountRole: null }
+        return {
+          exists: false,
+          isEmailVerified: false,
+          canReuseForSignup: false,
+          registrationBlocked: false,
+          accountRole: null,
+        }
       }
     },
     [mailChecker]
@@ -188,6 +252,8 @@ const Register = () => {
         state: 'idle',
         exists: false,
         isEmailVerified: false,
+        canReuseForSignup: false,
+        registrationBlocked: false,
         accountRole: null,
         message: '',
       })
@@ -200,6 +266,8 @@ const Register = () => {
         state: 'idle',
         exists: false,
         isEmailVerified: false,
+        canReuseForSignup: false,
+        registrationBlocked: false,
         accountRole: null,
         message: '',
       }))
@@ -225,11 +293,44 @@ const Register = () => {
     }
   }, [businessCategory, hasAttemptedBusinessSubmit, setValue])
 
+  const handleRegistrationApiError = (error, normalizedEmail) => {
+    const status = error?.response?.status
+    const code = error?.response?.data?.code
+    const message = error?.response?.data?.message
+
+    if (code === REGISTRATION_ERROR_CODES.DUPLICATE_EMAIL || status === 409) {
+      setError('email', { type: 'manual', message: 'This email is already registered.' })
+      showErrorToast(getRegistrationErrorMessage(REGISTRATION_ERROR_CODES.DUPLICATE_EMAIL))
+      void handleEmailCheck(normalizedEmail, { forSubmit: true })
+      return
+    }
+
+    if (code === REGISTRATION_ERROR_CODES.PROFILE_SETUP_FAILED) {
+      showErrorToast(getRegistrationErrorMessage(REGISTRATION_ERROR_CODES.PROFILE_SETUP_FAILED))
+      return
+    }
+
+    showErrorToast(getRegistrationErrorMessage(code, message))
+  }
+
   const onSubmit = async (data) => {
+    if (submitInFlightRef.current) {
+      return
+    }
+
+    const normalizedEmail = String(data.email || '').trim().toLowerCase()
+    submitInFlightRef.current = true
+    setIsRegistering(true)
+
     try {
-      if (emailStatus.exists && emailStatus.isEmailVerified) {
-        setError('email', { type: 'manual', message: 'This email is already taken.' })
-        showErrorToast(verifiedEmailTakenMessage(emailStatus.accountRole))
+      const freshEmailCheck = await handleEmailCheck(normalizedEmail, { forSubmit: true })
+      if (freshEmailCheck?.registrationBlocked) {
+        setError('email', { type: 'manual', message: 'This email is already registered.' })
+        showErrorToast(
+          freshEmailCheck.isEmailVerified
+            ? verifiedEmailTakenMessage(freshEmailCheck.accountRole)
+            : 'This email is already registered.'
+        )
         return
       }
 
@@ -237,7 +338,7 @@ const Register = () => {
       const normalizedPayload = isBusinessAccount
         ? {
             name: data.name,
-            email: data.email,
+            email: normalizedEmail,
             password: data.password,
             confirmPassword: data.confirmPassword,
             accountType: data.accountType,
@@ -252,7 +353,7 @@ const Register = () => {
           }
         : {
             name: data.name,
-            email: data.email,
+            email: normalizedEmail,
             password: data.password,
             confirmPassword: data.confirmPassword,
             accountType: data.accountType,
@@ -260,61 +361,34 @@ const Register = () => {
 
       await registerUser(normalizedPayload)
 
-      const response = await sendVerificationCode({ email: data.email })
-      const sessionToken = response.data.properties.sessionToken
-      const expiresAt = response.data.properties.expiresAt
-      setVerificationExpiry({ sessionToken, expiresAt })
-      const query = new URLSearchParams({
-        token: sessionToken,
-        email: data.email,
-      })
-      navigate(`/verify-email?${query.toString()}`)
-      showSuccessToast(
-        emailStatus.exists && !emailStatus.isEmailVerified
-          ? 'Account found but not verified. We sent a new verification code to your email.'
-          : 'Verification code sent to your email. Please check your inbox.'
-      )
-      setHasAttemptedBusinessSubmit(false)
-    } catch (error) {
-      const status = error?.response?.status
-      const message = error?.response?.data?.message || 'Unable to create account right now.'
-
-      if (status === 409) {
-        const checked = await handleEmailCheck(data.email)
-        if (checked?.exists && checked?.isEmailVerified) {
-          setError('email', { type: 'manual', message: 'This email is already taken.' })
-          showErrorToast(verifiedEmailTakenMessage(checked.accountRole))
-          return
-        }
-        if (checked?.exists && !checked?.isEmailVerified) {
-          try {
-            const response = await sendVerificationCode({ email: data.email })
-            const sessionToken = response.data.properties.sessionToken
-            const expiresAt = response.data.properties.expiresAt
-            setVerificationExpiry({ sessionToken, expiresAt })
-            const query = new URLSearchParams({
-              token: sessionToken,
-              email: data.email,
-            })
-            navigate(`/verify-email?${query.toString()}`)
-            showSuccessToast(
-              'Account found but not verified. We sent a new verification code to your email.'
-            )
-            return
-          } catch (sendError) {
-            showErrorToast(
-              sendError?.response?.data?.message || 'Could not send verification code right now.'
-            )
-            return
-          }
-        }
-
-        setError('email', { type: 'manual', message: 'This email is already taken.' })
-        showErrorToast('This email is already registered. Please sign in or use a different email.')
-        return
+      try {
+        const response = await sendVerificationCode({ email: normalizedEmail })
+        const sessionToken = response.data.properties.sessionToken
+        const expiresAt = response.data.properties.expiresAt
+        setVerificationExpiry({ sessionToken, expiresAt })
+        const query = new URLSearchParams({
+          token: sessionToken,
+          email: normalizedEmail,
+        })
+        navigate(`/verify-email?${query.toString()}`)
+        showSuccessToast(
+          freshEmailCheck?.canReuseForSignup
+            ? 'Account found but not verified. We sent a new verification code to your email.'
+            : 'Account created successfully. Verification code sent to your email.'
+        )
+        setHasAttemptedBusinessSubmit(false)
+      } catch (sendError) {
+        showErrorToast(
+          sendError?.response?.data?.message ||
+            'Account was created, but we could not send the verification email. Please sign in and request a new code.'
+        )
+        navigate('/login')
       }
-
-      showErrorToast(message)
+    } catch (error) {
+      handleRegistrationApiError(error, normalizedEmail)
+    } finally {
+      submitInFlightRef.current = false
+      setIsRegistering(false)
     }
   }
 
@@ -322,9 +396,13 @@ const Register = () => {
     const trimmed = String(emailValue || '').trim()
     if (looksLikeEmail(trimmed)) {
       const checked = await handleEmailCheck(trimmed)
-      if (checked?.exists && checked?.isEmailVerified) {
+      if (checked?.registrationBlocked) {
         setError('email', { type: 'manual', message: 'This email is already taken.' })
-        showErrorToast(verifiedEmailTakenMessage(checked.accountRole))
+        showErrorToast(
+          checked?.isEmailVerified
+            ? verifiedEmailTakenMessage(checked.accountRole)
+            : 'This email is linked to another account and cannot be used for a new signup. Please sign in or use a different email.'
+        )
         return
       }
     }
@@ -366,9 +444,9 @@ const Register = () => {
   const shouldShowBusinessDetailsErrors = hasAttemptedBusinessSubmit
   const shouldShowTouchedError = (fieldName) => Boolean(touchedFields?.[fieldName])
 
-  /** Email is already verified on another account — cannot register with it. */
+  /** Email cannot be used for a new signup (verified account or support-email conflict). */
   const isEmailUnavailableForRegister =
-    emailStatus.state === 'ok' && emailStatus.exists && emailStatus.isEmailVerified
+    emailStatus.state === 'ok' && emailStatus.registrationBlocked
 
   const trimmedEmailValue = String(emailValue || '').trim()
   const emailLooksComplete = looksLikeEmail(trimmedEmailValue)
@@ -378,8 +456,10 @@ const Register = () => {
   const isEmailAvailabilityPending =
     isOnEmailCaptureStep && emailLooksComplete && emailStatus.state === 'checking'
 
+  const isProcessingRegistration = isSubmitting || isRegistering
+
   const disablePrimaryRegisterAction =
-    isSubmitting || isEmailUnavailableForRegister || isEmailAvailabilityPending
+    isProcessingRegistration || isEmailUnavailableForRegister || isEmailAvailabilityPending
 
   return (
     <main className="grid min-h-[calc(100svh-57px)] grid-cols-1 lg:grid-cols-2">
@@ -501,9 +581,9 @@ const Register = () => {
                       role="status"
                       aria-live="polite"
                       className={`mt-1 block text-xs ${
-                        emailStatus.state === 'error' || (emailStatus.exists && emailStatus.isEmailVerified)
+                        emailStatus.state === 'error' || emailStatus.registrationBlocked
                           ? 'text-[#bb3a2d]'
-                          : emailStatus.exists && !emailStatus.isEmailVerified
+                          : emailStatus.canReuseForSignup
                             ? 'text-[#6f6a62]'
                             : 'text-[#4a7c59]'
                       }`}
@@ -751,7 +831,8 @@ const Register = () => {
               )}
 
               <button
-                className="flex h-11 w-full cursor-pointer items-center justify-center rounded-xl bg-[#ff7a1a] font-semibold text-white transition hover:bg-[#eb6c12] disabled:cursor-not-allowed disabled:opacity-75"
+                aria-busy={isProcessingRegistration}
+                className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#ff7a1a] font-semibold text-white transition hover:bg-[#eb6c12] disabled:cursor-not-allowed disabled:opacity-75"
                 disabled={disablePrimaryRegisterAction}
                 type={isBusiness && businessStep === 1 ? 'button' : 'submit'}
                 onClick={
@@ -762,11 +843,16 @@ const Register = () => {
                       : undefined
                 }
               >
-                {isBusiness && businessStep === 1
-                  ? 'Next: Business details'
-                  : isSubmitting
-                    ? 'Creating account...'
-                    : 'Create account'}
+                {isProcessingRegistration && !(isBusiness && businessStep === 1) ? (
+                  <>
+                    <FiLoader aria-hidden className="animate-spin" size={18} />
+                    Creating account...
+                  </>
+                ) : isBusiness && businessStep === 1 ? (
+                  'Next: Business details'
+                ) : (
+                  'Create account'
+                )}
               </button>
             </div>
           </form>

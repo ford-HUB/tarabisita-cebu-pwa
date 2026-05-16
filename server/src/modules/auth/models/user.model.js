@@ -10,13 +10,10 @@ const userSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
-    /** Optional alternate sign-in email for tourists (one per account; unique across users when set). */
+    /** Optional alternate sign-in email for tourists (unique only when set; field omitted when unused). */
     supportEmail: {
         type: String,
-        required: false,
-        default: null,
-        sparse: true,
-        unique: true
+        required: false
     },
     isEmailVerified: {
         type: Boolean,
@@ -57,6 +54,8 @@ const userSchema = new mongoose.Schema({
         default: true
     }
 })
+
+userSchema.index({ supportEmail: 1 }, { unique: true, sparse: true })
 
 const User = mongoose.model('User', userSchema)
 

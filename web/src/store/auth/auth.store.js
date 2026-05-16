@@ -41,7 +41,6 @@ export const useAuthStore = create((set) => ({
   register: async (data) => {
     try {
       const response = await registerUser(data)
-      set({ user: response.data, isAuthenticated: true })
       return response
     } catch (error) {
       console.error(error)
