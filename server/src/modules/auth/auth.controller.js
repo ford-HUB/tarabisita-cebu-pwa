@@ -82,8 +82,16 @@ export const register = async (req, res) => {
 
         return res.status(201).json({ message: "User registered successfully" })
     } catch (error) {
-        if (error?.statusCode === 409 || (error?.code === 11000 && (error?.keyPattern?.email || error?.keyPattern?.supportEmail))) {
+        if (error?.statusCode === 409) {
             return res.status(409).json({ message: "Email is already registered" })
+        }
+        if (error?.code === 11000) {
+            if (error?.keyPattern?.email) {
+                return res.status(409).json({ message: "Email is already registered" })
+            }
+            if (error?.keyPattern?.supportEmail) {
+                return res.status(409).json({ message: "That support email is already linked to another account" })
+            }
         }
         return res.status(500).json({ message: error.message })
     } finally {

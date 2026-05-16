@@ -14,7 +14,6 @@ const userSchema = new mongoose.Schema({
     supportEmail: {
         type: String,
         required: false,
-        default: null,
         sparse: true,
         unique: true
     },

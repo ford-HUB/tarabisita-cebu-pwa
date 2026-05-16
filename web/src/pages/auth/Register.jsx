@@ -431,10 +431,24 @@ const Register = () => {
         transition={{ duration: 0.7, delay: 0.15, ease: 'easeOut' }}
         className="flex items-center justify-center px-6 py-4 lg:px-10 lg:py-5"
       >
-        <div className="w-full max-w-[440px]">
+        <div className="relative w-full max-w-[440px]">
         <p className="mb-5 text-2xl text-[#c66b2b]">✶ <span>T a r a - B i s i t a C e b u</span></p>
         <h2 className="text-[42px] leading-tight font-semibold text-[#22211f]">Create an account</h2>
           <p className="mt-1.5 mb-4 text-sm text-[#6f6a62]">Start your Cebu journey with TARA.</p>
+
+          {isSubmitting && (
+            <motion.div
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-[#f8f5f0]/80 backdrop-blur-[1px]"
+              initial={{ opacity: 0 }}
+              role="status"
+              aria-busy="true"
+              aria-label="Creating your account"
+            >
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#e7dfd5] border-t-[#ff7a1a]" />
+              <p className="text-sm font-medium text-[#3f3a35]">Creating your account…</p>
+            </motion.div>
+          )}
 
           <form className="space-y-3" onSubmit={handleSubmit(onSubmit)}>
             <div className="grid grid-cols-2 gap-3">
@@ -775,7 +789,7 @@ const Register = () => {
               )}
 
               <button
-                className="flex h-11 w-full cursor-pointer items-center justify-center rounded-xl bg-[#ff7a1a] font-semibold text-white transition hover:bg-[#eb6c12] disabled:cursor-not-allowed disabled:opacity-75"
+                className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#ff7a1a] font-semibold text-white transition hover:bg-[#eb6c12] disabled:cursor-not-allowed disabled:opacity-75"
                 disabled={disablePrimaryRegisterAction}
                 type={isBusiness && businessStep === 1 ? 'button' : 'submit'}
                 onClick={
@@ -786,10 +800,16 @@ const Register = () => {
                       : undefined
                 }
               >
+                {isSubmitting && (
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  />
+                )}
                 {isBusiness && businessStep === 1
                   ? 'Next: Business details'
                   : isSubmitting
-                    ? 'Creating account...'
+                    ? 'Creating account…'
                     : 'Create account'}
               </button>
             </div>
