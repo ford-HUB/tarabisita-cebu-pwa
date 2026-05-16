@@ -6,7 +6,7 @@ const businessCategoryEnum = zod.enum(BUSINESS_CATEGORIES)
 export const registerSchema = zod.object({
     body: zod.object({
         name: zod.string().min(1, 'Name is required'),
-        email: zod.string().email('Invalid email'),
+        email: zod.string().email('Invalid email').transform((value) => value.trim().toLowerCase()),
         password: zod.string().min(1, 'Password is required'),
         confirmPassword: zod.string().min(1, 'Confirm password is required'),
 
@@ -33,19 +33,37 @@ export const registerSchema = zod.object({
     }, {
         message: 'Business contact must contain numbers only',
         path: ['businessContact']
+    }).superRefine((data, ctx) => {
+        if (data.accountType !== 'BUSINESS') {
+            return
+        }
+
+        const requiredBusinessFields = [
+            ['businessName', 'Business name is required'],
+            ['businessDescription', 'Business description is required'],
+            ['businessAddress', 'Business address is required'],
+            ['businessContact', 'Business contact is required'],
+            ['businessCategory', 'Business category is required']
+        ]
+
+        for (const [field, message] of requiredBusinessFields) {
+            if (!String(data[field] || '').trim()) {
+                ctx.addIssue({ code: 'custom', message, path: [field] })
+            }
+        }
     })
 })
 
 export const loginSchema = zod.object({
     body: zod.object({
-        email: zod.string().email('Invalid email'),
+        email: zod.string().email('Invalid email').transform((value) => value.trim().toLowerCase()),
         password: zod.string().min(1, 'Password is required')
     })
 })
 
 export const sendOrResetOrMailCheckerVerificationCodeSchema = zod.object({
     body: zod.object({
-        email: zod.string().email('Invalid email')
+        email: zod.string().email('Invalid email').transform((value) => value.trim().toLowerCase())
     })
 })
 
